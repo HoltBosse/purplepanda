@@ -1,6 +1,6 @@
 ---
 import '../styles/global.css';
-import { House, Users, LayoutTemplate, FileText, PenLine, ClipboardList, Images } from '@lucide/astro';
+import { House, Users, LayoutTemplate, FileText, PenLine, ClipboardList, Images, LogOut } from '@lucide/astro';
 ---
 <!DOCTYPE html>
 <html lang="en">
@@ -51,6 +51,26 @@ import { House, Users, LayoutTemplate, FileText, PenLine, ClipboardList, Images 
 				<Images size={20} />
 				<span class="text-[10px] font-medium leading-tight">Media</span>
 			</button>
+
+			<!-- User Avatar -->
+			<div class="mt-auto dropdown dropdown-right dropdown-end">
+				<button tabindex="0" role="button" class="flex flex-col items-center justify-center w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors">
+					<div class="avatar avatar-placeholder">
+						<div class="bg-primary text-primary-content rounded-full w-9">
+							<span class="text-xs font-semibold">AJ</span>
+						</div>
+					</div>
+				</button>
+				<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[100] w-44 p-2 shadow-lg border border-base-300">
+					<li><a href="#">Profile</a></li>
+					<li>
+						<a href="/admin/logout" class="text-error flex items-center justify-between">
+							Logout
+							<LogOut size={15} />
+						</a>
+					</li>
+				</ul>
+			</div>
 
 		</nav>
 
