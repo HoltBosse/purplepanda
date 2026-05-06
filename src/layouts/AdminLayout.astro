@@ -1,0 +1,162 @@
+---
+import '../styles/global.css';
+import { House, Users, LayoutTemplate, FileText, PenLine, ClipboardList, Images } from '@lucide/astro';
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<link rel="icon" type="image/svg+xml" href="/admin/assets/favicon.svg" />
+	<link rel="icon" href="/admin/assets/favicon.ico" />
+</head>
+<body class="h-screen overflow-hidden">
+	<div class="flex h-full">
+
+		<!-- Vertical Icon Nav -->
+		<nav class="flex flex-col w-16 bg-base-200 border-r border-base-300 items-center py-3 gap-1 shrink-0 z-50">
+
+			<a href="/admin" class="flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
+				<House size={20} />
+				<span class="text-[10px] font-medium leading-tight">Home</span>
+			</a>
+
+			<button data-panel="users" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
+				<Users size={20} />
+				<span class="text-[10px] font-medium leading-tight">Users</span>
+			</button>
+
+			<button data-panel="templates" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
+				<LayoutTemplate size={20} />
+				<span class="text-[10px] font-medium leading-tight">Templates</span>
+			</button>
+
+			<button data-panel="pages" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
+				<FileText size={20} />
+				<span class="text-[10px] font-medium leading-tight">Pages</span>
+			</button>
+
+			<button data-panel="content" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
+				<PenLine size={20} />
+				<span class="text-[10px] font-medium leading-tight">Content</span>
+			</button>
+
+			<button data-panel="forms" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
+				<ClipboardList size={20} />
+				<span class="text-[10px] font-medium leading-tight">Forms</span>
+			</button>
+
+			<button data-panel="media" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
+				<Images size={20} />
+				<span class="text-[10px] font-medium leading-tight">Media</span>
+			</button>
+
+		</nav>
+
+		<!-- Drawer + Main Content -->
+		<div class="drawer flex-1">
+			<input id="drawer-toggle" type="checkbox" class="drawer-toggle" />
+
+			<div class="drawer-content h-full overflow-auto">
+				<main class="p-6 h-full">
+					<slot />
+				</main>
+			</div>
+
+			<div class="drawer-side start-16">
+				<label for="drawer-toggle" aria-label="close sidebar" class="drawer-overlay"></label>
+				<aside class="bg-base-100 min-h-full w-60 border-r border-base-300">
+
+					<div id="panel-users" class="drawer-panel hidden">
+						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Users</h2>
+						<ul class="menu w-full px-2 py-1 gap-0.5">
+							<li><a href="#">All Users</a></li>
+							<li><a href="#">Add User</a></li>
+							<li><a href="#">Roles &amp; Permissions</a></li>
+						</ul>
+					</div>
+
+					<div id="panel-templates" class="drawer-panel hidden">
+						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Templates</h2>
+						<ul class="menu w-full px-2 py-1 gap-0.5">
+							<li><a href="#">All Templates</a></li>
+							<li><a href="#">New Template</a></li>
+						</ul>
+					</div>
+
+					<div id="panel-pages" class="drawer-panel hidden">
+						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Pages</h2>
+						<ul class="menu w-full px-2 py-1 gap-0.5">
+							<li><a href="#">All Pages</a></li>
+							<li><a href="#">New Page</a></li>
+						</ul>
+					</div>
+
+					<div id="panel-content" class="drawer-panel hidden">
+						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Content</h2>
+						<ul class="menu w-full px-2 py-1 gap-0.5">
+							<li><a href="#">All Content</a></li>
+							<li><a href="#">New Content</a></li>
+						</ul>
+					</div>
+
+					<div id="panel-forms" class="drawer-panel hidden">
+						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Forms</h2>
+						<ul class="menu w-full px-2 py-1 gap-0.5">
+							<li><a href="#">All Forms</a></li>
+							<li><a href="#">New Form</a></li>
+						</ul>
+					</div>
+
+					<div id="panel-media" class="drawer-panel hidden">
+						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Media</h2>
+						<ul class="menu w-full px-2 py-1 gap-0.5">
+							<li><a href="#">Library</a></li>
+							<li><a href="#">Upload</a></li>
+						</ul>
+					</div>
+
+				</aside>
+			</div>
+		</div>
+
+	</div>
+
+	<script>
+		const toggle = document.getElementById('drawer-toggle') as HTMLInputElement;
+		const navBtns = document.querySelectorAll<HTMLButtonElement>('.nav-drawer-btn');
+		let activePanel: string | null = null;
+
+		navBtns.forEach(btn => {
+			btn.addEventListener('click', () => {
+				const panelId = btn.dataset.panel!;
+
+				if (activePanel === panelId && toggle.checked) {
+					// Same item clicked while open → close drawer
+					toggle.checked = false;
+					activePanel = null;
+					navBtns.forEach(b => b.classList.remove('bg-base-300', 'text-primary'));
+				} else {
+					// Open drawer and switch to this panel
+					document.querySelectorAll('.drawer-panel').forEach(p => p.classList.add('hidden'));
+					document.getElementById('panel-' + panelId)?.classList.remove('hidden');
+					navBtns.forEach(b => b.classList.remove('bg-base-300', 'text-primary'));
+					btn.classList.add('bg-base-300', 'text-primary');
+					toggle.checked = true;
+					activePanel = panelId;
+				}
+			});
+		});
+
+		// Reset active state when drawer is closed via overlay
+		toggle.addEventListener('change', () => {
+			if (!toggle.checked) {
+				activePanel = null;
+				document.querySelectorAll('.drawer-panel').forEach(p => p.classList.add('hidden'));
+				navBtns.forEach(b => b.classList.remove('bg-base-300', 'text-primary'));
+			}
+		});
+	</script>
+</body>
+</html>
