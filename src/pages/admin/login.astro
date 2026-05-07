@@ -1,7 +1,18 @@
 ---
 import '../../styles/global.css';
+import pandaSVGRaw from '../../components/LoginPanda.svg?raw';
 
 const error = Astro.url.searchParams.get("error");
+
+// Extract the SVGator script from the SVG so we can run it on demand
+const scriptMatch = pandaSVGRaw.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+const svgatorScript = scriptMatch?.[1]
+  ?.replace(/^\s*<!\[CDATA\[\s*/, '').replace(/\s*\]\]>\s*$/, '') ?? '';
+
+// Inline SVG without the embedded script, and with explicit 256×256 dimensions
+const pandaSVGInline = pandaSVGRaw
+  .replace(/<script[^>]*>[\s\S]*?<\/script>/, '')
+  .replace('<svg ', '<svg width="256" height="256" ');
 ---
 
 <!DOCTYPE html>
@@ -10,42 +21,85 @@ const error = Astro.url.searchParams.get("error");
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Admin Login</title>
-    <link rel="stylesheet" href="/src/styles/global.css" />
+    <link rel="icon" type="image/svg+xml" href="/admin/assets/favicon.svg" />
+	  <link rel="icon" href="/admin/assets/favicon.ico" />
   </head>
   <body class="min-h-screen flex items-center justify-center bg-base-200">
-    <div class="card bg-base-100 shadow-md w-full max-w-sm">
-      <div class="card-body">
-        <h1 class="card-title text-2xl mb-2">Admin Login</h1>
-        {error === "invalid" && (
-          <p class="text-error text-sm mb-2">Invalid password. Please try again.</p>
-        )}
-        <form method="POST" action="/admin/login-action" class="flex flex-col gap-4">
-          <label class="form-control w-full">
-            <div class="label">
-              <span class="label-text font-medium">Username</span>
-            </div>
-            <input
-              type="text"
-              name="username"
-              required
-              class="input input-bordered w-full"
-            />
-          </label>
-          <label class="form-control w-full">
-            <div class="label">
-              <span class="label-text font-medium">Password</span>
-            </div>
-            <input
-              type="password"
-              name="password"
-              required
-              autofocus
-              class="input input-bordered w-full"
-            />
-          </label>
-          <button type="submit" class="btn btn-primary w-full">Login</button>
-        </form>
+    <!-- Relative wrapper so the panda can be positioned above the card without moving it -->
+    <div style="position: relative; width: 100%; max-width: 24rem;">
+      <div
+        id="panda-container"
+        aria-hidden="true"
+        style="position: absolute; bottom: 100%; left: 50%; width: 256px; height: 256px; transform: translateX(-50%) translateY(0); overflow: visible; pointer-events: none; transition: opacity 0.35s ease-out, transform 0.45s ease-out;"
+      ><Fragment set:html={pandaSVGInline} /></div>
+
+      <div class="card bg-base-100 shadow-md w-full">
+        <div class="card-body">
+          <h1 class="card-title text-2xl mb-2">Admin Login</h1>
+          {error === "invalid" && (
+            <p class="text-error text-sm mb-2">Invalid password. Please try again.</p>
+          )}
+          <form method="POST" action="/admin/login-action" class="flex flex-col gap-4">
+            <label class="form-control w-full">
+              <div class="label">
+                <span class="label-text font-medium">Username</span>
+              </div>
+              <input
+                id="username-input"
+                type="text"
+                name="username"
+                required
+                class="input input-bordered w-full"
+              />
+            </label>
+            <label class="form-control w-full">
+              <div class="label">
+                <span class="label-text font-medium">Password</span>
+              </div>
+              <input
+                type="password"
+                name="password"
+                required
+                class="input input-bordered w-full"
+              />
+            </label>
+            <button type="submit" class="btn btn-primary w-full">Login</button>
+          </form>
+        </div>
       </div>
     </div>
+
+    <script define:vars={{ svgatorScript }}>
+      let pandaShown = false;
+      const container = document.getElementById('panda-container');
+      const usernameInput = document.getElementById('username-input');
+
+      function playAnimation() {
+        if (!svgatorScript) return;
+        const script = document.createElement('script');
+        script.textContent = svgatorScript;
+        document.body.appendChild(script);
+        document.body.removeChild(script);
+      }
+
+      function showPanda() {
+        if (!pandaShown && container) {
+          pandaShown = true;
+          container.style.opacity = '1';
+          container.style.transform = 'translateX(-50%) translateY(0)';
+        }
+        playAnimation();
+      }
+
+      usernameInput?.addEventListener('focus', showPanda);
+
+      // Allow hover on the ears group (pointer-events: auto overrides the container's none)
+      const earsEl = document.getElementById('eNurODIfePU35');
+      if (earsEl) {
+        earsEl.style.pointerEvents = 'auto';
+        earsEl.style.cursor = 'pointer';
+        earsEl.addEventListener('mouseenter', showPanda);
+      }
+    </script>
   </body>
 </html>
