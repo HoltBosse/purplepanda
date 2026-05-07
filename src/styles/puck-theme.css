@@ -1,0 +1,113 @@
+@plugin "daisyui" {
+  themes: light --default, dark --prefersdark;
+  base: false;
+}
+
+/* Override Puck CSS variables using DaisyUI semantic tokens.
+   Scales: 01 = darkest, 12 = lightest. Derived via color-mix. */
+:root {
+  /* White/black → DaisyUI base colors */
+  --puck-color-white: var(--color-base-100);
+  --puck-color-black: var(--color-base-content);
+
+  /* Azure → DaisyUI primary */
+  --puck-color-azure-01: color-mix(in oklch, var(--color-primary), black 70%);
+  --puck-color-azure-02: color-mix(in oklch, var(--color-primary), black 55%);
+  --puck-color-azure-03: color-mix(in oklch, var(--color-primary), black 40%);
+  --puck-color-azure-04: color-mix(in oklch, var(--color-primary), black 25%);
+  --puck-color-azure-05: var(--color-primary);
+  --puck-color-azure-06: color-mix(in oklch, var(--color-primary), white 20%);
+  --puck-color-azure-07: color-mix(in oklch, var(--color-primary), white 38%);
+  --puck-color-azure-08: color-mix(in oklch, var(--color-primary), white 54%);
+  --puck-color-azure-09: color-mix(in oklch, var(--color-primary), white 68%);
+  --puck-color-azure-10: color-mix(in oklch, var(--color-primary), white 80%);
+  --puck-color-azure-11: color-mix(in oklch, var(--color-primary), white 90%);
+  --puck-color-azure-12: color-mix(in oklch, var(--color-primary), white 95%);
+
+  /* Grey scale: split into two semantic ranges.
+     01-04: dark surfaces (neutral → base-300).
+     05-08: text colors anchored to base-content (readable on base-* backgrounds).
+     09-12: surface levels (base-300 → base-100). */
+  --puck-color-grey-01: var(--color-neutral);
+  --puck-color-grey-02: var(--color-base-content);
+  --puck-color-grey-03: var(--color-base-content);
+  --puck-color-grey-04: var(--color-base-content);
+  --puck-color-grey-05: var(--color-base-content);
+  --puck-color-grey-06: var(--color-base-content);
+  --puck-color-grey-07: var(--color-base-content);
+  --puck-color-grey-08: var(--color-base-content);
+  --puck-color-grey-09: color-mix(in oklch, var(--color-base-300), var(--color-base-content) 50%);
+  --puck-color-grey-10: var(--color-base-200);
+  --puck-color-grey-11: var(--color-base-100);
+  --puck-color-grey-12: var(--color-base-100);
+
+  /* Red → DaisyUI error */
+  --puck-color-red-01: color-mix(in oklch, var(--color-error), black 70%);
+  --puck-color-red-02: color-mix(in oklch, var(--color-error), black 55%);
+  --puck-color-red-03: color-mix(in oklch, var(--color-error), black 40%);
+  --puck-color-red-04: color-mix(in oklch, var(--color-error), black 25%);
+  --puck-color-red-05: var(--color-error);
+  --puck-color-red-06: color-mix(in oklch, var(--color-error), white 20%);
+  --puck-color-red-07: color-mix(in oklch, var(--color-error), white 38%);
+  --puck-color-red-08: color-mix(in oklch, var(--color-error), white 54%);
+  --puck-color-red-09: color-mix(in oklch, var(--color-error), white 68%);
+  --puck-color-red-10: color-mix(in oklch, var(--color-error), white 80%);
+  --puck-color-red-11: color-mix(in oklch, var(--color-error), white 90%);
+  --puck-color-red-12: color-mix(in oklch, var(--color-error), white 95%);
+
+  /* Green → DaisyUI success */
+  --puck-color-green-01: color-mix(in oklch, var(--color-success), black 70%);
+  --puck-color-green-02: color-mix(in oklch, var(--color-success), black 55%);
+  --puck-color-green-03: color-mix(in oklch, var(--color-success), black 40%);
+  --puck-color-green-04: color-mix(in oklch, var(--color-success), black 25%);
+  --puck-color-green-05: var(--color-success);
+  --puck-color-green-06: color-mix(in oklch, var(--color-success), white 20%);
+  --puck-color-green-07: color-mix(in oklch, var(--color-success), white 38%);
+  --puck-color-green-08: color-mix(in oklch, var(--color-success), white 54%);
+  --puck-color-green-09: color-mix(in oklch, var(--color-success), white 68%);
+  --puck-color-green-10: color-mix(in oklch, var(--color-success), white 80%);
+  --puck-color-green-11: color-mix(in oklch, var(--color-success), white 90%);
+  --puck-color-green-12: color-mix(in oklch, var(--color-success), white 95%);
+
+  /* Yellow → DaisyUI warning */
+  --puck-color-yellow-01: color-mix(in oklch, var(--color-warning), black 70%);
+  --puck-color-yellow-02: color-mix(in oklch, var(--color-warning), black 55%);
+  --puck-color-yellow-03: color-mix(in oklch, var(--color-warning), black 40%);
+  --puck-color-yellow-04: color-mix(in oklch, var(--color-warning), black 25%);
+  --puck-color-yellow-05: var(--color-warning);
+  --puck-color-yellow-06: color-mix(in oklch, var(--color-warning), white 20%);
+  --puck-color-yellow-07: color-mix(in oklch, var(--color-warning), white 38%);
+  --puck-color-yellow-08: color-mix(in oklch, var(--color-warning), white 54%);
+  --puck-color-yellow-09: color-mix(in oklch, var(--color-warning), white 68%);
+  --puck-color-yellow-10: color-mix(in oklch, var(--color-warning), white 80%);
+  --puck-color-yellow-11: color-mix(in oklch, var(--color-warning), white 90%);
+  --puck-color-yellow-12: color-mix(in oklch, var(--color-warning), white 95%);
+
+  /* Rose → DaisyUI secondary */
+  --puck-color-rose-01: color-mix(in oklch, var(--color-secondary), black 70%);
+  --puck-color-rose-02: color-mix(in oklch, var(--color-secondary), black 55%);
+  --puck-color-rose-03: color-mix(in oklch, var(--color-secondary), black 40%);
+  --puck-color-rose-04: color-mix(in oklch, var(--color-secondary), black 25%);
+  --puck-color-rose-05: var(--color-secondary);
+  --puck-color-rose-06: color-mix(in oklch, var(--color-secondary), white 20%);
+  --puck-color-rose-07: color-mix(in oklch, var(--color-secondary), white 38%);
+  --puck-color-rose-08: color-mix(in oklch, var(--color-secondary), white 54%);
+  --puck-color-rose-09: color-mix(in oklch, var(--color-secondary), white 68%);
+  --puck-color-rose-10: color-mix(in oklch, var(--color-secondary), white 80%);
+  --puck-color-rose-11: color-mix(in oklch, var(--color-secondary), white 90%);
+  --puck-color-rose-12: color-mix(in oklch, var(--color-secondary), white 95%);
+}
+
+/* Override hardcoded background: white that bypasses the CSS variable system */
+._Select-items_xjbef_61 {
+  background: var(--color-base-100) !important;
+}
+
+._FieldsPlugin_nd930_1 {
+  background: var(--color-base-100) !important;
+}
+
+/* Inputs don't inherit text color from the theme — set explicitly */
+._Input-input_bsxfo_26 {
+  color: var(--color-base-content) !important;
+}

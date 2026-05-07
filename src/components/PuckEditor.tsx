@@ -1,5 +1,6 @@
 import { Puck } from "@puckeditor/core";
 import "@puckeditor/core/puck.css";
+import "../styles/puck-theme.css";
 import type { Config, Data } from "@puckeditor/core";
 
 const config: Config = {
