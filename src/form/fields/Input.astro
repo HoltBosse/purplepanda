@@ -5,16 +5,17 @@ import BaseField from "../BaseField.astro";
 interface Props extends ComponentProps<typeof BaseField> {
   placeholder?: string;
   classList?: string;
+  inputType?: "text" | "email" | "password" | "number" | "tel" | "url" | "checkbox" | "radio" | "file" | "submit" | "button" | "reset" | "hidden" | "date" | "time" | "datetime-local" | "month" | "week" | "color" | "search" | "range";
 }
 
-const { placeholder, classList, ...baseProps } = Astro.props;
+const { placeholder, classList, inputType, ...baseProps } = Astro.props;
 const { id, name, value, required } = baseProps;
 ---
 
 <BaseField {...baseProps}>
   <input
     class={classList}
-    type="text"
+    type={inputType ?? "text"}
     name={name}
     id={id}
     placeholder={placeholder}
