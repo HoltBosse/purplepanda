@@ -1,0 +1,20 @@
+---
+import type { Alert } from './index.js';
+import AlertComponent from './Alert.astro';
+
+interface Props {
+    alerts: Alert[];
+}
+
+const { alerts } = Astro.props;
+---
+<div class={"flex flex-col gap-4" + (alerts.length > 0 ? " mb-4" : "")}>
+    {alerts.map((alert, index) => {
+        const { type, message } = alert;
+        return (
+            <AlertComponent type={type}>
+                <span slot="message">{message}</span>
+            </AlertComponent>
+        );
+    })}
+</div>

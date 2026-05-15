@@ -1,0 +1,22 @@
+---
+import type { BaseFieldProps } from './types';
+type Props = BaseFieldProps;
+
+const {
+    id,
+    name,
+    label,
+    required,
+    type,
+    value,
+    description,
+} = Astro.props;
+---
+
+<div class="field">
+    {label && <label class={required ? 'after:content-["*"] after:text-error after:ml-0.5' : ''} for={id}>{label}</label>}
+    <div class="field_markup">
+        <slot />
+    </div>
+    {description && <span>{description}</span>}
+</div>

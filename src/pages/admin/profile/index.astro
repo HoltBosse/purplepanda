@@ -1,7 +1,35 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import Form from '../../../form/Form.astro';
+import { getAllFields } from '../../../form/index.js';
+import { getDb } from '../../../db/db.js';
+import { users } from '../../../db/schema.js';
+import { eq } from 'drizzle-orm';
+import { capitalize } from '../../../string';
+import { getProfileForm } from './form.js';
+import { createFormFlashSession } from '../../../form/session.js';
+
+const db = getDb();
+
+const userId = await Astro.session?.get('userId');
+const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+if(!user) {
+	throw new Error('User not found');
+}
+
+const fields = getAllFields();
+const formFlash = createFormFlashSession(Astro.session);
+const flash = await formFlash.get('profile') ?? {};
+await formFlash.delete('profile');
+const form = getProfileForm(user, fields, flash);
 ---
 
 <AdminLayout>
-	<p>Profile page</p>
+	<Form form={form} fields={fields}>
+		<div slot="before-fields" class="flex items-center justify-between align-middle border-b border-base-300 pt-2">
+			<h1 class="text-2xl font-semibold">{capitalize(user.fname)} {capitalize(user.lname)}</h1>
+			<button class="btn btn-primary">Save</button>
+		</div>
+	</Form>
 </AdminLayout>

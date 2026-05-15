@@ -1,12 +1,16 @@
 {
   "compilerOptions": {
     "rootDir": "./src",
+    "paths": {
+      "@lucide/astro": ["./src/lucide-astro.d.ts"]
+    },
     "outDir": "./dist",
     "module": "preserve",
     "moduleResolution": "bundler",
     "target": "esnext",
     "types": [
-      "astro/client"
+      "astro/client",
+      "node"
     ],
     "sourceMap": true,
     "declaration": true,
@@ -21,5 +25,6 @@
     "moduleDetection": "force",
     "skipLibCheck": true,
     "jsxImportSource": "react"
-  }
+  },
+  "exclude": ["drizzle.config.ts", "dist", "node_modules"]
 }

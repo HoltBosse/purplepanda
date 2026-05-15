@@ -1,4 +1,5 @@
 import { defineMiddleware } from "astro/middleware";
+import { getAlertsFromSession, clearAlertsFromSession } from "../alert/index.js";
 
 // Paths that do not require authentication
 const PUBLIC_PATHS = ["/admin/login", "/admin/login-action"];
@@ -20,6 +21,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (!userId) {
     return context.redirect("/admin/login");
   }
+
+  // Read and clear flash alerts before the response is committed
+  context.locals.alerts = await getAlertsFromSession(context.session);
+  await clearAlertsFromSession(context.session);
 
   return next();
 });

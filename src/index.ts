@@ -1,4 +1,6 @@
 import type { AstroIntegration } from "astro";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { setDb } from "./db/db.js";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 import { extname, resolve, join } from "node:path";
@@ -33,7 +35,7 @@ function copyDir(src: string, dest: string) {
   }
 }
 
-export default function purplePandaIntegration(options: { enabled?: boolean } = {}): AstroIntegration {
+export default function purplePandaIntegration(options: { enabled?: boolean; db?: NodePgDatabase<Record<string, unknown>> } = {}): AstroIntegration {
   // Resolves to src/assets/ relative to dist/index.js at runtime
   const assetsDir = fileURLToPath(new URL("../src/assets/", import.meta.url));
 
@@ -42,6 +44,13 @@ export default function purplePandaIntegration(options: { enabled?: boolean } = 
     hooks: {
       "astro:config:setup": ({ updateConfig, injectScript, addWatchFile, addMiddleware, injectRoute, logger }) => {
         if (options.enabled === false) return;
+
+        if (options.db) {
+          setDb(options.db);
+        } else {
+          //error out if no db provided, since it's required for the integration to work
+          throw new Error("[purple-panda] No db provided. Pass `db` to purplePandaIntegration().");
+        }
 
         logger.info("Setting up purple-panda");
 
@@ -126,6 +135,11 @@ export default function purplePandaIntegration(options: { enabled?: boolean } = 
         });
 
         injectRoute({
+          pattern: "/admin/profile/update",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/profile/update.ts",
+        });
+
+        injectRoute({
           pattern: "/admin/[...path]",
           entrypoint: "@holtbosse/purplepanda/pages/admin/404.astro",
         });
@@ -140,7 +154,7 @@ export default function purplePandaIntegration(options: { enabled?: boolean } = 
       },
 
       "astro:build:done": ({ dir, logger }) => {
-        if (options.enabled === false) return;
+        // if (options.enabled === false) return;
 
         const destDir = fileURLToPath(new URL("admin/assets/", dir));
         logger.info(`Copying admin assets to ${destDir}`);

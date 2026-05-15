@@ -1,0 +1,19 @@
+---
+import { type alertType, getAlertClass, getIconForAlert } from './index.js';
+
+interface Props {
+    type: alertType;
+}
+
+const { type } = Astro.props; 
+const Icon = getIconForAlert(type);
+---
+<div role="alert" class={getAlertClass(type) + " alert"}>
+    <slot name="icon">
+        <Icon size={20} />
+    </slot>
+    <slot name="message">
+        <span>This is an alert message.</span>
+    </slot>
+</div>
+

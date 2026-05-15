@@ -4,3 +4,4 @@ A CMS that runs as an astro integration
 
 Requirements:
 * React integration
+* drizzle db

@@ -1,0 +1,11 @@
+---
+import type { ComponentProps } from "astro/types";
+import BaseField from "../BaseField.astro";
+
+interface Props extends ComponentProps<typeof BaseField> {
+    markup: string;
+}
+
+const { markup } = Astro.props;
+---
+<Fragment set:html={markup} />

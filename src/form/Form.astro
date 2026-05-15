@@ -1,0 +1,21 @@
+---
+import type { FormSection } from './types';
+
+interface Props {
+    form: FormSection;
+    fields: Record<string, any>;
+}
+
+const {
+    form,
+    fields,
+} = Astro.props;
+---
+<form class={form.classList} action={form.props?.action} method={form.props?.method} enctype={form.props?.encType}>
+    <slot name="before-fields" />
+    {form.fields.map((field) => {
+        const FieldComponent = fields[field.type];
+        return <FieldComponent {...field} />;
+    })}
+    <slot name="after-fields" />
+</form>

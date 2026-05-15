@@ -1,6 +1,24 @@
 ---
 import '../styles/global.css';
 import { House, Users, LayoutTemplate, FileText, PenLine, ClipboardList, Images, LogOut } from '@lucide/astro';
+import { getDb } from '../db/db.js';
+import { users } from '../db/schema.js';
+import { eq } from 'drizzle-orm';
+import Alert from '../alert/Alert.astro';
+import SessionAlerts from '../alert/SessionAlerts.astro';
+import { alertType } from '../alert/index.js';
+import Container from '../components/Container.astro';
+
+const db = getDb();
+
+const userId = await Astro.session?.get('userId');
+const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+if(!user) {
+	throw new Error('User not found');
+}
+
+const alerts = Astro.locals.alerts ?? [];
 ---
 <!DOCTYPE html>
 <html lang="en">
@@ -15,7 +33,7 @@ import { House, Users, LayoutTemplate, FileText, PenLine, ClipboardList, Images,
 	<div class="flex h-full">
 
 		<!-- Vertical Icon Nav -->
-		<nav class="flex flex-col w-16 bg-base-200 border-r border-base-300 items-center py-3 gap-1 shrink-0 z-50">
+		<nav class="flex flex-col w-16 bg-base-100 border-r border-base-300 items-center py-3 gap-1 shrink-0 z-50">
 
 			<a href="/admin" class="flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
 				<House size={20} />
@@ -57,7 +75,7 @@ import { House, Users, LayoutTemplate, FileText, PenLine, ClipboardList, Images,
 				<button tabindex="0" role="button" class="flex flex-col items-center justify-center w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors">
 					<div class="avatar avatar-placeholder">
 						<div class="bg-primary text-primary-content rounded-full w-9">
-							<span class="text-xs font-semibold">AJ</span>
+							<span class="text-xs font-semibold">{user.fname[0]?.toUpperCase()}{user.lname[0]?.toUpperCase()}</span>
 						</div>
 					</div>
 				</button>
@@ -79,14 +97,17 @@ import { House, Users, LayoutTemplate, FileText, PenLine, ClipboardList, Images,
 			<input id="drawer-toggle" type="checkbox" class="drawer-toggle" />
 
 			<div class="drawer-content h-full overflow-auto">
-				<main class="p-6 h-full">
-					<slot />
+				<main class="p-6 h-full bg-base-200">
+					<Container>
+						<SessionAlerts alerts={alerts} />
+						<slot />
+					</Container>
 				</main>
 			</div>
 
 			<div class="drawer-side start-16">
 				<label for="drawer-toggle" aria-label="close sidebar" class="drawer-overlay"></label>
-				<aside class="bg-base-100 min-h-full w-60 border-r border-base-300">
+				<aside class="bg-base-200 min-h-full w-60 border-r border-base-300">
 
 					<div id="panel-users" class="drawer-panel hidden">
 						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Users</h2>
