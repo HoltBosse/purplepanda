@@ -12,7 +12,11 @@ import { hash } from "../../../password/index.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
-    const userId = context.params.id?.split('/')[0];
+    //get [id] from url
+    const { id } = context.params;
+    console.log("ID:");
+    console.log(id);
+    const userId = id;
     let isNewUser = !userId;
     let user: InferSelectModel<typeof users> | undefined;
 
@@ -63,6 +67,10 @@ export async function POST(context: APIContext): Promise<Response> {
     const password = getFieldByName(form, 'new-password')?.value;
     const confirmPassword = getFieldByName(form, 'confirm-new-password')?.value;
 
+    console.log(password);
+    console.log(confirmPassword);
+    console.log(isNewUser);
+
     if(isNewUser || (password || confirmPassword)) {
         if(isNewUser && !password) {
             await formFlash.set('newuser', formDataToRecord(formData));
@@ -81,6 +89,8 @@ export async function POST(context: APIContext): Promise<Response> {
             }
 
             return context.redirect(redirectUrl);
+        } else {
+            user.password = await hash(password!);
         }
     }
 
@@ -112,7 +122,12 @@ export async function POST(context: APIContext): Promise<Response> {
     }
 
     await formFlash.delete('newuser');
-    const alert = createAlert(alertType.success, "User created successfully.");
+    let message = "User updated successfully.";
+    if(isNewUser) {
+        message = "User created successfully.";
+    }
+
+    const alert = createAlert(alertType.success, message);
     await addAlertToSession(context.session, alert);
 
     return context.redirect("/admin/users");

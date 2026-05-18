@@ -10,29 +10,40 @@ import { createFormFlashSession } from '../../../form/session.js';
 
 const db = getDb();
 
-const userId = await Astro.session?.get('userId');
+//const userId = await Astro.session?.get('userId');
 /* const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
 if(!user) {
 	throw new Error('User not found');
 } */
+//get [id] from url
+const { id } = Astro.params;
 
-const user = Object.fromEntries(
-	Object.entries(getTableColumns(users)).map(([key, col]: [string, any]) => {
-		let value: unknown;
-		if (col.defaultFn !== undefined) value = col.defaultFn();
-		else if (col.default !== undefined) value = col.default;
-		else if (col.dataType === 'number') value = 0;
-		else value = '';
-		return [key, value];
-	})
-) as InferSelectModel<typeof users>;
+let user;
+if(id) {
+	[user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+	if(!user) {
+		throw new Error('User not found');
+	}
+} else {
+	user = Object.fromEntries(
+		Object.entries(getTableColumns(users)).map(([key, col]: [string, any]) => {
+			let value: unknown;
+			if (col.defaultFn !== undefined) value = col.defaultFn();
+			else if (col.default !== undefined) value = col.default;
+			else if (col.dataType === 'number') value = 0;
+			else value = '';
+			return [key, value];
+		})
+	) as InferSelectModel<typeof users>;
+}
 
 const fields = getAllFields();
 const formFlash = createFormFlashSession(Astro.session);
 const flash = await formFlash.get('profile') ?? {};
 await formFlash.delete('profile');
-const form = getProfileForm(user, fields, '/admin/users/update', flash, false);
+const url = id ? `/admin/users/update/${id}` : '/admin/users/update';
+const form = getProfileForm(user, fields, url, flash, false);
 ---
 
 <AdminLayout>
