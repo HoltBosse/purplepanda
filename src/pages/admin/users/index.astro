@@ -29,7 +29,7 @@ const allUsers = await db.select().from(users);
                 <tr>
                     <th>
                         <button class="btn btn-square">
-                            <CircleCheck size={20} class="text-green-500" />
+                            <CircleCheck size={20} class={user.state === 1 ? "text-green-500" : "text-red-500"} />
                         </button>
                     </th>
                     <td>
