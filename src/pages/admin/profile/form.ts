@@ -7,7 +7,7 @@ type User = InferSelectModel<typeof users>;
 
 const inputClassList = "w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200";
 
-export function getProfileForm(user: User, fields: Record<string, any>, flash: Record<string, string> = {}): FormSection {
+export function getProfileForm(user: User, fields: Record<string, any>, redirectUrl: string, flash: Record<string, string> = {}, showCurrentPassword: boolean = false): FormSection {
 	return {
 		id: 'profile-form',
 		title: 'Profile',
@@ -78,7 +78,7 @@ export function getProfileForm(user: User, fields: Record<string, any>, flash: R
 						id: 'password-group-header',
 						name: 'password-group-header',
 						type: 'Html',
-						markup: '<h2 class="text-lg font-medium">Change Password</h2>',
+						markup: `<h2 class="text-lg font-medium">${showCurrentPassword ? 'Change Password' : 'Set Password'}</h2>`,
 					},
 					{
 						id: 'password-group',
@@ -87,7 +87,7 @@ export function getProfileForm(user: User, fields: Record<string, any>, flash: R
 						fields: fields,
 						classList: "grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6 mt-6",
 						groupFields: [
-							{
+							...(showCurrentPassword ? [{
 								id: 'current-password',
 								name: 'current-password',
 								label: 'Current Password',
@@ -96,17 +96,17 @@ export function getProfileForm(user: User, fields: Record<string, any>, flash: R
                                 classList: inputClassList,
                                 ...(flash['current-password'] ? { value: flash['current-password'] } : {}),
                                 validator: z.string().min(1, "Current password is required").optional(),
-							},
-							{
+							}] : []),
+							...(showCurrentPassword ? [{
 								id: 'dummy-plug',
 								name: 'dummy-plug',
 								type: 'Html',
 								markup: '<div class="hidden lg:block"></div>',
-							},
+							}] : []),
 							{
 								id: 'new-password',
 								name: 'new-password',
-								label: 'New Password',
+								label: showCurrentPassword ? 'New Password' : 'Password',
 								type: 'Input',
                                 inputType: 'password',
                                 classList: inputClassList,
@@ -116,7 +116,7 @@ export function getProfileForm(user: User, fields: Record<string, any>, flash: R
 							{
 								id: 'confirm-new-password',
 								name: 'confirm-new-password',
-								label: 'Confirm New Password',
+								label: showCurrentPassword ? 'Confirm New Password' : 'Confirm Password',
 								type: 'Input',
                                 inputType: 'password',
                                 classList: inputClassList,
@@ -129,7 +129,7 @@ export function getProfileForm(user: User, fields: Record<string, any>, flash: R
 			}
 		],
 		props: {
-			action: '/admin/profile/update',
+			action: redirectUrl,
 			method: FormMethod.POST,
 			encType: FormEncType.URLENCODED,
 		},

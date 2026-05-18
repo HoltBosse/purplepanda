@@ -22,7 +22,7 @@ const fields = getAllFields();
 const formFlash = createFormFlashSession(Astro.session);
 const flash = await formFlash.get('profile') ?? {};
 await formFlash.delete('profile');
-const form = getProfileForm(user, fields, flash);
+const form = getProfileForm(user, fields, '/admin/profile/update', flash, true);
 ---
 
 <AdminLayout>

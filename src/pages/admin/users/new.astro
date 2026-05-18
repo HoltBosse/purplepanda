@@ -1,7 +1,45 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import Form from '../../../form/Form.astro';
+import { getAllFields } from '../../../form/index.js';
+import { getDb } from '../../../db/db.js';
+import { users } from '../../../db/schema.js';
+import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
+import { getProfileForm } from '../profile/form.js';
+import { createFormFlashSession } from '../../../form/session.js';
+
+const db = getDb();
+
+const userId = await Astro.session?.get('userId');
+/* const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+if(!user) {
+	throw new Error('User not found');
+} */
+
+const user = Object.fromEntries(
+	Object.entries(getTableColumns(users)).map(([key, col]: [string, any]) => {
+		let value: unknown;
+		if (col.defaultFn !== undefined) value = col.defaultFn();
+		else if (col.default !== undefined) value = col.default;
+		else if (col.dataType === 'number') value = 0;
+		else value = '';
+		return [key, value];
+	})
+) as InferSelectModel<typeof users>;
+
+const fields = getAllFields();
+const formFlash = createFormFlashSession(Astro.session);
+const flash = await formFlash.get('profile') ?? {};
+await formFlash.delete('profile');
+const form = getProfileForm(user, fields, '/admin/users/update', flash, false);
 ---
 
 <AdminLayout>
-	<p>edit user view</p>
+	<Form form={form} fields={fields}>
+		<div slot="before-fields" class="flex items-center justify-between align-middle border-b border-base-300 pt-2">
+			<h1 class="text-2xl font-semibold">New User</h1>
+			<button class="btn btn-primary">Save</button>
+		</div>
+	</Form>
 </AdminLayout>

@@ -19,7 +19,7 @@ export async function POST(context: APIContext): Promise<Response> {
     }
 
     const fields = getAllFields();
-    const form = getProfileForm(user, fields);
+    const form = getProfileForm(user, fields, '/admin/profile/update');
     const formData = await context.request.formData();
     const formFlash = createFormFlashSession(context.session);
     const result = validateForm(form, formData);
