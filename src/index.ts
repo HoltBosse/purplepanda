@@ -140,6 +140,16 @@ export default function purplePandaIntegration(options: { enabled?: boolean; db?
         });
 
         injectRoute({
+          pattern: "/admin/users",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/users/index.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/users/new",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/users/new.astro",
+        });
+
+        injectRoute({
           pattern: "/admin/[...path]",
           entrypoint: "@holtbosse/purplepanda/pages/admin/404.astro",
         });

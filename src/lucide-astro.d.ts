@@ -27,6 +27,7 @@ export declare const defaultAttributes: Record<string, unknown>;
 export declare const Info: AstroComponent;
 export declare const TriangleAlert: AstroComponent;
 export declare const CircleX: AstroComponent;
+export declare const CircleCheck: AstroComponent;
 export declare const CircleCheckBig: AstroComponent;
 export declare const House: AstroComponent;
 export declare const Users: AstroComponent;

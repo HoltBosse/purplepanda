@@ -1,0 +1,61 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { createHash } from 'node:crypto';
+import { getDb } from '../../../db/db.js';
+import { users } from '../../../db/schema.js';
+import { CircleCheck } from '@lucide/astro';
+import { capitalize } from '../../../string';
+
+const db = getDb();
+const allUsers = await db.select().from(users);
+//console.log(allUsers);
+---
+
+<AdminLayout>
+    <div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
+        <h1 class="text-2xl font-semibold">Users</h1>
+        <a href="/admin/users/new" class="btn btn-primary">New</a>
+    </div>
+    <table class="table">
+        <thead>
+            <tr>
+                <th class="w-px whitespace-nowrap">State</th>
+                <th>User</th>
+                <th>Roles</th>
+            </tr>
+        </thead>
+        <tbody>
+            {allUsers.map(user=>(
+                <tr>
+                    <th>
+                        <button class="btn btn-square">
+                            <CircleCheck size={20} class="text-green-500" />
+                        </button>
+                    </th>
+                    <td>
+                        <a href={`/admin/user/edit/${user.id}`}>
+                            <div class="flex items-center gap-3">
+                                <div class="avatar">
+                                    <div class="mask mask-squircle h-12 w-12">
+                                        <img
+                                        src={`https://www.gravatar.com/avatar/${createHash('sha256').update(user.email.trim().toLowerCase()).digest('hex')}?d=identicon&s=64`}
+                                        alt="Avatar Tailwind CSS Component" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="font-bold link link-info link-hover">{capitalize(user.fname)} {capitalize(user.lname)}</div>
+                                    <div class="text-sm opacity-50">{user.email}</div>
+                                </div>
+                            </div>
+                        </a>
+                    </td>
+                    <td>
+                        thingssss
+                        <br />
+                        <span class="badge badge-ghost badge-sm">Desktop Support Technician</span>
+                    </td>
+                </tr>
+            ))}
+        </tbody>
+    </table>
+</AdminLayout>
