@@ -2,6 +2,7 @@ import type { APIContext } from "astro";
 import { getDb } from "../../db/db.js";
 import {users} from "../../db/schema.js";
 import { eq } from 'drizzle-orm';
+import { hash, verify } from '../../password/index.js';
 
 const ADMIN_PASSWORD = "password";
 
@@ -15,16 +16,17 @@ export async function POST(context: APIContext): Promise<Response> {
     return context.redirect("/admin/login?error=invalid");
   }
 
-  const user = await db.select().from(users).where(eq(users.email, username)).limit(1);
+  const [user] = await db.select().from(users).where(eq(users.email, username)).limit(1);
 
-  if (!user || user.length === 0 || !user[0]) {
+  if (!user) {
     return context.redirect("/admin/login?error=invalid");
   }
 
-  if (password !== user[0].password) {
+  const isValid = await verify(password, user.password);
+  if (!isValid) {
     return context.redirect("/admin/login?error=invalid");
   }
 
-  await context.session?.set("userId", user[0].id);
+  await context.session?.set("userId", user.id);
   return context.redirect("/admin");
 }
