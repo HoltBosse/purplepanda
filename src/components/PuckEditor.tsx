@@ -46,5 +46,25 @@ const save = (data: Data) => {
 };
 
 export default function PuckEditor() {
-  return <Puck config={config} data={initialData} onPublish={save} overrides={overrides} />;
+  return (
+    <div style={{ position: "relative" }}>
+      <a
+        href="/admin"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          zIndex: 9999,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "67px",
+          height: "67px",
+        }}
+      >
+        <img src="/admin/assets/favicon.svg" alt="Admin" style={{ height: "28px", width: "28px" }} />
+      </a>
+      <Puck config={config} data={initialData} onPublish={save} overrides={overrides} />
+    </div>
+  );
 }
