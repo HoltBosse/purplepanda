@@ -65,10 +65,10 @@ const alerts = Astro.locals.alerts ?? [];
 				<span class="text-[10px] font-medium leading-tight">Forms</span>
 			</button>
 
-			<button data-panel="media" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content cursor-pointer">
+			<a href="/admin/media" class="flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
 				<Images size={20} />
 				<span class="text-[10px] font-medium leading-tight">Media</span>
-			</button>
+			</a>
 
 			<!-- User Avatar -->
 			<div class="mt-auto dropdown dropdown-right dropdown-end">
@@ -149,15 +149,6 @@ const alerts = Astro.locals.alerts ?? [];
 							<li><a href="#">New Form</a></li>
 						</ul>
 					</div>
-
-					<div id="panel-media" class="drawer-panel hidden">
-						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Media</h2>
-						<ul class="menu w-full px-2 py-1 gap-0.5">
-							<li><a href="#">Library</a></li>
-							<li><a href="#">Upload</a></li>
-						</ul>
-					</div>
-
 				</aside>
 			</div>
 		</div>

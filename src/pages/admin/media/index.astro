@@ -1,0 +1,367 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { createHash } from 'node:crypto';
+import { getDb } from '../../../db/db.js';
+import { users } from '../../../db/schema.js';
+import { Folder } from '@lucide/astro';
+import { capitalize } from '../../../string';
+import Input from '../../../form/fields/Input.astro';
+import { mediafolders, media } from "../../../db/schema.js";
+import { eq, sql, isNull } from 'drizzle-orm';
+import { z } from 'zod';
+
+const { id } = Astro.params;
+
+const db = getDb();
+const folderIdSchema = z.uuid();
+const adminNotFoundPath = '/admin/__not-found';
+
+if(id) {
+    // Reject invalid ids before hitting Postgres uuid comparison.
+    if (!folderIdSchema.safeParse(id).success) {
+        return Astro.rewrite(adminNotFoundPath);
+    }
+
+    //check that its a valid form
+    const folders_check = await db.select().from(mediafolders).where(eq(mediafolders.id, id)).limit(1);
+    if(folders_check.length === 0) {
+        return Astro.rewrite(adminNotFoundPath);
+    }
+}
+
+const items = ['Dog', 'Cat', 'Bird', 'Lol', 'Test', 'Dan', 'Hugo', 'James', 'John', 'Anna'];
+
+//using drizzle, fetch mediafolders, join media on mediafolders.id = media.folder, join mediafolders on mediafolders.parent=mediafolder.id to return the name of the folder, number of inner folders, number of inner media
+const folders = await db.select({
+    id: mediafolders.id,
+    name: mediafolders.name,
+    innerFolders: sql<number>`(SELECT COUNT(*) FROM ${mediafolders} AS mf WHERE mf.parent = "mediafolders"."id")`,
+    innerMedia: sql<number>`(SELECT COUNT(*) FROM ${media} WHERE ${media}.folder = "mediafolders"."id")`
+}).from(mediafolders).where(id ? eq(mediafolders.parent, id) : isNull(mediafolders.parent));
+
+const mediaItems = await db.select().from(media).where(id ? eq(media.folder, id) : isNull(media.folder));
+
+type FolderPathEntry = {
+    id: string | null;
+    name: string;
+};
+
+let folderPath: FolderPathEntry[] = [{ id: null, name: "Root" }];
+if(id) {
+    const ancestors: FolderPathEntry[] = [];
+    const visitedFolderIds = new Set<string>();
+    let currentFolderId: string | null = id;
+
+    while (currentFolderId && !visitedFolderIds.has(currentFolderId)) {
+        visitedFolderIds.add(currentFolderId);
+
+        const [currentFolder] = await db
+            .select({
+                id: mediafolders.id,
+                name: mediafolders.name,
+                parent: mediafolders.parent,
+            })
+            .from(mediafolders)
+            .where(eq(mediafolders.id, currentFolderId))
+            .limit(1);
+
+        if (!currentFolder) {
+            break;
+        }
+
+        ancestors.unshift({
+            id: currentFolder.id,
+            name: currentFolder.name,
+        });
+        currentFolderId = currentFolder.parent;
+    }
+
+    folderPath.push(...ancestors);
+}
+
+---
+
+<AdminLayout>
+    <div class="flex flex-wrap items-center justify-between gap-3 align-middle border-b border-base-300 pt-2 sticky top-0 z-10 bg-base-200">
+        <h1 class="text-2xl font-semibold">Media Library</h1>
+        <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <button class="btn btn-outline btn-error text-base-content w-full sm:w-auto select-mode-toggable hidden">Delete</button>
+            <button id="select-mode-trigger" class="btn btn-outline btn-primary hover:bg-transparent focus:bg-transparent text-base-content w-full sm:w-auto">Select</button>
+            <button commandfor="new-folder-dialog" command="show-modal" class="btn btn-primary w-full sm:w-auto">New Folder</button>
+            <button commandfor="new-image-dialog" command="show-modal" class="btn btn-primary w-full sm:w-auto">Upload</button>
+        </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 text-sm text-base-content/70 pb-4">
+        {folderPath.map((folder, index) => (
+            <div class="flex items-center gap-2">
+                {index > 0 && <span aria-hidden="true" class="text-base-content/40">&gt;</span>}
+                <a href={folder.id ? `/admin/media/${folder.id}` : "/admin/media"} class={index === 0 ? "text-base-content/70" : index === folderPath.length - 1 ? "font-semibold text-base-content" : ""}>{folder.name}</a>
+            </div>
+        ))}
+    </div>
+
+    <script>
+        document.querySelector("#select-mode-trigger")?.addEventListener("click", (e)=>{
+            const target = e.target as HTMLElement;
+            target.innerText = target.innerText=="Select" ? "Unselect" : "Select";
+            document.querySelectorAll(".select-mode-toggable").forEach(el => el.classList.toggle("hidden"));
+        });
+    </script>
+
+    <dialog id="new-folder-dialog" closedby="any" class="relative m-auto w-96 max-w-[calc(100vw-2rem)] rounded-xl bg-base-100 p-6 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <form action="/admin/media/newfolder" method="post">
+            <Input name="name" id="name" type="text" label="Folder Name" placeholder="e.g. Art" classList="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200" required />
+            {id ? <input type="hidden" name="parent" value={id} /> : null}
+            <br>
+            <button type="submit" class="btn btn-primary w-full">Create Folder</button>
+        </form>
+    </dialog>
+
+    <dialog id="new-image-dialog" closedby="any" class="relative m-auto w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] md:max-w-2xl rounded-xl bg-base-100 p-6 md:p-8 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <form class="space-y-4">
+            <label id="asset-dropzone" for="asset-upload" class="flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-base-300 bg-base-200/40 p-8 text-center transition-colors hover:border-primary hover:bg-base-200 md:min-h-72 md:p-14">
+                <p class="text-base font-medium text-base-content">Drag &amp; drop here or</p>
+                <span class="mt-2 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-content">Browse files</span>
+                <input id="asset-upload" name="asset" type="file" class="sr-only" multiple />
+            </label>
+        </form>
+    </dialog>
+
+    <dialog id="new-images-configuration" closedby="any" class="relative m-auto w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] md:max-w-4xl rounded-xl bg-base-200 p-6 md:p-8 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <form id="new-images-form" class="space-y-5" method="post" enctype="multipart/form-data" action="/admin/media/upload">
+            <div id="new-images-list" class="space-y-4"></div>
+            <div class="border-t border-base-300 pt-4">
+                <button type="submit" class="btn btn-primary w-full md:w-auto">Upload</button>
+            </div>
+        </form>
+
+        <template id="new-image-item-template">
+            <section data-image-config class="rounded-xl border border-base-300 bg-base-100 p-4 md:p-5">
+                <div class="flex flex-col gap-4 md:flex-row md:items-center">
+                    <div class="space-y-4 md:w-1/2">
+                        <Input id="image-title-template" name="title[]" type="text" label="Title" placeholder="Image title" classList="input input-bordered w-full" required />
+                        <Input id="image-alt-template" name="alt[]" type="text" label="Alt" placeholder="Alternative text" classList="input input-bordered w-full" required />
+                        <input data-image-file type="file" name="file[]" class="hidden" required />
+                        {id ? <input type="hidden" name="folder[]" value={id} /> : null}
+                    </div>
+                    <div class="md:w-1/2">
+                        <img data-image-preview alt="Selected image preview" class="h-48 w-full rounded-lg border border-base-300 object-cover md:h-56" />
+                        <p data-image-name class="mt-2 truncate text-sm text-base-content/70"></p>
+                    </div>
+                </div>
+            </section>
+        </template>
+    </dialog>
+
+    <script>
+        const uploadInput = document.querySelector("#asset-upload") as HTMLInputElement | null;
+        const uploadDropzone = document.querySelector("#asset-dropzone") as HTMLElement | null;
+        const uploadDialog = document.querySelector("#new-image-dialog") as HTMLDialogElement | null;
+        const imagesConfigDialog = document.querySelector("#new-images-configuration") as HTMLDialogElement | null;
+        const newImagesForm = document.querySelector("#new-images-form") as HTMLFormElement | null;
+        const newImagesList = document.querySelector("#new-images-list") as HTMLElement | null;
+        const newImageItemTemplate = document.querySelector("#new-image-item-template") as HTMLTemplateElement | null;
+
+        let previewObjectUrls: string[] = [];
+
+        const clearImageConfigurations = () => {
+            previewObjectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+            previewObjectUrls = [];
+
+            if (newImagesList) {
+                newImagesList.innerHTML = "";
+            }
+        };
+
+        const toDefaultImageText = (filename: string) => {
+            const withoutExtension = filename.replace(/\.[^/.]+$/, "");
+            return withoutExtension
+                .replace(/[\-_]+/g, " ")
+                .replace(/\s*\(\d+\)$/g, "")
+                .replace(/\s+/g, " ")
+                .trim();
+        };
+
+        const createImageConfigurationRows = (files: FileList | null) => {
+            if (!newImagesList || !newImageItemTemplate || !newImagesForm) {
+                return;
+            }
+
+            clearImageConfigurations();
+
+            if (!files || files.length === 0) {
+                return;
+            }
+
+            Array.from(files)
+                .filter((file) => file.type.startsWith("image/"))
+                .forEach((file, index) => {
+                    const fragment = newImageItemTemplate.content.cloneNode(true) as DocumentFragment;
+                    const section = fragment.querySelector("[data-image-config]") as HTMLElement | null;
+                    if (!section) {
+                        return;
+                    }
+
+                    const titleInput = section.querySelector('input[name="title[]"]') as HTMLInputElement | null;
+                    const altInput = section.querySelector('input[name="alt[]"]') as HTMLInputElement | null;
+                    const fileInput = section.querySelector("[data-image-file]") as HTMLInputElement | null;
+                    const imagePreview = section.querySelector("[data-image-preview]") as HTMLImageElement | null;
+                    const imageName = section.querySelector("[data-image-name]") as HTMLElement | null;
+                    const titleLabel = section.querySelector('label[for="image-title-template"]') as HTMLLabelElement | null;
+                    const altLabel = section.querySelector('label[for="image-alt-template"]') as HTMLLabelElement | null;
+
+                    if (titleInput) {
+                        const titleId = `image-title-${index}`;
+                        titleInput.id = titleId;
+                        titleInput.value = toDefaultImageText(file.name);
+                        if (titleLabel) {
+                            titleLabel.setAttribute("for", titleId);
+                        }
+                    }
+
+                    if (altInput) {
+                        const altId = `image-alt-${index}`;
+                        altInput.id = altId;
+                        altInput.value = toDefaultImageText(file.name);
+                        if (altLabel) {
+                            altLabel.setAttribute("for", altId);
+                        }
+                    }
+
+                    if (fileInput) {
+                        const transfer = new DataTransfer();
+                        transfer.items.add(file);
+                        fileInput.files = transfer.files;
+                    }
+
+                    if (imagePreview) {
+                        const objectUrl = URL.createObjectURL(file);
+                        previewObjectUrls.push(objectUrl);
+                        imagePreview.src = objectUrl;
+                    }
+
+                    if (imageName) {
+                        imageName.textContent = file.name;
+                    }
+
+                    newImagesList.append(section);
+                });
+
+            if (newImagesList.children.length > 0) {
+                uploadDialog?.close();
+                imagesConfigDialog?.showModal();
+            }
+        };
+
+        if (uploadInput && uploadDropzone) {
+            const setDragState = (isActive: boolean) => {
+                uploadDropzone.classList.toggle("border-primary", isActive);
+                uploadDropzone.classList.toggle("bg-base-200", isActive);
+            };
+
+            ["dragenter", "dragover"].forEach((eventName) => {
+                uploadDropzone.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setDragState(true);
+                });
+            });
+
+            ["dragleave", "dragend"].forEach((eventName) => {
+                uploadDropzone.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setDragState(false);
+                });
+            });
+
+            uploadDropzone.addEventListener("drop", (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setDragState(false);
+
+                const droppedFiles = event.dataTransfer?.files;
+                if (!droppedFiles || droppedFiles.length === 0) {
+                    return;
+                }
+
+                const transfer = new DataTransfer();
+                Array.from(droppedFiles).forEach((file) => transfer.items.add(file));
+                uploadInput.files = transfer.files;
+                uploadInput.dispatchEvent(new Event("change", { bubbles: true }));
+            });
+
+            uploadInput.addEventListener("change", () => {
+                createImageConfigurationRows(uploadInput.files);
+            });
+        }
+
+        newImagesForm?.addEventListener("submit", () => {
+            // Do not clear configurations here — clearing the DOM before the browser
+            // serializes form data would cause all fields to be missing from the POST body.
+        });
+
+        imagesConfigDialog?.addEventListener("close", () => {
+            clearImageConfigurations();
+            if (uploadInput) {
+                uploadInput.value = "";
+            }
+        });
+    </script>
+
+    {folders.length > 0 && <p class="text-lg font-semibold mt-4 mb-2">Folders</p>}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {folders.map(folder=>(
+            <a href={`/admin/media/${folder.id}`} class="flex w-full min-w-0 items-center gap-4 rounded-box border border-base-300 bg-base-100 p-4 shadow-sm transition-colors hover:bg-base-300">
+                <input type="checkbox" class="checkbox checkbox-info select-mode-toggable hidden" />
+                <div class="bg-info text-white px-2 py-1 rounded flex items-center justify-center h-full aspect-square">
+                    <Folder size={20} />
+                </div>
+                <div class="min-w-0">
+                    <h3 class="font-semibold text-base-content">{folder.name}</h3>
+                    <p class="text-sm text-base-content/60">{folder.innerFolders} folders, {folder.innerMedia} assets</p>
+                </div>
+            </a>
+        ))}
+    </div>
+
+    {folders.length > 0 && <br />}
+
+    <p class="text-lg font-semibold mt-4 mb-2">Assets</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {mediaItems.map((media)=>(
+            <a href="#" class="card w-full min-w-0 bg-base-100 shadow-sm hover:bg-base-300">
+                {/* w-full bg-base-200 bg-[image:repeating-linear-gradient(45deg,#d4d4d8_0,#d4d4d8_8px,transparent_0,transparent_16px),repeating-linear-gradient(-45deg,#d4d4d8_0,#d4d4d8_8px,transparent_0,transparent_16px)] */}
+                <figure class="">
+                    <img
+                        src={`/image/${media.id}?fmt=webp&w=1000&q=80`}
+                        title={media.title}
+                        alt={media.title}
+                        class="aspect-video object-contain"
+                    />
+                </figure>
+                <input type="checkbox" class="checkbox checkbox-neutral absolute left-2 top-2 z-10 select-mode-toggable hidden" />
+                <div class="card-body">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <h5 class="font-semibold text-base-content">{media.title}</h5>
+                            <p class="text-sm text-base-content/60">#### x ###</p>
+                        </div>
+                        <div>
+                            <span class="bg-info text-white px-2 py-1 rounded">MIME</span>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        ))}
+    </div>
+</AdminLayout>

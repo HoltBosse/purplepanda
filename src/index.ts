@@ -1,10 +1,11 @@
 import type { AstroIntegration } from "astro";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { setDb } from "./db/db.js";
+import { setMediaPath } from "./media/media.js";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 import { extname, resolve, join } from "node:path";
-import { existsSync, createReadStream, readdirSync, copyFileSync, mkdirSync } from "node:fs";
+import { existsSync, createReadStream, readdirSync, statSync, copyFileSync, mkdirSync } from "node:fs";
 
 const MIME_TYPES: Record<string, string> = {
   ".ico": "image/x-icon",
@@ -35,7 +36,7 @@ function copyDir(src: string, dest: string) {
   }
 }
 
-export default function purplePandaIntegration(options: { enabled?: boolean; db?: NodePgDatabase<Record<string, unknown>> } = {}): AstroIntegration {
+export default function purplePandaIntegration(options: { enabled?: boolean; db?: NodePgDatabase<Record<string, unknown>>, mediaPath?: string } = {}): AstroIntegration {
   // Resolves to src/assets/ relative to dist/index.js at runtime
   const assetsDir = fileURLToPath(new URL("../src/assets/", import.meta.url));
 
@@ -50,6 +51,17 @@ export default function purplePandaIntegration(options: { enabled?: boolean; db?
         } else {
           //error out if no db provided, since it's required for the integration to work
           throw new Error("[purple-panda] No db provided. Pass `db` to purplePandaIntegration().");
+        }
+
+        if(options.mediaPath) {
+          //check that mediaPath is a valid directory
+          if (!existsSync(options.mediaPath) || !statSync(options.mediaPath).isDirectory()) {
+            throw new Error(`[purple-panda] Invalid media path provided: ${options.mediaPath}. It must be a valid directory.`);
+          }
+
+          setMediaPath(options.mediaPath);
+        } else {
+          throw new Error("[purple-panda] No media path provided. Pass `mediaPath` to purplePandaIntegration().");
         }
 
         logger.info("Setting up purple-panda");
@@ -165,8 +177,33 @@ export default function purplePandaIntegration(options: { enabled?: boolean; db?
         });
 
         injectRoute({
+          pattern: "/admin/media",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/media/index.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/media/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/media/index.astro",
+        });
+        
+        injectRoute({
+          pattern: "/admin/media/newfolder",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/media/newfolder.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/media/upload",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/media/upload.ts",
+        });
+
+        injectRoute({
           pattern: "/admin/[...path]",
           entrypoint: "@holtbosse/purplepanda/pages/admin/404.astro",
+        });
+
+        injectRoute({
+          pattern: "/image/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/image/[id].ts",
         });
 
         addMiddleware({
