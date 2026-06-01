@@ -7,6 +7,16 @@ import { fileURLToPath } from "node:url";
 import { extname, resolve, join } from "node:path";
 import { existsSync, createReadStream, readdirSync, statSync, copyFileSync, mkdirSync } from "node:fs";
 
+const VIRTUAL_PUCK_CONFIG_ID = "virtual:purplepanda/puck-config";
+const RESOLVED_VIRTUAL_PUCK_CONFIG_ID = `\0${VIRTUAL_PUCK_CONFIG_ID}`;
+
+export interface PurplePandaIntegrationOptions {
+  enabled?: boolean;
+  db?: NodePgDatabase<Record<string, unknown>>;
+  mediaPath?: string;
+  puckConfigModule?: string;
+}
+
 const MIME_TYPES: Record<string, string> = {
   ".ico": "image/x-icon",
   ".svg": "image/svg+xml",
@@ -36,14 +46,14 @@ function copyDir(src: string, dest: string) {
   }
 }
 
-export default function purplePandaIntegration(options: { enabled?: boolean; db?: NodePgDatabase<Record<string, unknown>>, mediaPath?: string } = {}): AstroIntegration {
+export default function purplePandaIntegration(options: PurplePandaIntegrationOptions = {}): AstroIntegration {
   // Resolves to src/assets/ relative to dist/index.js at runtime
   const assetsDir = fileURLToPath(new URL("../src/assets/", import.meta.url));
 
   return {
     name: "purple-panda",
     hooks: {
-      "astro:config:setup": ({ updateConfig, injectScript, addWatchFile, addMiddleware, injectRoute, logger }) => {
+      "astro:config:setup": ({ updateConfig, injectScript, addWatchFile, addMiddleware, injectRoute, logger, config }) => {
         if (options.enabled === false) return;
 
         if (options.db) {
@@ -76,6 +86,29 @@ export default function purplePandaIntegration(options: { enabled?: boolean; db?
               tailwindcss(),
               {
                 name: "purple-panda-assets",
+                resolveId(id) {
+                  if (id === VIRTUAL_PUCK_CONFIG_ID) {
+                    return RESOLVED_VIRTUAL_PUCK_CONFIG_ID;
+                  }
+
+                  return null;
+                },
+                load(id) {
+                  if (id !== RESOLVED_VIRTUAL_PUCK_CONFIG_ID) {
+                    return null;
+                  }
+
+                  if (!options.puckConfigModule) {
+                    return "export default {};";
+                  }
+
+                  const rootDir = fileURLToPath(config.root);
+                  const modulePath = options.puckConfigModule.startsWith(".")
+                    ? resolve(rootDir, options.puckConfigModule)
+                    : options.puckConfigModule;
+
+                  return `export { default } from ${JSON.stringify(modulePath)};`;
+                },
                 configureServer(server) {
                   server.middlewares.use("/admin/assets", (req, res, next) => {
                     const urlPath = (req.url ?? "/").split("?")[0];
@@ -194,6 +227,11 @@ export default function purplePandaIntegration(options: { enabled?: boolean; db?
         injectRoute({
           pattern: "/admin/media/upload",
           entrypoint: "@holtbosse/purplepanda/pages/admin/media/upload.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/components/data",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/components/data.ts",
         });
 
         injectRoute({

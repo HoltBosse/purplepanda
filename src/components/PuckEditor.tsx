@@ -3,8 +3,10 @@ import "@puckeditor/core/puck.css";
 import "../styles/puck-theme.css";
 import type { Config, Data, Overrides } from "@puckeditor/core";
 import { cloneElement, isValidElement, useEffect } from "react";
+import externalPuckConfig from "virtual:purplepanda/puck-config";
+import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
 
-const config: Config = {
+const baseConfig: Config = {
   components: {
     HeadingBlock: {
       fields: {
@@ -18,6 +20,19 @@ const config: Config = {
     },
   },
 };
+
+const hostConfig: Partial<Config> = externalPuckConfig ?? {};
+
+const mergedConfig: Config = {
+  ...baseConfig,
+  ...hostConfig,
+  components: {
+    ...baseConfig.components,
+    ...(hostConfig.components ?? {}),
+  },
+};
+
+const config = wrapConfigWithClientDataResolvers(mergedConfig);
 
 const initialData: Data = { content: [], root: { props: {} } };
 

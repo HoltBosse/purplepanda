@@ -12,6 +12,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./puck": {
+      "types": "./dist/puck/index.d.ts",
+      "default": "./dist/puck/index.js"
+    },
     "./pages/*": "./src/pages/*",
     "./middleware": "./src/middleware/index.ts",
     "./schema": {
