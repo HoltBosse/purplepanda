@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, integer } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, integer, jsonb } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -22,4 +22,17 @@ export const media = pgTable("media", {
   title: varchar("title", { length: 255 }).notNull(),
   alt: varchar("alt", { length: 255 }).notNull(),
   folder: uuid("folder").references(() => mediafolders.id),
+});
+
+export const templates = pgTable("templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  state: integer("state").notNull().default(1),
+  content: jsonb("content").notNull(),
+});
+
+//todo: add nullable content type field once content types are a thing
+export const pages = pgTable("pages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  state: integer("state").notNull().default(1),
+  content: jsonb("content").notNull(),
 });

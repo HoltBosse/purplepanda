@@ -3,40 +3,8 @@ import "@puckeditor/core/puck.css";
 import "../styles/puck-theme.css";
 import type { Config, Data, Overrides } from "@puckeditor/core";
 import { cloneElement, isValidElement, useEffect } from "react";
-import externalPuckConfig from "virtual:purplepanda/puck-config";
-import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
 
-const baseConfig: Config = {
-  components: {
-    HeadingBlock: {
-      fields: {
-        children: {
-          type: "text",
-        },
-      },
-      render: ({ children }) => {
-        return <h1>{children}</h1>;
-      },
-    },
-  },
-};
-
-const hostConfig: Partial<Config> = externalPuckConfig ?? {};
-
-const mergedConfig: Config = {
-  ...baseConfig,
-  ...hostConfig,
-  components: {
-    ...baseConfig.components,
-    ...(hostConfig.components ?? {}),
-  },
-};
-
-const config = wrapConfigWithClientDataResolvers(mergedConfig);
-
-const initialData: Data = { content: [], root: { props: {} } };
-
-const overrides: Partial<Overrides<Config>> = {
+export const overrides: Partial<Overrides<Config>> = {
   headerActions: ({ children }) => {
     if (isValidElement(children)) {
       return cloneElement(children as any, { "data-puck-publish": "" });
@@ -56,11 +24,13 @@ const overrides: Partial<Overrides<Config>> = {
   },
 };
 
-const save = (data: Data) => {
-  console.log("Saving data:", data);
-};
+interface PuckEditorProps {
+  config: Config;
+  data: Data;
+  onPublish: (data: Data) => void;
+}
 
-export default function PuckEditor() {
+export default function PuckEditor({ config, data, onPublish }: PuckEditorProps) {
   return (
     <div style={{ position: "relative" }}>
       <a
@@ -79,7 +49,7 @@ export default function PuckEditor() {
       >
         <img src="/admin/assets/favicon.svg" alt="Admin" style={{ height: "28px", width: "28px" }} />
       </a>
-      <Puck config={config} data={initialData} onPublish={save} overrides={overrides} />
+      <Puck config={config} data={data} onPublish={onPublish} overrides={overrides} />
     </div>
   );
 }
