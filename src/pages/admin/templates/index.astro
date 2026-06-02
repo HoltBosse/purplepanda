@@ -1,7 +1,42 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { createHash } from 'node:crypto';
+import { getDb } from '../../../db/db.js';
+import { templates } from '../../../db/schema.js';
+import { CircleCheck } from '@lucide/astro';
+import { capitalize } from '../../../string';
+
+const db = getDb();
+const allTemplates = await db.select().from(templates);
 ---
 
 <AdminLayout>
-	<p>template list view</p>
+	<div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
+        <h1 class="text-2xl font-semibold">Templates</h1>
+        <a href="/admin/templates/new" class="btn btn-primary">New</a>
+    </div>
+    <table class="table p-2 bg-base-100 rounded-lg">
+        <thead>
+            <tr>
+                <th class="w-px whitespace-nowrap">State</th>
+                <th>Template</th>
+            </tr>
+        </thead>
+        <tbody>
+            {allTemplates.map(template=>(
+                <tr>
+                    <th>
+                        <button class="btn btn-square">
+                            <CircleCheck size={20} class={template.state === 1 ? "text-green-500" : "text-red-500"} />
+                        </button>
+                    </th>
+                    <td>
+                        <a href={`/admin/templates/edit/${template.id}`}>
+                            <div class="font-bold link link-info link-hover">{(template.content as any)?.root?.props?.title || 'Untitled'}</div>
+                        </a>
+                    </td>
+                </tr>
+            ))}
+        </tbody>
+    </table>
 </AdminLayout>

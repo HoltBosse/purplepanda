@@ -55,16 +55,33 @@ const defaultInitialData: Data = {
   root: { props: {} },
 };
 
-const defaultSave = (data: Data) => {
-  console.log("Saving template data:", data);
-};
-
 interface TemplatePuckEditorProps {
   initialData?: Data;
+  saveUrl?: string;
   onPublish?: (data: Data) => void;
 }
 
-export default function TemplatePuckEditor({ initialData, onPublish }: TemplatePuckEditorProps = {}) {
+export default function TemplatePuckEditor({
+  initialData,
+  saveUrl = "/admin/templates/update",
+  onPublish,
+}: TemplatePuckEditorProps = {}) {
+  const defaultSave = (data: Data) => {
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = saveUrl;
+    form.style.display = "none";
+
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "content";
+    input.value = JSON.stringify(data);
+    form.appendChild(input);
+
+    document.body.appendChild(form);
+    form.submit();
+  };
+
   return (
     <PuckEditor
       config={config}

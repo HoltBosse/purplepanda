@@ -1,7 +1,47 @@
 ---
 import AdminBareLayout from '../../../layouts/AdminBareLayout.astro';
 import TemplatePuckEditor from '../../../components/TemplatePuckEditor';
+import { getDb } from '../../../db/db.js';
+import { templates } from '../../../db/schema.js';
+import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
+import { getProfileForm } from '../profile/form.js';
+import { createFormFlashSession } from '../../../form/session.js';
+import type { Data } from '@puckeditor/core';
+
+const db = getDb();
+
+const { id } = Astro.params;
+let saveUrl = '/admin/templates/update';
+if (id) {
+	saveUrl += `/${id}`;
+}
+
+let template;
+if(id) {
+	[template] = await db.select().from(templates).where(eq(templates.id, id)).limit(1);
+	if(!template) {
+		throw new Error('Template not found');
+	}
+} else {
+	template = Object.fromEntries(
+		Object.entries(getTableColumns(templates)).map(([key, col]: [string, any]) => {
+			let value: unknown;
+			if (col.defaultFn !== undefined) value = col.defaultFn();
+			else if (col.default !== undefined) value = col.default;
+			else if (col.dataType === 'number') value = 0;
+			else value = '';
+			return [key, value];
+		})
+	) as InferSelectModel<typeof templates>;
+}
+
+const editorProps = id ? { initialData: template.content as Data } : {};
+
 ---
 <AdminBareLayout>
-    <TemplatePuckEditor client:only="react" />
+    <TemplatePuckEditor
+        client:only="react"
+		saveUrl={saveUrl}
+		{...editorProps}
+    />
 </AdminBareLayout>

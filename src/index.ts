@@ -185,6 +185,21 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/templates/edit/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/templates/new.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/templates/update/",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/templates/update.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/templates/update/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/templates/update.ts",
+        });
+
+        injectRoute({
           pattern: "/admin/profile",
           entrypoint: "@holtbosse/purplepanda/pages/admin/profile/index.astro",
         });
