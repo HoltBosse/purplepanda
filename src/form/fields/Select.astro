@@ -1,0 +1,29 @@
+---
+import type { ComponentProps } from "astro/types";
+import BaseField from "../BaseField.astro";
+
+interface Props extends ComponentProps<typeof BaseField> {
+  placeholder?: string;
+  classList?: string;
+  options: { value: string; label: string }[];
+}
+
+const { placeholder, classList, options, ...baseProps } = Astro.props;
+const { id, name, value, required } = baseProps;
+---
+
+<BaseField {...baseProps}>
+    <select
+        class={classList}
+        name={name}
+        id={id}
+        required={required}
+    >
+        {placeholder && <option value="" disabled selected={value === undefined && !options.some(option => option.value === value)}>{placeholder}</option>}
+        {options.map((option) => (
+            <option value={option.value} selected={option.value === value}>
+                {option.label}
+            </option>
+        ))}
+    </select>
+</BaseField>

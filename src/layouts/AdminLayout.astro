@@ -1,6 +1,6 @@
 ---
 import '../styles/global.css';
-import { House, Users, LayoutTemplate, FileText, PenLine, ClipboardList, Images, LogOut } from '@lucide/astro';
+import { House, Users, LayoutTemplate, FileText, PenLine, ClipboardList, Images, Settings, LogOut } from '@lucide/astro';
 import { getDb } from '../db/db.js';
 import { users } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
@@ -68,6 +68,11 @@ const alerts = Astro.locals.alerts ?? [];
 			<a href="/admin/media" class="flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
 				<Images size={20} />
 				<span class="text-[10px] font-medium leading-tight">Media</span>
+			</a>
+
+			<a href="/admin/settings" class="flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
+				<Settings size={20} />
+				<span class="text-[10px] font-medium leading-tight">Settings</span>
 			</a>
 
 			<!-- User Avatar -->

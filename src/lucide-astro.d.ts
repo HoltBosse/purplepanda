@@ -38,3 +38,4 @@ export declare const ClipboardList: AstroComponent;
 export declare const Images: AstroComponent;
 export declare const LogOut: AstroComponent;
 export declare const Folder: AstroComponent;
+export declare const Settings: AstroComponent;

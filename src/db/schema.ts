@@ -36,3 +36,9 @@ export const pages = pgTable("pages", {
   state: integer("state").notNull().default(1),
   content: jsonb("content").notNull(),
 });
+
+export const settings = pgTable("settings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  key: varchar("key", { length: 255 }).notNull().unique(),
+  value: jsonb("value").notNull(),
+});
