@@ -58,12 +58,14 @@ const defaultInitialData: Data = {
 interface TemplatePuckEditorProps {
   initialData?: Data;
   saveUrl?: string;
+  templateData?: Data;
   onPublish?: (data: Data) => void;
 }
 
 export default function TemplatePuckEditor({
   initialData,
   saveUrl = "/admin/templates/update",
+  templateData,
   onPublish,
 }: TemplatePuckEditorProps = {}) {
   const defaultSave = (data: Data) => {
@@ -82,10 +84,13 @@ export default function TemplatePuckEditor({
     form.submit();
   };
 
+  const optionalProps = templateData ? { templateData } : {};
+
   return (
     <PuckEditor
       config={config}
       data={initialData ?? defaultInitialData}
+      {...optionalProps}
       onPublish={onPublish ?? defaultSave}
     />
   );

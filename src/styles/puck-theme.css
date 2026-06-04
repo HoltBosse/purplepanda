@@ -78,6 +78,24 @@
   --puck-color-rose-12: color-mix(in oklch, var(--color-secondary) 2%, var(--color-base-100));
 }
 
+/* During DnD, outlines/placeholders can momentarily exceed bounds at desktop zoom.
+   Clamp horizontal overflow to prevent transient page scrollbars. */
+.Puck:has([data-dnd-dragging]) {
+  overflow-x: clip;
+}
+
+.Puck:has([data-dnd-dragging]) [class*="_PuckCanvas_"] {
+  overflow-x: hidden !important;
+}
+
+.Puck [class*="_PuckCanvas_"] {
+  overflow-x: hidden !important;
+}
+
+.Puck [data-puck-dropzone] {
+  max-width: 100%;
+}
+
 /* targeted hacks around specific things */
 @media (prefers-color-scheme: dark), (data-theme="dark") {
   .Puck {

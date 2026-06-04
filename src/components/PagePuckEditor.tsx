@@ -37,15 +37,19 @@ const defaultSave = (data: Data) => {
 
 interface PagePuckEditorProps {
   initialData?: Data;
+  templateData?: Data;
   onPublish?: (data: Data) => void;
 }
 
-export default function PagePuckEditor({ initialData, onPublish }: PagePuckEditorProps = {}) {
+export default function PagePuckEditor({ initialData, templateData, onPublish }: PagePuckEditorProps = {}) {
+  const optionalProps = templateData ? { templateData } : {};
+
   return (
     <PuckEditor
       config={config}
       data={initialData ?? defaultInitialData}
       onPublish={onPublish ?? defaultSave}
+      {...optionalProps}
     />
   );
 }
