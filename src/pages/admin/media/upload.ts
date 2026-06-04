@@ -23,6 +23,8 @@ export async function POST(context: APIContext): Promise<Response> {
     const alt = z.array(z.string().min(1).max(255)).safeParse(formData.getAll("alt[]"));
     const file = z.array(z.instanceof(File)).safeParse(formData.getAll("file[]"));
     const folder = z.array(z.string().uuid()).optional().safeParse(formData.getAll("folder[]") as string[] | undefined);
+    const id = z.array(z.string().uuid().optional()).safeParse(formData.getAll("id[]") as string[] | undefined);
+    //console.log(id);
 
     if(!title.success || !alt.success || !file.success || !folder.success) {
         let message = "Invalid form data. Please make sure to provide a title, alt text, and a file.";
@@ -50,6 +52,24 @@ export async function POST(context: APIContext): Promise<Response> {
 
     //loop over files, insert into media table. take the returned uuid from the db and save the file to the mediaPath with the uuid split into /cc/cc/cccc-cc..... format, making the folders if they dont exist
     for(let i = 0; i < file.data.length; i++) {
+        if(id && id.success && id.data && id.data[i]) {
+            //update alt and title of existing media
+            const [updatedMedia] = await db.update(media).set({
+                title: title.data[i]!,
+                alt: alt.data[i]!,
+                folder: folder.data ? folder.data[i] ?? null : null,
+            }).where(eq(media.id, id.data[i]!)).returning({ id: media.id });
+
+            if(!updatedMedia) {
+                let message = "Failed to update media in database.";
+                const alert = createAlert(alertType.error, message);
+                await addAlertToSession(context.session, alert);
+                return context.redirect(`/admin/media${redirectFolderId ? `/${redirectFolderId}` : ""}`);
+            }
+
+            continue;
+        }
+
         //console.log("Inserting media into database...");
         const [insertedMedia] = await db.insert(media).values({
             title: title.data[i]!,

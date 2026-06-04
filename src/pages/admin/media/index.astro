@@ -140,7 +140,7 @@ if(id) {
         <form id="new-images-form" class="space-y-5" method="post" enctype="multipart/form-data" action="/admin/media/upload">
             <div id="new-images-list" class="space-y-4"></div>
             <div class="border-t border-base-300 pt-4">
-                <button type="submit" class="btn btn-primary w-full md:w-auto">Upload</button>
+                <button id="new-images-submit" type="submit" class="btn btn-primary w-full md:w-auto">Upload</button>
             </div>
         </form>
 
@@ -150,6 +150,7 @@ if(id) {
                     <div class="space-y-4 md:w-1/2">
                         <Input id="image-title-template" name="title[]" type="text" label="Title" placeholder="Image title" classList="input input-bordered w-full" required />
                         <Input id="image-alt-template" name="alt[]" type="text" label="Alt" placeholder="Alternative text" classList="input input-bordered w-full" required />
+                        <input data-image-id type="hidden" name="id[]" />
                         <input data-image-file type="file" name="file[]" class="hidden" required />
                         {id ? <input type="hidden" name="folder[]" value={id} /> : null}
                     </div>
@@ -170,6 +171,7 @@ if(id) {
         const newImagesForm = document.querySelector("#new-images-form") as HTMLFormElement | null;
         const newImagesList = document.querySelector("#new-images-list") as HTMLElement | null;
         const newImageItemTemplate = document.querySelector("#new-image-item-template") as HTMLTemplateElement | null;
+        const newImagesSubmit = document.querySelector("#new-images-submit") as HTMLButtonElement | null;
 
         let previewObjectUrls: string[] = [];
 
@@ -196,6 +198,10 @@ if(id) {
                 return;
             }
 
+            if (newImagesSubmit) {
+                newImagesSubmit.textContent = "Upload";
+            }
+
             clearImageConfigurations();
 
             if (!files || files.length === 0) {
@@ -213,11 +219,17 @@ if(id) {
 
                     const titleInput = section.querySelector('input[name="title[]"]') as HTMLInputElement | null;
                     const altInput = section.querySelector('input[name="alt[]"]') as HTMLInputElement | null;
+                    const idInput = section.querySelector('input[name="id[]"]') as HTMLInputElement | null;
                     const fileInput = section.querySelector("[data-image-file]") as HTMLInputElement | null;
                     const imagePreview = section.querySelector("[data-image-preview]") as HTMLImageElement | null;
                     const imageName = section.querySelector("[data-image-name]") as HTMLElement | null;
                     const titleLabel = section.querySelector('label[for="image-title-template"]') as HTMLLabelElement | null;
                     const altLabel = section.querySelector('label[for="image-alt-template"]') as HTMLLabelElement | null;
+
+                    if (idInput) {
+                        // Upload flow creates new assets, so id[] must be blank.
+                        idInput.value = "";
+                    }
 
                     if (titleInput) {
                         const titleId = `image-title-${index}`;
@@ -316,6 +328,103 @@ if(id) {
                 uploadInput.value = "";
             }
         });
+
+        const fileFromMediaCardImage = async (item: Element, id: string): Promise<File | null> => {
+            const image = item.querySelector("img") as HTMLImageElement | null;
+            if (!image) {
+                return null;
+            }
+
+            try {
+                if (!image.complete) {
+                    await image.decode();
+                }
+
+                const width = image.naturalWidth;
+                const height = image.naturalHeight;
+                if (!width || !height) {
+                    return null;
+                }
+
+                const canvas = document.createElement("canvas");
+                canvas.width = width;
+                canvas.height = height;
+
+                const context = canvas.getContext("2d");
+                if (!context) {
+                    return null;
+                }
+
+                context.drawImage(image, 0, 0, width, height);
+
+                const blob = await new Promise<Blob | null>((resolve) => {
+                    canvas.toBlob((result) => resolve(result), "image/webp", 0.92);
+                });
+
+                if (!blob) {
+                    return null;
+                }
+
+                return new File([blob], `${id}.webp`, { type: blob.type || "image/webp" });
+            } catch {
+                return null;
+            }
+        };
+
+        document.querySelectorAll(".media-item").forEach((item) => {
+            item.addEventListener("click", async (event) => {
+                event.preventDefault();
+
+                const title = item.getAttribute("data-title") || "";
+                const alt = item.getAttribute("data-alt") || "";
+                const id = item.getAttribute("data-id") || "";
+
+                if (!id) {
+                    return;
+                }
+
+                try {
+                    let file = await fileFromMediaCardImage(item, id);
+
+                    if (!file) {
+                        const response = await fetch(`/image/${id}`);
+                        if (!response.ok) {
+                            return;
+                        }
+
+                        const blob = await response.blob();
+                        const extension = blob.type.split("/")[1] || "bin";
+                        file = new File([blob], `${id}.${extension}`, { type: blob.type || "application/octet-stream" });
+                    }
+
+                    const transfer = new DataTransfer();
+                    transfer.items.add(file);
+                    createImageConfigurationRows(transfer.files);
+
+                    const titleInput = newImagesList?.querySelector('input[name="title[]"]') as HTMLInputElement | null;
+                    const altInput = newImagesList?.querySelector('input[name="alt[]"]') as HTMLInputElement | null;
+                    const idInput = newImagesList?.querySelector('input[name="id[]"]') as HTMLInputElement | null;
+
+                    if (titleInput) {
+                        titleInput.value = title;
+                    }
+
+                    if (altInput) {
+                        altInput.value = alt;
+                    }
+
+                    if (idInput) {
+                        idInput.value = id;
+                    }
+
+                    if (newImagesSubmit) {
+                        newImagesSubmit.textContent = "Update";
+                    }
+                } catch {
+                    // Keep the UI silent on network failures; user can retry.
+                }
+            });
+        });
     </script>
 
     {folders.length > 0 && <p class="text-lg font-semibold mt-4 mb-2">Folders</p>}
@@ -339,25 +448,30 @@ if(id) {
     <p class="text-lg font-semibold mt-4 mb-2">Assets</p>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {mediaItems.map((media)=>(
-            <a href="#" class="card w-full min-w-0 bg-base-100 shadow-sm hover:bg-base-300">
+            <a
+                class="card w-full min-w-0 bg-base-100 shadow-sm hover:bg-base-300 media-item"
+                data-title={media.title}
+                data-alt={media.alt}
+                data-id={media.id}
+            >
                 {/* w-full bg-base-200 bg-[image:repeating-linear-gradient(45deg,#d4d4d8_0,#d4d4d8_8px,transparent_0,transparent_16px),repeating-linear-gradient(-45deg,#d4d4d8_0,#d4d4d8_8px,transparent_0,transparent_16px)] */}
-                <figure class="">
+                <figure class="pointer-events-none aspect-video w-full overflow-hidden">
                     <img
                         src={`/image/${media.id}?fmt=webp&w=1000&q=80`}
                         title={media.title}
                         alt={media.title}
-                        class="aspect-video object-contain"
+                        class="h-full w-full object-contain pointer-events-none"
                     />
                 </figure>
-                <input type="checkbox" class="checkbox checkbox-neutral absolute left-2 top-2 z-10 select-mode-toggable hidden" />
-                <div class="card-body">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div class="min-w-0">
-                            <h5 class="font-semibold text-base-content">{media.title}</h5>
-                            <p class="text-sm text-base-content/60">#### x ###</p>
+                <input type="checkbox" class="checkbox checkbox-neutral absolute left-2 top-2 z-10 select-mode-toggable hidden pointer-events-none" />
+                <div class="card-body border-t border-base-300 bg-base-200/40">
+                    <div class="flex flex-wrap items-start justify-between gap-3 pointer-events-none">
+                        <div class="min-w-0 pointer-events-none">
+                            <h5 class="font-semibold text-base-content pointer-events-none">{media.title}</h5>
+                            <p class="text-sm text-base-content/60 pointer-events-none">#### x ###</p>
                         </div>
                         <div>
-                            <span class="bg-info text-white px-2 py-1 rounded">MIME</span>
+                            <span class="bg-info text-white px-2 py-1 rounded pointer-events-none">MIME</span>
                         </div>
                     </div>
                 </div>
