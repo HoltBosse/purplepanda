@@ -255,6 +255,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/media/movemediatofolder",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/media/movemediatofolder.ts",
+        });
+
+        injectRoute({
           pattern: "/admin/settings",
           entrypoint: "@holtbosse/purplepanda/pages/admin/settings/index.astro",
         });

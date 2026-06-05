@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@astrojs/react": "^5.0.4",
+    "@dnd-kit/dom": "^0.1.21",
     "@lucide/astro": "^1.3.0",
     "@puckeditor/core": "^0.21.2",
     "@tailwindcss/vite": "^4.2.4",
