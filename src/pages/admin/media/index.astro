@@ -9,6 +9,10 @@ import Input from '../../../form/fields/Input.astro';
 import { mediafolders, media } from "../../../db/schema.js";
 import { eq, sql, isNull } from 'drizzle-orm';
 import { z } from 'zod';
+import sharp from 'sharp';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { getMediaPath } from '../../../media/media.js';
 
 const { id } = Astro.params;
 
@@ -40,6 +44,41 @@ const folders = await db.select({
 }).from(mediafolders).where(id ? eq(mediafolders.parent, id) : isNull(mediafolders.parent));
 
 const mediaItems = await db.select().from(media).where(id ? eq(media.folder, id) : isNull(media.folder));
+
+// Load image metadata in parallel using sharp
+type MediaItemWithMetadata = typeof mediaItems[number] & {
+  mimetype?: string | undefined;
+  dimensions?: {
+    width: number;
+    height: number;
+  } | undefined;
+};
+
+const mediaItemsWithMetadata: MediaItemWithMetadata[] = await Promise.all(
+  mediaItems.map(async (item): Promise<MediaItemWithMetadata> => {
+    try {
+      const mediaPath = getMediaPath();
+      const filePath = join(mediaPath, item.id.slice(0, 2), item.id.slice(2, 4), item.id);
+      const fileBuffer = await readFile(filePath);
+      const metadata = await sharp(fileBuffer).metadata();
+      
+      return {
+        ...item,
+        mimetype: metadata.format ? `image/${metadata.format}` : undefined,
+        dimensions: metadata.width && metadata.height 
+          ? { width: metadata.width, height: metadata.height }
+          : undefined
+      };
+    } catch {
+      // Return item without metadata if sharp processing fails
+      return {
+        ...item,
+        mimetype: undefined,
+        dimensions: undefined
+      };
+    }
+  })
+);
 
 type FolderPathEntry = {
     id: string | null;
@@ -797,7 +836,7 @@ if(id) {
 
     <p class="text-lg font-semibold mt-4 mb-2">Assets</p>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {mediaItems.map((media)=>(
+        {mediaItemsWithMetadata.map((media)=>(
             <a
                 class="card w-full min-w-0 bg-base-100 shadow-sm hover:bg-base-300 media-item"
                 data-title={media.title}
@@ -818,10 +857,15 @@ if(id) {
                     <div class="flex flex-wrap items-start justify-between gap-3 pointer-events-none">
                         <div class="min-w-0 pointer-events-none">
                             <h5 class="font-semibold text-base-content pointer-events-none">{media.title}</h5>
-                            <p class="text-sm text-base-content/60 pointer-events-none">#### x ###</p>
+                            <p class="text-sm text-base-content/60 pointer-events-none">
+                                {media.dimensions ? `${media.dimensions.width} x ${media.dimensions.height}` : '#### x ###'}
+                            </p>
                         </div>
                         <div>
-                            <span class="bg-info text-white px-2 py-1 rounded pointer-events-none">MIME</span>
+                            <span class="bg-info text-white px-2 py-1 rounded pointer-events-none">
+                                {/* lazyily splitting on / and showing second half, consider using https://www.npmjs.com/package/mime-db */}
+                                {media.mimetype ? media.mimetype.split('/')[1]?.toUpperCase() ?? 'TYPE' : 'TYPE'}
+                            </span>
                         </div>
                     </div>
                 </div>
