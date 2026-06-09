@@ -183,7 +183,7 @@ export default function PuckEditor({ config, data, templateData, onPublish }: Pu
       >
         <img src="/admin/assets/favicon.svg" alt="Admin" style={{ height: "28px", width: "28px" }} />
       </a>
-      <Puck config={configCopy} data={data} onPublish={onPublish} overrides={overrides} />
+      <Puck config={configCopy} data={data} onPublish={onPublish} overrides={overrides}/>
     </div>
   );
 }
