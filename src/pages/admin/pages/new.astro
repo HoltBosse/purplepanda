@@ -2,23 +2,53 @@
 import AdminBareLayout from '../../../layouts/AdminBareLayout.astro';
 import PagePuckEditor from '../../../components/PagePuckEditor';
 import { getDb } from '../../../db/db.js';
-import { settings, templates } from '../../../db/schema.js';
+import { settings, templates, pages } from '../../../db/schema.js';
 import { eq, sql } from 'drizzle-orm';
 import type { Data } from '@puckeditor/core';
 
 const db = getDb();
-const [defaultTemplate] = await db
-    .select()
-    .from(settings)
-    .leftJoin(templates, sql`(${templates.id})::text = (${settings.value} #>> '{}')`)
-    .where(eq(settings.key, 'default_template'))
-    .limit(1);
 
-const editorProps = defaultTemplate?.templates?.content
-    ? { templateData: defaultTemplate.templates.content as Data }
-    : {};
+const { id } = Astro.params;
+
+let saveUrl = '/admin/pages/update';
+if (id) {
+    saveUrl += `/${id}`;
+}
+
+const [defaultTemplate, allPages, existingPage] = await Promise.all([
+    db
+        .select()
+        .from(settings)
+        .leftJoin(templates, sql`(${templates.id})::text = (${settings.value} #>> '{}')`)
+        .where(eq(settings.key, 'default_template'))
+        .limit(1)
+        .then(rows => rows[0]),
+    db
+        .select({
+            id: pages.id,
+            title: sql<string>`(${pages.content}->'root'->'props'->>'title')`,
+        })
+        .from(pages)
+        .where(eq(pages.state, 1)),
+    id
+        ? db.select().from(pages).where(eq(pages.id, id)).limit(1).then(rows => rows[0])
+        : Promise.resolve(undefined),
+]);
+
+if (id && !existingPage) {
+    throw new Error('Page not found');
+}
+
+const templateData = defaultTemplate?.templates?.content as Data | undefined;
+
+const editorProps = {
+    ...(existingPage ? { initialData: existingPage.content as Data } : {}),
+    ...(templateData ? { templateData } : {}),
+};
+
+const pageOptions = allPages.map(p => ({ id: p.id, title: p.title ?? '' }));
 
 ---
 <AdminBareLayout>
-    <PagePuckEditor client:only="react" {...editorProps} />
+    <PagePuckEditor client:only="react" saveUrl={saveUrl} {...editorProps} pages={pageOptions} />
 </AdminBareLayout>

@@ -1,4 +1,5 @@
 import type { Config, Data } from "@puckeditor/core";
+import { useMemo } from "react";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
 import { filterConfigByLocation } from "../puck/index.js";
@@ -36,22 +37,64 @@ const config = wrapConfigWithClientDataResolvers(filterConfigByLocation(mergedCo
 
 const defaultInitialData: Data = { content: [], root: { props: {} } };
 
-const defaultSave = (data: Data) => {
-  console.log("Saving page data:", data);
-};
+export interface PageOption {
+  id: string;
+  title: string;
+}
 
 interface PagePuckEditorProps {
   initialData?: Data;
   templateData?: Data;
+  saveUrl?: string;
   onPublish?: (data: Data) => void;
+  pages?: PageOption[];
 }
 
-export default function PagePuckEditor({ initialData, templateData, onPublish }: PagePuckEditorProps = {}) {
+export default function PagePuckEditor({ initialData, templateData, saveUrl = "/admin/pages/update", onPublish, pages = [] }: PagePuckEditorProps = {}) {
+  const defaultSave = (data: Data) => {
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = saveUrl;
+    form.style.display = "none";
+
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "content";
+    input.value = JSON.stringify(data);
+    form.appendChild(input);
+
+    document.body.appendChild(form);
+    form.submit();
+  };
+  const configWithRootFields = useMemo(() => ({
+    ...config,
+    root: {
+      ...config.root,
+      fields: {
+        title: { type: "text" as const, label: "Title" },
+        alias: { type: "text" as const, label: "Alias" },
+        parentPage: {
+          type: "select" as const,
+          label: "Parent Page",
+          options: [
+            { label: "None", value: "" },
+            ...pages.map((p) => ({ label: p.title || p.id, value: p.id })),
+          ],
+        },
+      },
+      defaultProps: {
+        title: "",
+        alias: "",
+        parentPage: "",
+      },
+    },
+  }), [pages]);
+
   const optionalProps = templateData ? { templateData } : {};
 
   return (
     <PuckEditor
-      config={config}
+      config={configWithRootFields}
       data={initialData ?? defaultInitialData}
       onPublish={onPublish ?? defaultSave}
       {...optionalProps}
