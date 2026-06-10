@@ -5,6 +5,9 @@ import { filterConfigByLocation } from "../puck/index.js";
 import PuckEditor from "./PuckEditor.js";
 
 const baseConfig: Config = {
+    root: {
+      label: "Form",
+    },
     categories: {
         DummyHidden: {
             components: [],
