@@ -29,7 +29,7 @@
     "./form/*": "./src/form/*"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest",
     "build": "tsc",
     "dev": "tsc -w"
   },
@@ -39,7 +39,8 @@
     "astro": "^6.2.2",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
   },
   "dependencies": {
     "@astrojs/react": "^5.0.4",
