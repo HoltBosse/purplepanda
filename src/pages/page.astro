@@ -4,6 +4,7 @@ import { pages, settings, templates } from '../db/schema.js';
 import { eq, sql } from 'drizzle-orm';
 import type { Data } from '@puckeditor/core';
 import externalPuckConfig from 'virtual:purplepanda/puck-config';
+import { has404Page } from 'virtual:purplepanda/has-404';
 import { resolveDataForSSR } from '../puck/server-data-wrapper.js';
 import PageRenderer from '../components/PageRenderer.js';
 
@@ -39,6 +40,9 @@ const pathToPage = new Map(allPages.map(p => [getPagePath(p), p]));
 const matchedPage = pathToPage.get(requestPath);
 
 if (!matchedPage) {
+    if (has404Page) {
+        return Astro.rewrite('/404');
+    }
     return new Response('Not Found', { status: 404 });
 }
 

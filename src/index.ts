@@ -10,6 +10,9 @@ import { existsSync, createReadStream, readdirSync, statSync, copyFileSync, mkdi
 const VIRTUAL_PUCK_CONFIG_ID = "virtual:purplepanda/puck-config";
 const RESOLVED_VIRTUAL_PUCK_CONFIG_ID = `\0${VIRTUAL_PUCK_CONFIG_ID}`;
 
+const VIRTUAL_HAS_404_ID = "virtual:purplepanda/has-404";
+const RESOLVED_VIRTUAL_HAS_404_ID = `\0${VIRTUAL_HAS_404_ID}`;
+
 export interface PurplePandaIntegrationOptions {
   enabled?: boolean;
   db?: NodePgDatabase<Record<string, unknown>>;
@@ -74,6 +77,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
           throw new Error("[purple-panda] No media path provided. Pass `mediaPath` to purplePandaIntegration().");
         }
 
+        const srcDir = fileURLToPath(config.srcDir);
+        const has404Page = ['404.astro', '404.md', '404.mdx'].some(f =>
+          existsSync(join(srcDir, 'pages', f))
+        );
+
         logger.info("Setting up purple-panda");
 
         // Example: inject a script into every page (runs in the browser)
@@ -87,13 +95,15 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
               {
                 name: "purple-panda-assets",
                 resolveId(id) {
-                  if (id === VIRTUAL_PUCK_CONFIG_ID) {
-                    return RESOLVED_VIRTUAL_PUCK_CONFIG_ID;
-                  }
-
+                  if (id === VIRTUAL_PUCK_CONFIG_ID) return RESOLVED_VIRTUAL_PUCK_CONFIG_ID;
+                  if (id === VIRTUAL_HAS_404_ID) return RESOLVED_VIRTUAL_HAS_404_ID;
                   return null;
                 },
                 load(id) {
+                  if (id === RESOLVED_VIRTUAL_HAS_404_ID) {
+                    return `export const has404Page = ${has404Page};`;
+                  }
+
                   if (id !== RESOLVED_VIRTUAL_PUCK_CONFIG_ID) {
                     return null;
                   }
