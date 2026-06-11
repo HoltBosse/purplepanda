@@ -1,0 +1,67 @@
+---
+import { getDb } from '../db/db.js';
+import { pages, settings, templates } from '../db/schema.js';
+import { eq, sql } from 'drizzle-orm';
+import type { Data } from '@puckeditor/core';
+import externalPuckConfig from 'virtual:purplepanda/puck-config';
+import { resolveDataForSSR } from '../puck/server-data-wrapper.js';
+import PageRenderer from '../components/PageRenderer.js';
+
+const db = getDb();
+const requestPath = Astro.params.path ?? '';
+
+const [allPages, templateSetting] = await Promise.all([
+    db.select().from(pages).where(eq(pages.state, 1)),
+    db
+        .select()
+        .from(settings)
+        .leftJoin(templates, sql`(${templates.id})::text = (${settings.value} #>> '{}')`)
+        .where(eq(settings.key, 'default_template'))
+        .limit(1)
+        .then(rows => rows[0]),
+]);
+
+const pageById = new Map(allPages.map(p => [p.id, p]));
+
+function getPagePath(page: typeof allPages[0], visited = new Set<string>()): string {
+    if (visited.has(page.id)) return '';
+    const content = page.content as any;
+    const alias: string = content?.root?.props?.alias ?? '';
+    const parentId: string = content?.root?.props?.parentPage ?? '';
+    if (parentId && pageById.has(parentId)) {
+        const parentPath = getPagePath(pageById.get(parentId)!, new Set([...visited, page.id]));
+        return parentPath ? `${parentPath}/${alias}` : alias;
+    }
+    return alias;
+}
+
+const pathToPage = new Map(allPages.map(p => [getPagePath(p), p]));
+const matchedPage = pathToPage.get(requestPath);
+
+if (!matchedPage) {
+    return new Response('Not Found', { status: 404 });
+}
+
+const config = externalPuckConfig ?? {};
+
+const [pageData, templateData] = await Promise.all([
+    resolveDataForSSR(config, matchedPage.content as Data),
+    templateSetting?.templates?.content
+        ? resolveDataForSSR(config, templateSetting.templates.content as Data)
+        : Promise.resolve(undefined),
+]);
+
+const title: string = (pageData as any)?.root?.props?.title ?? '';
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+</head>
+<body>
+    <PageRenderer pageData={pageData} templateData={templateData} />
+</body>
+</html>

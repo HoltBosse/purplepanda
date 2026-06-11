@@ -310,6 +310,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/[...path]",
+          entrypoint: "@holtbosse/purplepanda/pages/page.astro",
+        });
+
+        injectRoute({
           pattern: "/image/[id]",
           entrypoint: "@holtbosse/purplepanda/pages/image/[id].ts",
         });
