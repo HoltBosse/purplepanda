@@ -42,3 +42,9 @@ export const settings = pgTable("settings", {
   key: varchar("key", { length: 255 }).notNull().unique(),
   value: jsonb("value").notNull(),
 });
+
+export const forms = pgTable("forms", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  state: integer("state").notNull().default(1),
+  content: jsonb("content").notNull(),
+});

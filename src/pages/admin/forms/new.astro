@@ -1,7 +1,30 @@
 ---
 import AdminBareLayout from '../../../layouts/AdminBareLayout.astro';
 import FormPuckEditor from '../../../components/FormPuckEditor';
+import { getDb } from '../../../db/db.js';
+import { forms } from '../../../db/schema.js';
+import { eq } from 'drizzle-orm';
+import type { Data } from '@puckeditor/core';
+
+const db = getDb();
+
+const { id } = Astro.params;
+
+let saveUrl = '/admin/forms/update';
+if (id) {
+    saveUrl += `/${id}`;
+}
+
+const existingForm = id
+    ? await db.select().from(forms).where(eq(forms.id, id)).limit(1).then(rows => rows[0])
+    : undefined;
+
+if (id && !existingForm) {
+    throw new Error('Form not found');
+}
+
+const editorProps = existingForm ? { initialData: existingForm.content as Data } : {};
 ---
 <AdminBareLayout>
-    <FormPuckEditor client:only="react" />
+    <FormPuckEditor client:only="react" saveUrl={saveUrl} {...editorProps} />
 </AdminBareLayout>
