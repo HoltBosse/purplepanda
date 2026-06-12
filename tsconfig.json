@@ -26,5 +26,5 @@
     "skipLibCheck": true,
     "jsxImportSource": "react"
   },
-  "exclude": ["drizzle.config.ts", "vitest.config.ts", "dist", "node_modules"]
+  "exclude": ["drizzle.config.ts", "vitest.config.ts", "dist", "node_modules", "**/*.test.ts"]
 }
