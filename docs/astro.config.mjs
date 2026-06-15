@@ -23,6 +23,7 @@ export default defineConfig({
 						// Each item here is one entry in the navigation menu.
 						{ label: 'Installation', slug: 'devs/install' },
 						{ label: 'Components', slug: 'devs/components' },
+						{ label: 'Content Types', slug: 'devs/content-types' },
 					],
 				},
 			],
