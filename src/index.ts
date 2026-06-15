@@ -310,6 +310,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/content/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/content/index.astro",
+        });
+
+        injectRoute({
           pattern: "/admin/forms/api/lookup",
           entrypoint: "@holtbosse/purplepanda/pages/admin/forms/api/lookup.ts",
         });

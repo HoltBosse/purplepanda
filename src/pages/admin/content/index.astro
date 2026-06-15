@@ -3,37 +3,47 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
 import { pages } from '../../../db/schema.js';
 import { CircleCheck } from '@lucide/astro';
-import { desc, eq, isNull } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
+import externalPuckConfig from "virtual:purplepanda/puck-config";
+
+const { id } = Astro.params;
+const contentTypes = (externalPuckConfig ? externalPuckConfig.contentTypes : []) ?? [];
+//check that one of contentTypes .id matches id param
+if(!id || !contentTypes.find(ct => ct.id === id)) {
+    return Astro.rewrite('/admin/__not-found');
+}
+
+const contentType = contentTypes.find(ct => ct.id === id);
 
 const db = getDb();
 //order by id desc
-const allPages = await db.select().from(pages).where(isNull(pages.contentType)).orderBy(desc(pages.id));
+const allPages = await db.select().from(pages).where(eq(pages.contentType, id)).orderBy(desc(pages.id));
 ---
 
 <AdminLayout>
 	<div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
-        <h1 class="text-2xl font-semibold">Pages</h1>
-        <a href="/admin/pages/new" class="btn btn-primary">New</a>
+        <h1 class="text-2xl font-semibold">{contentType?.title || 'Content'}</h1>
+        <a href={`/admin/content/${id}/new`} class="btn btn-primary">New</a>
     </div>
     <table class="table p-2 bg-base-100 rounded-lg">
         <thead>
             <tr>
                 <th class="w-px whitespace-nowrap">State</th>
-                <th>Page</th>
+                <th>{contentType?.title || 'Content'}</th>
             </tr>
         </thead>
         <tbody>
             {allPages.map(page => (
                 <tr>
                     <th>
-                        <form action={`/admin/pages/toggle/${page.id}`} method="POST">
+                        <form action={`/admin/content/${id}/toggle/${page.id}`} method="POST">
                             <button class="btn btn-square" type="submit">
                                 <CircleCheck size={20} class={page.state === 1 ? "text-green-500" : "text-red-500"} />
                             </button>
                         </form>
                     </th>
                     <td>
-                        <a href={`/admin/pages/edit/${page.id}`}>
+                        <a href={`/admin/content/${id}/edit/${page.id}`}>
                             <div class="font-bold link link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</div>
                         </a>
                     </td>

@@ -34,6 +34,7 @@ export const templates = pgTable("templates", {
 export const pages = pgTable("pages", {
   id: uuid("id").defaultRandom().primaryKey(),
   state: integer("state").notNull().default(1),
+  contentType: uuid("contentType"),
   content: jsonb("content").notNull(),
 });
 

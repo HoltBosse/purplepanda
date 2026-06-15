@@ -8,6 +8,7 @@ import Alert from '../alert/Alert.astro';
 import SessionAlerts from '../alert/SessionAlerts.astro';
 import { alertType } from '../alert/index.js';
 import Container from '../components/Container.astro';
+import externalPuckConfig from "virtual:purplepanda/puck-config";
 
 const db = getDb();
 
@@ -19,6 +20,8 @@ if(!user) {
 }
 
 const alerts = Astro.locals.alerts ?? [];
+
+const contentTypes = (externalPuckConfig ? externalPuckConfig.contentTypes : []) ?? [];
 ---
 <!DOCTYPE html>
 <html lang="en">
@@ -142,8 +145,9 @@ const alerts = Astro.locals.alerts ?? [];
 					<div id="panel-content" class="drawer-panel hidden">
 						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Content</h2>
 						<ul class="menu w-full px-2 py-1 gap-0.5">
-							<li><a href="#">All Content</a></li>
-							<li><a href="#">New Content</a></li>
+							{contentTypes.map(ct => (
+								<li><a href={`/admin/content/${ct.id}`}>{ct.title}</a></li>
+							))}
 						</ul>
 					</div>
 

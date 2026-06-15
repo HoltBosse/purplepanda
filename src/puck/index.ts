@@ -1,4 +1,4 @@
-import type { Config } from "@puckeditor/core";
+import type { Config, Fields } from "@puckeditor/core";
 export { ClientComponentDataWrapper, wrapConfigWithClientDataResolvers } from "./client-data-wrapper.js";
 
 export type { ComponentConfig } from "@puckeditor/core";
@@ -22,10 +22,17 @@ type ComponentWithDataResolver<TComponent> = Omit<TComponent, "data" | "location
   locations?: Location | Location[];
 };
 
+export type ContentType = {
+  id: string;
+  title: string,
+  fields: Fields;
+};
+
 type ConfigWithDataResolvers<TConfig extends Config> = Omit<TConfig, "components"> & {
   components: {
     [TName in keyof TConfig["components"]]: ComponentWithDataResolver<TConfig["components"][TName]>;
   };
+  contentTypes?: ContentType[];
 };
 
 declare module "@puckeditor/core" {
