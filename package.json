@@ -20,6 +20,10 @@
       "types": "./dist/puck/form-fields/index.d.ts",
       "default": "./dist/puck/form-fields/index.js"
     },
+    "./puck/form": {
+      "types": "./dist/puck/form/index.d.ts",
+      "default": "./src/puck/form/index.js"
+    },
     "./pages/*": "./src/pages/*",
     "./middleware": "./src/middleware/index.ts",
     "./schema": {

@@ -173,7 +173,7 @@ export default function PuckEditor({ config, data, templateData, onPublish }: Pu
           position: "absolute",
           top: 0,
           left: 0,
-          zIndex: 9999,
+          zIndex: 1,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
