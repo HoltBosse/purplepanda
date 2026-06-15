@@ -8,3 +8,5 @@ A CMS that runs as an astro integration
 Requirements:
 * React integration
 * drizzle db
+
+See https://purplepanda.holtbosse.com for more details
