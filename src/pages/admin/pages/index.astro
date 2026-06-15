@@ -3,9 +3,11 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
 import { pages } from '../../../db/schema.js';
 import { CircleCheck } from '@lucide/astro';
+import { desc } from 'drizzle-orm';
 
 const db = getDb();
-const allPages = await db.select().from(pages);
+//order by id desc
+const allPages = await db.select().from(pages).orderBy(desc(pages.id));
 ---
 
 <AdminLayout>
@@ -24,9 +26,11 @@ const allPages = await db.select().from(pages);
             {allPages.map(page => (
                 <tr>
                     <th>
-                        <button class="btn btn-square">
-                            <CircleCheck size={20} class={page.state === 1 ? "text-green-500" : "text-red-500"} />
-                        </button>
+                        <form action={`/admin/pages/toggle/${page.id}`} method="POST">
+                            <button class="btn btn-square" type="submit">
+                                <CircleCheck size={20} class={page.state === 1 ? "text-green-500" : "text-red-500"} />
+                            </button>
+                        </form>
                     </th>
                     <td>
                         <a href={`/admin/pages/edit/${page.id}`}>

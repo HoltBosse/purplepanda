@@ -200,6 +200,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/pages/toggle/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/pages/toggle.ts",
+        });
+
+        injectRoute({
           pattern: "/admin/templates",
           entrypoint: "@holtbosse/purplepanda/pages/admin/templates/index.astro",
         });
@@ -222,6 +227,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         injectRoute({
           pattern: "/admin/templates/update/[id]",
           entrypoint: "@holtbosse/purplepanda/pages/admin/templates/update.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/templates/toggle/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/templates/toggle.ts",
         });
 
         injectRoute({
@@ -327,6 +337,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         injectRoute({
           pattern: "/admin/forms/update/[id]",
           entrypoint: "@holtbosse/purplepanda/pages/admin/forms/update.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/forms/toggle/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/forms/toggle.ts",
         });
 
         injectRoute({

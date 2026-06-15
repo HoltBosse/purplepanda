@@ -3,9 +3,10 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
 import { forms } from '../../../db/schema.js';
 import { CircleCheck } from '@lucide/astro';
+import { desc } from 'drizzle-orm';
 
 const db = getDb();
-const allForms = await db.select().from(forms);
+const allForms = await db.select().from(forms).orderBy(desc(forms.id));
 ---
 
 <AdminLayout>
@@ -24,9 +25,11 @@ const allForms = await db.select().from(forms);
             {allForms.map(form => (
                 <tr>
                     <th>
-                        <button class="btn btn-square">
-                            <CircleCheck size={20} class={form.state === 1 ? "text-green-500" : "text-red-500"} />
-                        </button>
+                        <form action={`/admin/forms/toggle/${form.id}`} method="POST">
+                            <button class="btn btn-square" type="submit">
+                                <CircleCheck size={20} class={form.state === 1 ? "text-green-500" : "text-red-500"} />
+                            </button>
+                        </form>
                     </th>
                     <td>
                         <a href={`/admin/forms/edit/${form.id}`}>
