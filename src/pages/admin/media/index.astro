@@ -7,7 +7,7 @@ import { Folder } from '@lucide/astro';
 import { capitalize } from '../../../string';
 import Input from '../../../form/fields/Input.astro';
 import { mediafolders, media } from "../../../db/schema.js";
-import { eq, sql, isNull } from 'drizzle-orm';
+import { eq, sql, isNull, and } from 'drizzle-orm';
 import { z } from 'zod';
 import sharp from 'sharp';
 import { readFile } from 'node:fs/promises';
@@ -46,12 +46,12 @@ const offset = (page - 1) * itemsPerPage;
 const folders = await db.select({
     id: mediafolders.id,
     name: mediafolders.name,
-    innerFolders: sql<number>`(SELECT COUNT(*) FROM ${mediafolders} AS mf WHERE mf.parent = "mediafolders"."id")`,
-    innerMedia: sql<number>`(SELECT COUNT(*) FROM ${media} WHERE ${media}.folder = "mediafolders"."id")`
-}).from(mediafolders).where(id ? eq(mediafolders.parent, id) : isNull(mediafolders.parent));
+    innerFolders: sql<number>`(SELECT COUNT(*) FROM ${mediafolders} AS mf WHERE mf.parent = "mediafolders"."id" AND mf.state = 1)`,
+    innerMedia: sql<number>`(SELECT COUNT(*) FROM ${media} WHERE ${media}.folder = "mediafolders"."id" AND ${media}.state = 1)`,
+}).from(mediafolders).where(and(id ? eq(mediafolders.parent, id) : isNull(mediafolders.parent), eq(mediafolders.state, 1))).orderBy(mediafolders.name);
 
-const mediaItems = await db.select().from(media).where(id ? eq(media.folder, id) : isNull(media.folder)).limit(itemsPerPage).offset(offset);
-const totalMediaItems = await db.select({ count: sql<number>`COUNT(*)` }).from(media).where(id ? eq(media.folder, id) : isNull(media.folder)).then(result => result[0]?.count ?? 0);
+const mediaItems = await db.select().from(media).where(and(id ? eq(media.folder, id) : isNull(media.folder), eq(media.state, 1))).limit(itemsPerPage).offset(offset);
+const totalMediaItems = await db.select({ count: sql<number>`COUNT(*)` }).from(media).where(and(id ? eq(media.folder, id) : isNull(media.folder), eq(media.state, 1))).then(result => result[0]?.count ?? 0);
 const totalPages = Math.ceil(totalMediaItems / itemsPerPage);
 
 // Load image metadata in parallel using sharp
