@@ -35,8 +35,9 @@ export async function POST(context: APIContext): Promise<Response> {
 
     //validate folders
     if(folder.data) {
+        const dedupedFolders = [...new Set(folder.data)];
         const existingFolders = await db.select().from(mediafolders).where(inArray(mediafolders.id, folder.data));
-        if(existingFolders.length !== folder.data.length) {
+        if(existingFolders.length !== dedupedFolders.length) {
             let message = "One or more selected folders do not exist.";
             const alert = createAlert(alertType.error, message);
             await addAlertToSession(context.session, alert);
