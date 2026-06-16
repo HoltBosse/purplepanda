@@ -156,6 +156,22 @@ if(id) {
         import "./media-library";
     </script>
 
+    <dialog id="delete-confirm-dialog" closedby="any" class="relative m-auto w-96 max-w-[calc(100vw-2rem)] rounded-xl bg-base-100 p-6 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <h3 class="text-lg font-semibold mb-2">Confirm Delete</h3>
+        <p id="delete-confirm-summary" class="text-base-content/70 mb-3"></p>
+        <p id="delete-folder-warning" class="text-sm text-warning mb-4 hidden">Deleting folders will also delete all their contents.</p>
+        <form id="delete-confirm-form" method="post" action="/admin/media/delete">
+            <input type="hidden" name="currentfolderid" value={id ?? ""} />
+            <div class="flex gap-3">
+                <button type="button" id="delete-cancel-btn" class="btn btn-outline flex-1">Cancel</button>
+                <button type="submit" class="btn btn-error flex-1">Delete</button>
+            </div>
+        </form>
+    </dialog>
+
     <dialog id="new-folder-dialog" closedby="any" class="relative m-auto w-96 max-w-[calc(100vw-2rem)] rounded-xl bg-base-100 p-6 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
         <form method="dialog">
             <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>

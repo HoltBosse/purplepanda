@@ -2,6 +2,57 @@ import { DragDropManager, Draggable, Droppable } from "@dnd-kit/dom";
 
 document.body.dataset.mediaSelectMode = "false";
 
+const deleteConfirmDialog = document.querySelector("#delete-confirm-dialog") as HTMLDialogElement | null;
+const deleteConfirmForm = document.querySelector("#delete-confirm-form") as HTMLFormElement | null;
+const deleteConfirmSummary = document.querySelector("#delete-confirm-summary") as HTMLElement | null;
+const deleteFolderWarning = document.querySelector("#delete-folder-warning") as HTMLElement | null;
+const deleteCancelBtn = document.querySelector("#delete-cancel-btn") as HTMLButtonElement | null;
+
+document.querySelector(".select-mode-toggable.btn")?.addEventListener("click", () => {
+    if (!deleteConfirmDialog || !deleteConfirmForm) return;
+
+    const checkedMedia = mediaCards.filter((card) => {
+        const cb = card.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+        return cb?.checked === true;
+    });
+    const checkedFolders = folderCards.filter((card) => {
+        const cb = card.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+        return cb?.checked === true;
+    });
+
+    if (checkedMedia.length === 0 && checkedFolders.length === 0) return;
+
+    // Build summary text
+    const parts: string[] = [];
+    if (checkedFolders.length > 0) parts.push(`${checkedFolders.length} folder${checkedFolders.length === 1 ? "" : "s"}`);
+    if (checkedMedia.length > 0) parts.push(`${checkedMedia.length} asset${checkedMedia.length === 1 ? "" : "s"}`);
+    if (deleteConfirmSummary) deleteConfirmSummary.textContent = `Delete ${parts.join(" and ")}?`;
+    if (deleteFolderWarning) deleteFolderWarning.classList.toggle("hidden", checkedFolders.length === 0);
+
+    // Clear previously injected id inputs, keep the currentfolderid hidden input
+    deleteConfirmForm.querySelectorAll('input[name="mediaid[]"], input[name="folderid[]"]').forEach((el) => el.remove());
+
+    checkedMedia.forEach((card) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "mediaid[]";
+        input.value = card.dataset.id ?? "";
+        deleteConfirmForm.append(input);
+    });
+
+    checkedFolders.forEach((card) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "folderid[]";
+        input.value = card.dataset.id ?? "";
+        deleteConfirmForm.append(input);
+    });
+
+    deleteConfirmDialog.showModal();
+});
+
+deleteCancelBtn?.addEventListener("click", () => deleteConfirmDialog?.close());
+
 document.querySelector("#select-mode-trigger")?.addEventListener("click", (e) => {
     const target = e.target as HTMLElement;
     const selectModeActive = document.body.dataset.mediaSelectMode !== "true";
