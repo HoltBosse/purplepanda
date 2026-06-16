@@ -13,6 +13,7 @@ import sharp from 'sharp';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getMediaPath } from '../../../media/media.js';
+import Pagination from '../../../components/Pagination.astro';
 
 const { id } = Astro.params;
 
@@ -33,7 +34,13 @@ if(id) {
     }
 }
 
-const items = ['Dog', 'Cat', 'Bird', 'Lol', 'Test', 'Dan', 'Hugo', 'James', 'John', 'Anna'];
+const itemsPerPage = 12;
+const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);
+let page = 1;
+if (pageData.success) {
+    page = pageData.data;
+}
+const offset = (page - 1) * itemsPerPage;
 
 //using drizzle, fetch mediafolders, join media on mediafolders.id = media.folder, join mediafolders on mediafolders.parent=mediafolder.id to return the name of the folder, number of inner folders, number of inner media
 const folders = await db.select({
@@ -43,7 +50,9 @@ const folders = await db.select({
     innerMedia: sql<number>`(SELECT COUNT(*) FROM ${media} WHERE ${media}.folder = "mediafolders"."id")`
 }).from(mediafolders).where(id ? eq(mediafolders.parent, id) : isNull(mediafolders.parent));
 
-const mediaItems = await db.select().from(media).where(id ? eq(media.folder, id) : isNull(media.folder));
+const mediaItems = await db.select().from(media).where(id ? eq(media.folder, id) : isNull(media.folder)).limit(itemsPerPage).offset(offset);
+const totalMediaItems = await db.select({ count: sql<number>`COUNT(*)` }).from(media).where(id ? eq(media.folder, id) : isNull(media.folder)).then(result => result[0]?.count ?? 0);
+const totalPages = Math.ceil(totalMediaItems / itemsPerPage);
 
 // Load image metadata in parallel using sharp
 type MediaItemWithMetadata = typeof mediaItems[number] & {
@@ -872,4 +881,9 @@ if(id) {
             </a>
         ))}
     </div>
+    {totalMediaItems-mediaItemsWithMetadata.length > 0 &&
+        <div class="pt-6 pb-6 flex items-center justify-center">
+            <Pagination currentPage={page} totalPages={totalPages} basePath={`/admin/media/${id ? `${id}/` : ""}`} />
+        </div>
+    }
 </AdminLayout>
