@@ -2,7 +2,7 @@
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
 import { pages } from '../../../db/schema.js';
-import { CircleCheck } from '@lucide/astro';
+import { CircleCheck, CircleX } from '@lucide/astro';
 import { desc, eq } from 'drizzle-orm';
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 
@@ -69,7 +69,7 @@ const allPages = await db.select().from(pages).where(eq(pages.contentType, id)).
                     <th class="w-px whitespace-nowrap">
                         <form action={`/admin/content/${id}/toggle/${page.id}`} method="POST">
                             <button class="btn btn-square" type="submit">
-                                <CircleCheck size={20} class={page.state === 1 ? "text-green-500" : "text-red-500"} />
+                                {page.state === 1 ? <CircleCheck size={20} class="text-green-500" /> : <CircleX size={20} class="text-red-500" />}
                             </button>
                         </form>
                     </th>

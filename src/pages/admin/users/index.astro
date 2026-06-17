@@ -3,7 +3,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { createHash } from 'node:crypto';
 import { getDb } from '../../../db/db.js';
 import { users } from '../../../db/schema.js';
-import { CircleCheck } from '@lucide/astro';
+import { CircleCheck, CircleX } from '@lucide/astro';
 import { capitalize } from '../../../string';
 import { desc, eq, gt } from 'drizzle-orm';
 
@@ -62,7 +62,7 @@ const allUsers = await db.select().from(users).where(gt(users.state, -1)).orderB
                     <td class="w-px whitespace-nowrap">
                         <form action={`/admin/users/toggle/${user.id}`} method="POST">
                             <button type="submit" class="btn btn-square">
-                                <CircleCheck size={20} class={user.state === 1 ? "text-green-500" : "text-red-500"} />
+                                {user.state === 1 ? <CircleCheck size={20} class="text-green-500" /> : <CircleX size={20} class="text-red-500" />}
                             </button>
                         </form>
                     </td>
