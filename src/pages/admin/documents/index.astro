@@ -59,7 +59,7 @@ const allDocuments = await db.select().from(documents).orderBy(desc(documents.id
                             />
                         </label>
                     </td>
-                    <td>
+                    <td class="w-px whitespace-nowrap">
                         <form action={`/admin/documents/toggle/${doc.id}`} method="POST">
                             <button class="btn btn-square" type="submit">
                                 <CircleCheck size={20} class={doc.state === 1 ? "text-green-500" : "text-red-500"} />
