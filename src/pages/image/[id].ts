@@ -7,6 +7,7 @@ import { getMediaPath } from "../../media/media.js";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from 'sharp';
+import { has404Page } from 'virtual:purplepanda/has-404';
 
 //TODO: in future support image manip via get params (sharp? package)
 
@@ -37,7 +38,7 @@ function getMimeType(buffer: Buffer): string {
   return "application/octet-stream";
 }
 
-export const GET: APIRoute = async ({ params, request }) => {
+export const GET: APIRoute = async ({ params, request, rewrite }) => {
   const parsed = uuidSchema.safeParse(params.id);
   if (!parsed.success) {
     return new Response(null, { status: 404 });
@@ -60,7 +61,10 @@ export const GET: APIRoute = async ({ params, request }) => {
     .limit(1);
 
   if (!row) {
-    return new Response(null, { status: 404 });
+    if (has404Page) {
+      return rewrite('/404');
+    }
+    return new Response('Not Found', { status: 404 });
   }
 
   const mediaPath = getMediaPath();
@@ -70,7 +74,10 @@ export const GET: APIRoute = async ({ params, request }) => {
   try {
     fileBuffer = await readFile(filePath);
   } catch {
-    return new Response(null, { status: 404 });
+    if (has404Page) {
+      return rewrite('/404');
+    }
+    return new Response('Not Found', { status: 404 });
   }
 
   if(fmt.success || w.success || h.success || q.success) {

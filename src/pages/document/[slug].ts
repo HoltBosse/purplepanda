@@ -5,6 +5,7 @@ import { documents } from "../../db/schema.js";
 import { getDocumentPath } from "../../document/document.js";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { has404Page } from 'virtual:purplepanda/has-404';
 
 function getMimeType(buffer: Buffer): string {
     // PDF
@@ -19,7 +20,7 @@ function getMimeType(buffer: Buffer): string {
     return "application/octet-stream";
 }
 
-export const GET: APIRoute = async ({ params }) => {
+export const GET: APIRoute = async ({ params, rewrite }) => {
     const { slug } = params;
     if (!slug) return new Response(null, { status: 404 });
 
@@ -30,7 +31,12 @@ export const GET: APIRoute = async ({ params }) => {
         .where(and(eq(documents.slug, slug), eq(documents.state, 1)))
         .limit(1);
 
-    if (!doc) return new Response(null, { status: 404 });
+    if (!doc) {
+        if (has404Page) {
+            return rewrite('/404');
+        }
+        return new Response('Not Found', { status: 404 });
+    }
 
     const documentPath = getDocumentPath();
     const filePath = join(documentPath, doc.id.slice(0, 2), doc.id.slice(2, 4), doc.id);
@@ -39,7 +45,10 @@ export const GET: APIRoute = async ({ params }) => {
     try {
         fileBuffer = await readFile(filePath);
     } catch {
-        return new Response(null, { status: 404 });
+        if (has404Page) {
+            return rewrite('/404');
+        }
+        return new Response('Not Found', { status: 404 });
     }
 
     const mimeType = getMimeType(fileBuffer);
