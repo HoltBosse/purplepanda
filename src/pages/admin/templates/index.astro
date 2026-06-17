@@ -1,14 +1,12 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
-import { createHash } from 'node:crypto';
 import { getDb } from '../../../db/db.js';
 import { templates } from '../../../db/schema.js';
 import { CircleCheck } from '@lucide/astro';
-import { capitalize } from '../../../string';
-import { desc } from 'drizzle-orm';
+import { desc, gt } from 'drizzle-orm';
 
 const db = getDb();
-const allTemplates = await db.select().from(templates).orderBy(desc(templates.id));
+const allTemplates = await db.select().from(templates).where(gt(templates.state, -1)).orderBy(desc(templates.id));
 ---
 
 <AdminLayout>
@@ -16,9 +14,29 @@ const allTemplates = await db.select().from(templates).orderBy(desc(templates.id
         <h1 class="text-2xl font-semibold">Templates</h1>
         <a href="/admin/templates/new" class="btn btn-primary">New</a>
     </div>
+    <form id="bulk-form" method="POST"></form>
     <table class="table p-2 bg-base-100 rounded-lg">
         <thead>
-            <tr>
+            <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
+                <th colspan="2">
+                    <div class="flex items-center gap-2">
+                        <button form="bulk-form" type="submit" formaction="/admin/templates/bulk/publish" class="btn btn-xs btn-outline btn-accent">Publish</button>
+                        <button form="bulk-form" type="submit" formaction="/admin/templates/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Unpublish</button>
+                        <button form="bulk-form" type="submit" formaction="/admin/templates/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+                    </div>
+                </th>
+            </tr>
+            <tr class="[table:has(.row-select:checked)_&]:hidden">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
                 <th class="w-px whitespace-nowrap">State</th>
                 <th>Template</th>
             </tr>
@@ -26,13 +44,24 @@ const allTemplates = await db.select().from(templates).orderBy(desc(templates.id
         <tbody>
             {allTemplates.map(template=>(
                 <tr>
-                    <th>
+                    <td>
+                        <label>
+                            <input
+                                form="bulk-form"
+                                type="checkbox"
+                                class="checkbox row-select"
+                                name="selected[]"
+                                value={template.id}
+                            />
+                        </label>
+                    </td>
+                    <td>
                         <form action={`/admin/templates/toggle/${template.id}`} method="POST">
                             <button class="btn btn-square" type="submit">
                                 <CircleCheck size={20} class={template.state === 1 ? "text-green-500" : "text-red-500"} />
                             </button>
                         </form>
-                    </th>
+                    </td>
                     <td>
                         <a href={`/admin/templates/edit/${template.id}`}>
                             <div class="font-bold link link-info link-hover">{(template.content as any)?.root?.props?.title || 'Untitled'}</div>
@@ -42,4 +71,5 @@ const allTemplates = await db.select().from(templates).orderBy(desc(templates.id
             ))}
         </tbody>
     </table>
+    <script>import '../../../scripts/select-all'</script>
 </AdminLayout>

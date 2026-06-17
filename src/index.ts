@@ -205,6 +205,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/pages/bulk/[action]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/pages/bulk/[action].ts",
+        });
+
+        injectRoute({
           pattern: "/admin/templates",
           entrypoint: "@holtbosse/purplepanda/pages/admin/templates/index.astro",
         });
@@ -232,6 +237,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         injectRoute({
           pattern: "/admin/templates/toggle/[id]",
           entrypoint: "@holtbosse/purplepanda/pages/admin/templates/toggle.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/templates/bulk/[action]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/templates/bulk/[action].ts",
         });
 
         injectRoute({
@@ -267,6 +277,16 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         injectRoute({
           pattern: "/admin/users/update/[id]",
           entrypoint: "@holtbosse/purplepanda/pages/admin/users/update.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/users/toggle/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/users/toggle.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/users/bulk/[action]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/users/bulk/[action].ts",
         });
 
         injectRoute({
@@ -345,6 +365,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/content/[typeId]/bulk/[action]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/content/bulk/[action].ts",
+        });
+
+        injectRoute({
           pattern: "/admin/forms/api/lookup",
           entrypoint: "@holtbosse/purplepanda/pages/admin/forms/api/lookup.ts",
         });
@@ -377,6 +402,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         injectRoute({
           pattern: "/admin/forms/toggle/[id]",
           entrypoint: "@holtbosse/purplepanda/pages/admin/forms/toggle.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/forms/bulk/[action]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/forms/bulk/[action].ts",
         });
 
         injectRoute({

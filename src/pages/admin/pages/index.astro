@@ -3,10 +3,9 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
 import { pages } from '../../../db/schema.js';
 import { CircleCheck } from '@lucide/astro';
-import { desc, eq, isNull } from 'drizzle-orm';
+import { desc, gt, isNull } from 'drizzle-orm';
 
 const db = getDb();
-//order by id desc
 const allPages = await db.select().from(pages).where(isNull(pages.contentType)).orderBy(desc(pages.id));
 ---
 
@@ -15,9 +14,29 @@ const allPages = await db.select().from(pages).where(isNull(pages.contentType)).
         <h1 class="text-2xl font-semibold">Pages</h1>
         <a href="/admin/pages/new" class="btn btn-primary">New</a>
     </div>
+    <form id="bulk-form" method="POST"></form>
     <table class="table p-2 bg-base-100 rounded-lg">
         <thead>
-            <tr>
+            <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
+                <th colspan="2">
+                    <div class="flex items-center gap-2">
+                        <button form="bulk-form" type="submit" formaction="/admin/pages/bulk/publish" class="btn btn-xs btn-outline btn-accent">Publish</button>
+                        <button form="bulk-form" type="submit" formaction="/admin/pages/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Unpublish</button>
+                        <button form="bulk-form" type="submit" formaction="/admin/pages/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+                    </div>
+                </th>
+            </tr>
+            <tr class="[table:has(.row-select:checked)_&]:hidden">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
                 <th class="w-px whitespace-nowrap">State</th>
                 <th>Page</th>
             </tr>
@@ -25,13 +44,24 @@ const allPages = await db.select().from(pages).where(isNull(pages.contentType)).
         <tbody>
             {allPages.map(page => (
                 <tr>
-                    <th>
+                    <td>
+                        <label>
+                            <input
+                                form="bulk-form"
+                                type="checkbox"
+                                class="checkbox row-select"
+                                name="selected[]"
+                                value={page.id}
+                            />
+                        </label>
+                    </td>
+                    <td>
                         <form action={`/admin/pages/toggle/${page.id}`} method="POST">
                             <button class="btn btn-square" type="submit">
                                 <CircleCheck size={20} class={page.state === 1 ? "text-green-500" : "text-red-500"} />
                             </button>
                         </form>
-                    </th>
+                    </td>
                     <td>
                         <a href={`/admin/pages/edit/${page.id}`}>
                             <div class="font-bold link link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</div>
@@ -41,4 +71,5 @@ const allPages = await db.select().from(pages).where(isNull(pages.contentType)).
             ))}
         </tbody>
     </table>
+    <script>import '../../../scripts/select-all'</script>
 </AdminLayout>

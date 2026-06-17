@@ -25,9 +25,29 @@ const allPages = await db.select().from(pages).where(eq(pages.contentType, id)).
         <h1 class="text-2xl font-semibold">{contentType?.title || 'Content'}</h1>
         <a href={`/admin/content/${id}/new`} class="btn btn-primary">New</a>
     </div>
+    <form id="bulk-form" method="POST"></form>
     <table class="table p-2 bg-base-100 rounded-lg">
         <thead>
-            <tr>
+            <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
+                <th colspan="2">
+                    <div class="flex items-center gap-2">
+                        <button form="bulk-form" type="submit" formaction={`/admin/content/${id}/bulk/publish`} class="btn btn-xs btn-outline btn-accent">Publish</button>
+                        <button form="bulk-form" type="submit" formaction={`/admin/content/${id}/bulk/unpublish`} class="btn btn-xs btn-outline btn-warning">Unpublish</button>
+                        <button form="bulk-form" type="submit" formaction={`/admin/content/${id}/bulk/delete`} class="btn btn-xs btn-error">Delete</button>
+                    </div>
+                </th>
+            </tr>
+            <tr class="[table:has(.row-select:checked)_&]:hidden">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
                 <th class="w-px whitespace-nowrap">State</th>
                 <th>{contentType?.title || 'Content'}</th>
             </tr>
@@ -35,6 +55,17 @@ const allPages = await db.select().from(pages).where(eq(pages.contentType, id)).
         <tbody>
             {allPages.map(page => (
                 <tr>
+                    <td>
+                        <label>
+                            <input
+                                form="bulk-form"
+                                type="checkbox"
+                                class="checkbox row-select"
+                                name="selected[]"
+                                value={page.id}
+                            />
+                        </label>
+                    </td>
                     <th>
                         <form action={`/admin/content/${id}/toggle/${page.id}`} method="POST">
                             <button class="btn btn-square" type="submit">
@@ -51,4 +82,5 @@ const allPages = await db.select().from(pages).where(eq(pages.contentType, id)).
             ))}
         </tbody>
     </table>
+    <script>import '../../../scripts/select-all'</script>
 </AdminLayout>

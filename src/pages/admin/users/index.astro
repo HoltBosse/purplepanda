@@ -5,9 +5,10 @@ import { getDb } from '../../../db/db.js';
 import { users } from '../../../db/schema.js';
 import { CircleCheck } from '@lucide/astro';
 import { capitalize } from '../../../string';
+import { desc, eq, gt } from 'drizzle-orm';
 
 const db = getDb();
-const allUsers = await db.select().from(users);
+const allUsers = await db.select().from(users).where(gt(users.state, -1)).orderBy(desc(users.id));
 //console.log(allUsers);
 ---
 
@@ -16,9 +17,29 @@ const allUsers = await db.select().from(users);
         <h1 class="text-2xl font-semibold">Users</h1>
         <a href="/admin/users/new" class="btn btn-primary">New</a>
     </div>
+    <form id="bulk-form" method="POST"></form>
     <table class="table p-2 bg-base-100 rounded-lg">
         <thead>
-            <tr>
+            <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
+                <th colspan="3">
+                    <div class="flex items-center gap-2">
+                        <button form="bulk-form" type="submit" formaction="/admin/users/bulk/publish" class="btn btn-xs btn-outline btn-accent">Publish</button>
+                        <button form="bulk-form" type="submit" formaction="/admin/users/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Unpublish</button>
+                        <button form="bulk-form" type="submit" formaction="/admin/users/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+                    </div>
+                </th>
+            </tr>
+            <tr class="[table:has(.row-select:checked)_&]:hidden">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
                 <th class="w-px whitespace-nowrap">State</th>
                 <th>User</th>
                 <th>Roles</th>
@@ -27,11 +48,24 @@ const allUsers = await db.select().from(users);
         <tbody>
             {allUsers.map(user=>(
                 <tr>
-                    <th>
-                        <button class="btn btn-square">
-                            <CircleCheck size={20} class={user.state === 1 ? "text-green-500" : "text-red-500"} />
-                        </button>
-                    </th>
+                    <td>
+                        <label>
+                            <input
+                                form="bulk-form"
+                                type="checkbox"
+                                class="checkbox row-select"
+                                name="selected[]"
+                                value={user.id}
+                            />
+                        </label>
+                    </td>
+                    <td class="w-px whitespace-nowrap">
+                        <form action={`/admin/users/toggle/${user.id}`} method="POST">
+                            <button type="submit" class="btn btn-square">
+                                <CircleCheck size={20} class={user.state === 1 ? "text-green-500" : "text-red-500"} />
+                            </button>
+                        </form>
+                    </td>
                     <td>
                         <a href={`/admin/users/edit/${user.id}`}>
                             <div class="flex items-center gap-3">
@@ -58,4 +92,5 @@ const allUsers = await db.select().from(users);
             ))}
         </tbody>
     </table>
+    <script>import '../../../scripts/select-all'</script>
 </AdminLayout>
