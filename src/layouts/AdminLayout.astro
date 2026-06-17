@@ -68,12 +68,12 @@ const contentTypes = (externalPuckConfig ? externalPuckConfig.contentTypes : [])
 				<span class="text-[10px] font-medium leading-tight">Forms</span>
 			</button>
 
-			<a href="/admin/media" class="flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
+			<a data-panel="media" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content cursor-pointer">
 				<Images size={20} />
 				<span class="text-[10px] font-medium leading-tight">Media</span>
 			</a>
 
-			<a href="/admin/settings" class="flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
+			<a data-panel="settings" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content cursor-pointer">
 				<Settings size={20} />
 				<span class="text-[10px] font-medium leading-tight">Settings</span>
 			</a>
@@ -157,6 +157,24 @@ const contentTypes = (externalPuckConfig ? externalPuckConfig.contentTypes : [])
 							<li><a href="/admin/forms">All Forms</a></li>
 							<li><a href="/admin/forms/new">New Form</a></li>
 							<li><a href="/admin/forms/submissions">Submissions</a></li>
+						</ul>
+					</div>
+
+					<div id="panel-media" class="drawer-panel hidden">
+						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Media</h2>
+						<ul class="menu w-full px-2 py-1 gap-0.5">
+							<li><a href="/admin/media">Images</a></li>
+							<li><a href="#">Documents</a></li>
+						</ul>
+					</div>
+
+					<div id="panel-settings" class="drawer-panel hidden">
+						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Settings</h2>
+						<ul class="menu w-full px-2 py-1 gap-0.5">
+							<li><a href="/admin/settings">Configurations</a></li>
+							<li><a href="#">Redirects</a></li>
+							<li><a href="#">Tags</a></li>
+							<li><a href="#">Audit</a></li>
 						</ul>
 					</div>
 				</aside>
