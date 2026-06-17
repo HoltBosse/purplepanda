@@ -2,6 +2,7 @@ import type { AstroIntegration } from "astro";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { setDb } from "./db/db.js";
 import { setMediaPath } from "./media/media.js";
+import { setDocumentPath } from "./document/document.js";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 import { extname, resolve, join } from "node:path";
@@ -17,6 +18,7 @@ export interface PurplePandaIntegrationOptions {
   enabled?: boolean;
   db?: NodePgDatabase<Record<string, unknown>>;
   mediaPath?: string;
+  documentPath?: string;
   puckConfigModule?: string;
 }
 
@@ -75,6 +77,13 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
           setMediaPath(options.mediaPath);
         } else {
           throw new Error("[purple-panda] No media path provided. Pass `mediaPath` to purplePandaIntegration().");
+        }
+
+        if (options.documentPath) {
+          if (!existsSync(options.documentPath) || !statSync(options.documentPath).isDirectory()) {
+            throw new Error(`[purple-panda] Invalid document path provided: ${options.documentPath}. It must be a valid directory.`);
+          }
+          setDocumentPath(options.documentPath);
         }
 
         const srcDir = fileURLToPath(config.srcDir);
@@ -332,6 +341,36 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         injectRoute({
           pattern: "/admin/components/data",
           entrypoint: "@holtbosse/purplepanda/pages/admin/components/data.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/documents",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/documents/index.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/documents/upload",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/documents/upload.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/documents/update",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/documents/update.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/documents/toggle/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/documents/toggle.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/documents/bulk/[action]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/documents/bulk/[action].ts",
+        });
+
+        injectRoute({
+          pattern: "/document/[slug]",
+          entrypoint: "@holtbosse/purplepanda/pages/document/[slug].ts",
         });
 
         injectRoute({

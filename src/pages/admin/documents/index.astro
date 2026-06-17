@@ -1,0 +1,151 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getDb } from '../../../db/db.js';
+import { documents } from '../../../db/schema.js';
+import { CircleCheck, ExternalLink } from '@lucide/astro';
+import Input from '../../../form/fields/Input.astro';
+import { desc } from 'drizzle-orm';
+
+const db = getDb();
+const allDocuments = await db.select().from(documents).orderBy(desc(documents.id));
+
+---
+
+<AdminLayout>
+    <div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
+        <h1 class="text-2xl font-semibold">Documents</h1>
+        <button commandfor="new-document-dialog" command="show-modal" class="btn btn-primary">Upload</button>
+    </div>
+    <form id="bulk-form" method="POST"></form>
+    <table class="table p-2 bg-base-100 rounded-lg">
+        <thead>
+            <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
+                <th colspan="2">
+                    <div class="flex items-center gap-2">
+                        <button form="bulk-form" type="submit" formaction="/admin/documents/bulk/publish" class="btn btn-xs btn-outline btn-accent">Publish</button>
+                        <button form="bulk-form" type="submit" formaction="/admin/documents/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Unpublish</button>
+                        <button form="bulk-form" type="submit" formaction="/admin/documents/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+                    </div>
+                </th>
+                <th></th>
+            </tr>
+            <tr class="[table:has(.row-select:checked)_&]:hidden">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
+                <th class="w-px whitespace-nowrap">State</th>
+                <th>Document</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {allDocuments.map(doc => (
+                <tr>
+                    <td>
+                        <label>
+                            <input
+                                form="bulk-form"
+                                type="checkbox"
+                                class="checkbox row-select"
+                                name="selected[]"
+                                value={doc.id}
+                            />
+                        </label>
+                    </td>
+                    <td>
+                        <form action={`/admin/documents/toggle/${doc.id}`} method="POST">
+                            <button class="btn btn-square" type="submit">
+                                <CircleCheck size={20} class={doc.state === 1 ? "text-green-500" : "text-red-500"} />
+                            </button>
+                        </form>
+                    </td>
+                    <td>
+                        <button
+                            class="font-bold link link-info link-hover text-left"
+                            data-edit-id={doc.id}
+                            data-edit-title={doc.title}
+                        >{doc.title}</button>
+                    </td>
+                    <td class="w-px whitespace-nowrap">
+                        <a
+                            href={`/document/${doc.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="btn btn-ghost btn-square btn-sm"
+                            title={`Open ${doc.title}`}
+                        >
+                            <ExternalLink size={16} />
+                        </a>
+                    </td>
+                </tr>
+            ))}
+        </tbody>
+    </table>
+
+    <dialog id="new-document-dialog" closedby="any" class="relative m-auto w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] md:max-w-2xl rounded-xl bg-base-100 p-6 md:p-8 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <form class="space-y-4">
+            <label id="document-dropzone" for="document-upload" class="flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-base-300 bg-base-200/40 p-8 text-center transition-colors hover:border-primary hover:bg-base-200 md:min-h-72 md:p-14">
+                <p class="text-base font-medium text-base-content">Drag &amp; drop here or</p>
+                <span class="mt-2 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-content">Browse files</span>
+                <input id="document-upload" name="document" type="file" class="sr-only" multiple />
+            </label>
+        </form>
+    </dialog>
+
+    <dialog id="new-documents-configuration" closedby="any" class="relative m-auto w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] md:max-w-4xl rounded-xl bg-base-200 p-6 md:p-8 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <form id="new-documents-form" class="space-y-5" method="post" enctype="multipart/form-data" action="/admin/documents/upload">
+            <div id="new-documents-list" class="space-y-4"></div>
+            <div class="border-t border-base-300 pt-4">
+                <button id="new-documents-submit" type="submit" class="btn btn-primary w-full md:w-auto">Upload</button>
+            </div>
+        </form>
+
+        <template id="new-document-item-template">
+            <section data-document-config class="rounded-xl border border-base-300 bg-base-100 p-4 md:p-5">
+                <div class="flex flex-col gap-4">
+                    <div class="space-y-4 w-full">
+                        <Input id="document-title-template" name="title[]" type="text" label="Title" placeholder="Document title" classList="input input-bordered w-full" required />
+                        <input data-document-file type="file" name="file[]" class="hidden" required />
+                        <p data-document-name class="text-sm text-base-content/70 truncate"></p>
+                    </div>
+                </div>
+            </section>
+        </template>
+    </dialog>
+
+    <dialog id="edit-document-dialog" closedby="any" class="relative m-auto w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] md:max-w-lg rounded-xl bg-base-100 p-6 md:p-8 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
+        <form method="dialog">
+            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <h3 class="text-lg font-semibold mb-4">Edit Document</h3>
+        <form id="edit-document-form" class="space-y-4" method="post" enctype="multipart/form-data" action="/admin/documents/update">
+            <input type="hidden" name="id" id="edit-doc-id" />
+            <Input id="edit-doc-title" name="title" type="text" label="Title" placeholder="Document title" classList="input input-bordered w-full" required />
+            <div class="form-control w-full">
+                <label class="label" for="edit-doc-file">
+                    <span class="label-text">Replace file <span class="text-base-content/50">(optional)</span></span>
+                </label>
+                <input id="edit-doc-file" name="file" type="file" class="file-input file-input-bordered w-full" />
+            </div>
+            <div class="pt-2">
+                <button type="submit" class="btn btn-primary w-full">Save</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script>import '../../../scripts/select-all'</script>
+    <script>import './document-library'</script>
+</AdminLayout>

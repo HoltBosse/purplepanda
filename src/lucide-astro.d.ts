@@ -39,3 +39,4 @@ export declare const Images: AstroComponent;
 export declare const LogOut: AstroComponent;
 export declare const Folder: AstroComponent;
 export declare const Settings: AstroComponent;
+export declare const ExternalLink: AstroComponent;

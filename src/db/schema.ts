@@ -49,3 +49,10 @@ export const forms = pgTable("forms", {
   state: integer("state").notNull().default(1),
   content: jsonb("content").notNull(),
 });
+
+export const documents = pgTable("documents", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  state: integer("state").notNull().default(1),
+  title: varchar("title", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull(),
+});
