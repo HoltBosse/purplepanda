@@ -4,7 +4,9 @@ import { eq, and } from "drizzle-orm";
 import { getDb } from "../../db/db.js";
 import { media } from "../../db/schema.js";
 import { getMediaPath } from "../../media/media.js";
-import { readFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { open } from "node:fs/promises";
+import { Readable } from "node:stream";
 import { join } from "node:path";
 import sharp from 'sharp';
 import { has404Page } from 'virtual:purplepanda/has-404';
@@ -73,45 +75,65 @@ export const GET: APIRoute = async ({ params, request, rewrite }) => {
   const mediaPath = getMediaPath();
   const filePath = join(mediaPath, id.slice(0, 2), id.slice(2, 4), id);
 
-  let fileBuffer: Buffer;
-  try {
-    fileBuffer = await readFile(filePath);
-  } catch {
-    if (has404Page) {
-      return rewrite('/404');
-    }
-    return new Response('Not Found', { status: 404 });
-  }
+  if (fmt.success || w.success || h.success || q.success) {
+    // #4: pass file path directly — sharp/libvips reads the file internally
+    let image = sharp(filePath);
 
-  if(fmt.success || w.success || h.success || q.success) {
-    let image = sharp(fileBuffer);
-
-    if(w.success || h.success) {
+    if (w.success || h.success) {
       image = image.resize(w.success ? w.data : undefined, h.success ? h.data : undefined);
     }
 
-    if(fmt.success) {
-      if(fmt.data === "jpeg") {
+    if (fmt.success) {
+      if (fmt.data === "jpeg") {
         image = image.jpeg({ quality: q.success ? q.data : 100 });
-      } else if(fmt.data === "png") {
+      } else if (fmt.data === "png") {
         image = image.png({ quality: q.success ? q.data : 100 });
-      } else if(fmt.data === "webp") {
+      } else if (fmt.data === "webp") {
         image = image.webp({ quality: q.success ? q.data : 100 });
-      } else if(fmt.data === "avif") {
+      } else if (fmt.data === "avif") {
         image = image.avif({ quality: q.success ? q.data : 100 });
       }
     }
 
-    fileBuffer = await image.toBuffer();
+    let outputBuffer: Buffer;
+    try {
+      outputBuffer = await image.toBuffer();
+    } catch {
+      if (has404Page) return rewrite('/404');
+      return new Response('Not Found', { status: 404 });
+    }
+
+    const mimeType = getMimeType(outputBuffer);
+    return new Response(outputBuffer.buffer as ArrayBuffer, {
+      status: 200,
+      headers: {
+        "Content-Type": mimeType,
+        "Content-Length": String(outputBuffer.byteLength),
+      },
+    });
   }
 
-  const mimeType = getMimeType(fileBuffer);
+  // #2: stream directly — read only 12 magic bytes for MIME detection
+  let fh: Awaited<ReturnType<typeof open>>;
+  try {
+    fh = await open(filePath, 'r');
+  } catch {
+    if (has404Page) return rewrite('/404');
+    return new Response('Not Found', { status: 404 });
+  }
 
-  return new Response(fileBuffer.buffer as ArrayBuffer, {
+  const magicBuf = Buffer.alloc(12);
+  const [{ size }] = await Promise.all([fh.stat(), fh.read(magicBuf, 0, 12, 0)]);
+  await fh.close();
+
+  const mimeType = getMimeType(magicBuf);
+  const stream = Readable.toWeb(createReadStream(filePath));
+
+  return new Response(stream as ReadableStream, {
     status: 200,
     headers: {
       "Content-Type": mimeType,
-      "Content-Length": String(fileBuffer.byteLength),
+      "Content-Length": String(size),
     },
   });
 };
