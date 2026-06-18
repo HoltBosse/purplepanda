@@ -41,6 +41,9 @@ function getMimeType(buffer: Buffer): string {
 export const GET: APIRoute = async ({ params, request, rewrite }) => {
   const parsed = uuidSchema.safeParse(params.id);
   if (!parsed.success) {
+    if (has404Page) {
+      return rewrite('/404');
+    }
     return new Response(null, { status: 404 });
   }
 
