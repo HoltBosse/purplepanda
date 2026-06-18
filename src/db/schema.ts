@@ -56,3 +56,10 @@ export const documents = pgTable("documents", {
   title: varchar("title", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 255 }).notNull(),
 });
+
+export const redirects = pgTable("redirects", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  state: integer("state").notNull().default(1),
+  from: varchar("from", { length: 2048 }).notNull(),
+  to: varchar("to", { length: 2048 }).notNull(),
+});

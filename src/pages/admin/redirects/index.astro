@@ -1,0 +1,77 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getDb } from '../../../db/db.js';
+import { redirects } from '../../../db/schema.js';
+import { CircleCheck, CircleX } from '@lucide/astro';
+import { desc } from 'drizzle-orm';
+
+const db = getDb();
+const allRedirects = await db.select().from(redirects).orderBy(desc(redirects.id));
+---
+
+<AdminLayout>
+	<div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
+        <h1 class="text-2xl font-semibold">Redirects</h1>
+        <a href="/admin/redirects/new" class="btn btn-primary">New</a>
+    </div>
+    <form id="bulk-form" method="POST"></form>
+    <table class="table p-2 bg-base-100 rounded-lg">
+        <thead>
+            <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
+                <th colspan="3">
+                    <div class="flex items-center gap-2">
+                        <button form="bulk-form" type="submit" formaction="/admin/redirects/bulk/publish" class="btn btn-xs btn-outline btn-accent">Enable</button>
+                        <button form="bulk-form" type="submit" formaction="/admin/redirects/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Disable</button>
+                        <button form="bulk-form" type="submit" formaction="/admin/redirects/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+                    </div>
+                </th>
+            </tr>
+            <tr class="[table:has(.row-select:checked)_&]:hidden">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
+                <th class="w-px whitespace-nowrap">State</th>
+                <th>From</th>
+                <th>To</th>
+            </tr>
+        </thead>
+        <tbody>
+            {allRedirects.map(redirect => (
+                <tr>
+                    <td>
+                        <label>
+                            <input
+                                form="bulk-form"
+                                type="checkbox"
+                                class="checkbox row-select"
+                                name="selected[]"
+                                value={redirect.id}
+                            />
+                        </label>
+                    </td>
+                    <td class="w-px whitespace-nowrap">
+                        <form action={`/admin/redirects/toggle/${redirect.id}`} method="POST">
+                            <button class="btn btn-square" type="submit">
+                                {redirect.state === 1 ? <CircleCheck size={20} class="text-green-500" /> : <CircleX size={20} class="text-red-500" />}
+                            </button>
+                        </form>
+                    </td>
+                    <td>
+                        <a href={`/admin/redirects/edit/${redirect.id}`}>
+                            <div class="font-bold link-info link-hover">{redirect.from}</div>
+                        </a>
+                    </td>
+                    <td class="text-base-content/70">{redirect.to}</td>
+                </tr>
+            ))}
+        </tbody>
+    </table>
+    <script>import '../../../scripts/select-all'</script>
+</AdminLayout>

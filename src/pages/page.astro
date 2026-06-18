@@ -1,6 +1,6 @@
 ---
 import { getDb } from '../db/db.js';
-import { pages, settings, templates } from '../db/schema.js';
+import { pages, settings, templates, redirects } from '../db/schema.js';
 import { eq, sql } from 'drizzle-orm';
 import type { Data } from '@puckeditor/core';
 import externalPuckConfig from 'virtual:purplepanda/puck-config';
@@ -40,6 +40,17 @@ const pathToPage = new Map(allPages.map(p => [getPagePath(p), p]));
 const matchedPage = pathToPage.get(requestPath);
 
 if (!matchedPage) {
+    const fromPath = '/' + requestPath;
+    const [redirect] = await db
+        .select()
+        .from(redirects)
+        .where(eq(redirects.from, fromPath))
+        .limit(1);
+
+    if (redirect && redirect.state === 1) {
+        return Astro.redirect(redirect.to, 301);
+    }
+
     if (has404Page) {
         return Astro.rewrite('/404');
     }

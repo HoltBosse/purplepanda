@@ -454,6 +454,41 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/redirects",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/redirects/index.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/redirects/new",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/redirects/new.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/redirects/edit/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/redirects/new.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/redirects/update/",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/redirects/update.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/redirects/update/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/redirects/update.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/redirects/toggle/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/redirects/toggle.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/redirects/bulk/[action]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/redirects/bulk/[action].ts",
+        });
+
+        injectRoute({
           pattern: "/admin/[...path]",
           entrypoint: "@holtbosse/purplepanda/pages/admin/404.astro",
         });
