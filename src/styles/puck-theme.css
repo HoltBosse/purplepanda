@@ -1,81 +1,50 @@
-/* Map DaisyUI theme colors to Puck editor CSS variables.
+/* Map DaisyUI theme colors to Puck's semantic theming tokens.
    Imported AFTER @puckeditor/core/puck.css to override Puck's defaults.
-   Scoped to .Puck so it only targets the editor UI, not the iframe preview. */
+   Scoped to .Puck so it only targets the editor UI, not the iframe preview.
+
+   Uses Puck's semantic theming API (https://puckeditor.com/docs/extending-puck/theming)
+   rather than the legacy numbered grey/azure/... scales. The values below reproduce
+   the previous mapping: each token is set to the DaisyUI color the corresponding
+   legacy scale step used to resolve to. */
 .Puck {
-  --puck-color-grey-01: var(--color-neutral);
-  --puck-color-grey-02: color-mix(in oklch, var(--color-neutral) 70%, var(--color-base-content) 30%);
-  --puck-color-grey-03: color-mix(in oklch, var(--color-base-content) 80%, var(--color-neutral) 20%);
-  --puck-color-grey-04: var(--color-base-content);
-  --puck-color-grey-05: color-mix(in oklch, var(--color-base-content) 70%, var(--color-base-300) 30%);
-  --puck-color-grey-06: color-mix(in oklch, var(--color-base-content) 50%, var(--color-base-300) 50%);
-  --puck-color-grey-07: color-mix(in oklch, var(--color-base-content) 35%, var(--color-base-300) 65%);
-  --puck-color-grey-08: color-mix(in oklch, var(--color-base-content) 20%, var(--color-base-300) 80%);
-  --puck-color-grey-09: var(--color-base-300);
-  --puck-color-grey-10: var(--color-base-200);
-  --puck-color-grey-11: color-mix(in oklch, var(--color-base-200) 50%, var(--color-base-100) 50%);
-  --puck-color-grey-12: var(--color-base-100);
-  --puck-color-black: var(--color-base-content);
-  --puck-color-white: var(--color-base-100);
-  --puck-color-azure-01: color-mix(in oklch, var(--color-primary) 40%, black);
-  --puck-color-azure-02: color-mix(in oklch, var(--color-primary) 55%, black);
-  --puck-color-azure-03: color-mix(in oklch, var(--color-primary) 75%, black);
-  --puck-color-azure-04: var(--color-primary);
-  --puck-color-azure-05: color-mix(in oklch, var(--color-primary) 75%, var(--color-base-100));
-  --puck-color-azure-06: color-mix(in oklch, var(--color-primary) 55%, var(--color-base-100));
-  --puck-color-azure-07: color-mix(in oklch, var(--color-primary) 40%, var(--color-base-100));
-  --puck-color-azure-08: color-mix(in oklch, var(--color-primary) 28%, var(--color-base-100));
-  --puck-color-azure-09: color-mix(in oklch, var(--color-primary) 18%, var(--color-base-100));
-  --puck-color-azure-10: color-mix(in oklch, var(--color-primary) 10%, var(--color-base-100));
-  --puck-color-azure-11: color-mix(in oklch, var(--color-primary) 5%, var(--color-base-100));
-  --puck-color-azure-12: color-mix(in oklch, var(--color-primary) 2%, var(--color-base-100));
-  --puck-color-green-01: color-mix(in oklch, var(--color-success) 40%, black);
-  --puck-color-green-02: color-mix(in oklch, var(--color-success) 55%, black);
-  --puck-color-green-03: color-mix(in oklch, var(--color-success) 75%, black);
-  --puck-color-green-04: var(--color-success);
-  --puck-color-green-05: color-mix(in oklch, var(--color-success) 75%, var(--color-base-100));
-  --puck-color-green-06: color-mix(in oklch, var(--color-success) 55%, var(--color-base-100));
-  --puck-color-green-07: color-mix(in oklch, var(--color-success) 40%, var(--color-base-100));
-  --puck-color-green-08: color-mix(in oklch, var(--color-success) 28%, var(--color-base-100));
-  --puck-color-green-09: color-mix(in oklch, var(--color-success) 18%, var(--color-base-100));
-  --puck-color-green-10: color-mix(in oklch, var(--color-success) 10%, var(--color-base-100));
-  --puck-color-green-11: color-mix(in oklch, var(--color-success) 5%, var(--color-base-100));
-  --puck-color-green-12: color-mix(in oklch, var(--color-success) 2%, var(--color-base-100));
-  --puck-color-red-01: color-mix(in oklch, var(--color-error) 40%, black);
-  --puck-color-red-02: color-mix(in oklch, var(--color-error) 55%, black);
-  --puck-color-red-03: color-mix(in oklch, var(--color-error) 75%, black);
-  --puck-color-red-04: var(--color-error);
-  --puck-color-red-05: color-mix(in oklch, var(--color-error) 75%, var(--color-base-100));
-  --puck-color-red-06: color-mix(in oklch, var(--color-error) 55%, var(--color-base-100));
-  --puck-color-red-07: color-mix(in oklch, var(--color-error) 40%, var(--color-base-100));
-  --puck-color-red-08: color-mix(in oklch, var(--color-error) 28%, var(--color-base-100));
-  --puck-color-red-09: color-mix(in oklch, var(--color-error) 18%, var(--color-base-100));
-  --puck-color-red-10: color-mix(in oklch, var(--color-error) 10%, var(--color-base-100));
-  --puck-color-red-11: color-mix(in oklch, var(--color-error) 5%, var(--color-base-100));
-  --puck-color-red-12: color-mix(in oklch, var(--color-error) 2%, var(--color-base-100));
-  --puck-color-yellow-01: color-mix(in oklch, var(--color-warning) 40%, black);
-  --puck-color-yellow-02: color-mix(in oklch, var(--color-warning) 55%, black);
-  --puck-color-yellow-03: color-mix(in oklch, var(--color-warning) 75%, black);
-  --puck-color-yellow-04: var(--color-warning);
-  --puck-color-yellow-05: color-mix(in oklch, var(--color-warning) 75%, var(--color-base-100));
-  --puck-color-yellow-06: color-mix(in oklch, var(--color-warning) 55%, var(--color-base-100));
-  --puck-color-yellow-07: color-mix(in oklch, var(--color-warning) 40%, var(--color-base-100));
-  --puck-color-yellow-08: color-mix(in oklch, var(--color-warning) 28%, var(--color-base-100));
-  --puck-color-yellow-09: color-mix(in oklch, var(--color-warning) 18%, var(--color-base-100));
-  --puck-color-yellow-10: color-mix(in oklch, var(--color-warning) 10%, var(--color-base-100));
-  --puck-color-yellow-11: color-mix(in oklch, var(--color-warning) 5%, var(--color-base-100));
-  --puck-color-yellow-12: color-mix(in oklch, var(--color-warning) 2%, var(--color-base-100));
-  --puck-color-rose-01: color-mix(in oklch, var(--color-secondary) 40%, black);
-  --puck-color-rose-02: color-mix(in oklch, var(--color-secondary) 55%, black);
-  --puck-color-rose-03: color-mix(in oklch, var(--color-secondary) 75%, black);
-  --puck-color-rose-04: var(--color-secondary);
-  --puck-color-rose-05: color-mix(in oklch, var(--color-secondary) 75%, var(--color-base-100));
-  --puck-color-rose-06: color-mix(in oklch, var(--color-secondary) 55%, var(--color-base-100));
-  --puck-color-rose-07: color-mix(in oklch, var(--color-secondary) 40%, var(--color-base-100));
-  --puck-color-rose-08: color-mix(in oklch, var(--color-secondary) 28%, var(--color-base-100));
-  --puck-color-rose-09: color-mix(in oklch, var(--color-secondary) 18%, var(--color-base-100));
-  --puck-color-rose-10: color-mix(in oklch, var(--color-secondary) 10%, var(--color-base-100));
-  --puck-color-rose-11: color-mix(in oklch, var(--color-secondary) 5%, var(--color-base-100));
-  --puck-color-rose-12: color-mix(in oklch, var(--color-secondary) 2%, var(--color-base-100));
+  /* Surfaces */
+  --puck-color-surface: var(--color-base-100);
+  --puck-color-surface-muted: color-mix(in oklch, var(--color-base-200) 50%, var(--color-base-100) 50%);
+  --puck-color-surface-subtle: var(--color-base-100);
+  --puck-color-surface-inverse: var(--color-neutral);
+
+  /* Borders */
+  --puck-color-border: var(--color-base-300);
+  --puck-color-border-hover: color-mix(in oklch, var(--color-base-content) 70%, var(--color-base-300) 30%);
+  --puck-color-border-muted: var(--color-base-200);
+  --puck-color-border-inverse: color-mix(in oklch, var(--color-base-content) 70%, var(--color-base-300) 30%);
+
+  /* Text */
+  --puck-color-text: var(--color-base-content);
+  --puck-color-text-secondary: var(--color-base-content);
+  --puck-color-text-muted: color-mix(in oklch, var(--color-base-content) 70%, var(--color-base-300) 30%);
+  --puck-color-text-subtle: color-mix(in oklch, var(--color-base-content) 35%, var(--color-base-300) 65%);
+  --puck-color-text-inverse: var(--color-base-100);
+  --puck-color-text-disabled: color-mix(in oklch, var(--color-base-content) 80%, var(--color-neutral) 20%);
+  --puck-color-bg-disabled: color-mix(in oklch, var(--color-base-content) 35%, var(--color-base-300) 65%);
+
+  /* Interactive (primary accent) */
+  --puck-color-interactive: var(--color-primary);
+  --puck-color-interactive-hover: color-mix(in oklch, var(--color-primary) 75%, black);
+  --puck-color-interactive-active: color-mix(in oklch, var(--color-primary) 55%, black);
+  --puck-color-interactive-subtle: color-mix(in oklch, var(--color-primary) 10%, var(--color-base-100));
+  --puck-color-interactive-soft: color-mix(in oklch, var(--color-primary) 5%, var(--color-base-100));
+  --puck-color-interactive-soft-hover: color-mix(in oklch, var(--color-primary) 2%, var(--color-base-100));
+  --puck-color-interactive-neutral-hover: var(--color-base-200);
+  --puck-color-interactive-inverse-hover: color-mix(in oklch, var(--color-primary) 55%, var(--color-base-100));
+  --puck-color-interactive-inverse-active: color-mix(in oklch, var(--color-primary) 40%, var(--color-base-100));
+
+  /* Focus / selection / highlight */
+  --puck-color-focus-ring: color-mix(in oklch, var(--color-primary) 75%, var(--color-base-100));
+  --puck-color-selection-bg: color-mix(in srgb, color-mix(in oklch, var(--color-primary) 18%, var(--color-base-100)) 30%, transparent);
+  --puck-color-selection-border: color-mix(in oklch, var(--color-primary) 28%, var(--color-base-100));
+  --puck-color-highlight: color-mix(in oklch, var(--color-secondary) 40%, var(--color-base-100));
+  --puck-color-overlay-backdrop: color-mix(in srgb, var(--color-base-content) 75%, transparent);
 }
 
 /* During DnD, outlines/placeholders can momentarily exceed bounds at desktop zoom.
@@ -99,11 +68,11 @@
 /* targeted hacks around specific things */
 @media (prefers-color-scheme: dark), (data-theme="dark") {
   .Puck {
-    --puck-color-grey-07: var(--puck-color-black);
-    --puck-color-grey-09: color-mix(in oklab,var(--color-base-content)10%,transparent);
+    --puck-color-text-subtle: var(--color-base-content);
+    --puck-color-border: color-mix(in oklab, var(--color-base-content) 10%, transparent);
 
     [data-puck-publish] {
-        color: var(--puck-color-black);
+        color: var(--puck-color-text);
     }
   }
 }

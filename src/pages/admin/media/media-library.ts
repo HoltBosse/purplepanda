@@ -1,4 +1,4 @@
-import { DragDropManager, Draggable, Droppable } from "@dnd-kit/dom";
+import { DragDropManager, Draggable, Droppable, Feedback, defaultPreset } from "@dnd-kit/dom";
 
 document.body.dataset.mediaSelectMode = "false";
 
@@ -316,7 +316,9 @@ const postMoveMediaToFolder = (mediaIds: string[], folderId: string) => {
     form.submit();
 };
 
-const dragDropManager = new DragDropManager();
+const dragDropManager = new DragDropManager({
+    plugins: defaultPreset.plugins.map((p) => (p === Feedback ? Feedback.configure({ feedback: "none" }) : p)),
+});
 const draggableInstances: Draggable[] = [];
 const droppableInstances: Droppable[] = [];
 const activeFolderStates = new Map<HTMLElement, boolean>();
@@ -476,7 +478,6 @@ mediaCards.forEach((mediaCard) => {
         id: mediaId,
         element: mediaCard,
         data: { mediaId },
-        feedback: "none"
     }, dragDropManager);
 
     draggableInstances.push(draggable);

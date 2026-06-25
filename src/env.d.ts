@@ -1,4 +1,5 @@
 /// <reference types="astro/client" />
+/// <reference types="node" />
 
 declare global {
     namespace App {

@@ -10,7 +10,7 @@ import { mediafolders, media } from "../../../db/schema.js";
 import { eq, sql, isNull, and } from 'drizzle-orm';
 import { z } from 'zod';
 import sharp from 'sharp';
-import { readFile } from 'node:fs/promises';
+import { promises as fs } from 'fs';
 import { join } from 'node:path';
 import { getMediaPath } from '../../../media/media.js';
 import Pagination from '../../../components/Pagination.astro';
@@ -68,7 +68,7 @@ const mediaItemsWithMetadata: MediaItemWithMetadata[] = await Promise.all(
     try {
       const mediaPath = getMediaPath();
       const filePath = join(mediaPath, item.id.slice(0, 2), item.id.slice(2, 4), item.id);
-      const fileBuffer = await readFile(filePath);
+    const fileBuffer = await fs.readFile(filePath);
       const metadata = await sharp(fileBuffer).metadata();
       
       return {

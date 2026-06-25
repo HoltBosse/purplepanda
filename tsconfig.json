@@ -12,6 +12,10 @@
       "astro/client",
       "node"
     ],
+    "typeRoots": [
+      "../../node_modules/@types",
+      "./node_modules/@types"
+    ],
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,

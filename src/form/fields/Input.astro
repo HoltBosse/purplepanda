@@ -1,21 +1,22 @@
 ---
-import type { ComponentProps } from "astro/types";
+import type { BaseFieldProps } from "../types";
 import BaseField from "../BaseField.astro";
 
-interface Props extends ComponentProps<typeof BaseField> {
+interface Props extends BaseFieldProps {
   placeholder?: string;
   classList?: string;
   inputType?: "text" | "email" | "password" | "number" | "tel" | "url" | "checkbox" | "radio" | "file" | "submit" | "button" | "reset" | "hidden" | "date" | "time" | "datetime-local" | "month" | "week" | "color" | "search" | "range";
 }
 
-const { placeholder, classList, inputType, ...baseProps } = Astro.props;
-const { id, name, value, required } = baseProps;
+const { placeholder, classList, inputType, ...baseProps } = Astro.props as Props;
+const { id, name, value, required, type } = baseProps;
+const resolvedInputType = (inputType ?? type ?? "text") as astroHTML.JSX.HTMLInputTypeAttribute;
 ---
 
 <BaseField {...baseProps}>
   <input
     class={classList}
-    type={inputType ?? "text"}
+    type={resolvedInputType}
     name={name}
     id={id}
     placeholder={placeholder}
