@@ -1,0 +1,47 @@
+---
+import AdminBareLayout from '../../../../../layouts/AdminBareLayout.astro';
+import PagePuckEditor from '../../../../../components/PagePuckEditor';
+import { getDb } from '../../../../../db/db.js';
+import { settings, templates, pages, dagNodes } from '../../../../../db/schema.js';
+import { eq, sql } from 'drizzle-orm';
+import type { Data } from '@puckeditor/core';
+
+const db = getDb();
+const { draftId } = Astro.params;
+
+const [draft] = await db.select().from(dagNodes).where(eq(dagNodes.id, draftId!)).limit(1);
+if (!draft || draft.nodeType !== 'draft' || draft.entityType !== 'page' || draft.state === -1) {
+    return Astro.redirect('/admin/pages');
+}
+
+const saveUrl = `/admin/pages/drafts/update/${draftId}`;
+
+const [defaultTemplate, allPages] = await Promise.all([
+    db
+        .select()
+        .from(settings)
+        .leftJoin(templates, sql`(${templates.id})::text = (${settings.value} #>> '{}')`)
+        .where(eq(settings.key, 'default_template'))
+        .limit(1)
+        .then(rows => rows[0]),
+    db
+        .select({
+            id: pages.id,
+            title: sql<string>`(${pages.content}->'root'->'props'->>'title')`,
+        })
+        .from(pages)
+        .where(eq(pages.state, 1)),
+]);
+
+const templateData = defaultTemplate?.templates?.content as Data | undefined;
+const pageOptions = allPages.map(p => ({ id: p.id, title: p.title ?? '' }));
+---
+<AdminBareLayout>
+    <PagePuckEditor
+        client:only="react"
+        saveUrl={saveUrl}
+        initialData={draft.content as Data}
+        pages={pageOptions}
+        {...(templateData ? { templateData } : {})}
+    />
+</AdminBareLayout>

@@ -1,8 +1,8 @@
 import type { APIContext } from "astro";
 import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
 import { getDb } from "../../../db/db.js";
-import { pages } from "../../../db/schema.js";
-import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
+import { pages, dagNodes } from "../../../db/schema.js";
+import { eq, and, desc, getTableColumns, type InferSelectModel } from 'drizzle-orm';
 import * as z from "zod";
 
 export async function POST(context: APIContext): Promise<Response> {
@@ -50,13 +50,30 @@ export async function POST(context: APIContext): Promise<Response> {
         return context.redirect(isNewPage ? "/admin/pages/new" : `/admin/pages/edit/${pageId}`);
     }
 
+    const parsedContent = JSON.parse(contentResult.data);
+
     if (isNewPage) {
-        page.content = JSON.parse(contentResult.data);
+        page.content = parsedContent;
         page.state = 1;
         await db.insert(pages).values(page).returning();
     } else {
-        await db.update(pages).set({ content: JSON.parse(contentResult.data) }).where(eq(pages.id, page.id));
+        await db.update(pages).set({ content: parsedContent }).where(eq(pages.id, page.id));
     }
+
+    const [latestPublishNode] = await db
+        .select()
+        .from(dagNodes)
+        .where(and(eq(dagNodes.entityType, 'page'), eq(dagNodes.entityId, page.id), eq(dagNodes.nodeType, 'publish')))
+        .orderBy(desc(dagNodes.createdAt))
+        .limit(1);
+
+    await db.insert(dagNodes).values({
+        entityType: 'page',
+        entityId: page.id,
+        parentId: latestPublishNode?.id ?? null,
+        content: parsedContent,
+        nodeType: 'publish',
+    });
 
     const alert = createAlert(alertType.success, isNewPage ? "Page created successfully." : "Page updated successfully.");
     await addAlertToSession(context.session, alert);

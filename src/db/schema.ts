@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -62,4 +62,16 @@ export const redirects = pgTable("redirects", {
   state: integer("state").notNull().default(1),
   from: varchar("from", { length: 2048 }).notNull(),
   to: varchar("to", { length: 2048 }).notNull(),
+});
+
+export const dagNodes = pgTable("dag_nodes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  state: integer("state").notNull().default(1), // 1 = active, -1 = deleted
+  entityType: varchar("entity_type", { length: 50 }).notNull(), // 'page' | 'template'
+  entityId: uuid("entity_id").notNull(),
+  parentId: uuid("parent_id").references((): any => dagNodes.id),
+  content: jsonb("content").notNull(),
+  nodeType: varchar("node_type", { length: 20 }).notNull().default("publish"), // 'publish' | 'draft'
+  name: varchar("name", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });

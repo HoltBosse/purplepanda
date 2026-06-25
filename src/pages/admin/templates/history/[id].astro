@@ -1,0 +1,62 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import HistoryView from '../../../../components/HistoryView';
+import type { DagNodeData } from '../../../../components/HistoryView';
+import { getDb } from '../../../../db/db.js';
+import { templates, dagNodes } from '../../../../db/schema.js';
+import { eq, and, or, gt } from 'drizzle-orm';
+
+const db = getDb();
+const { id } = Astro.params;
+
+if (!id) return Astro.redirect('/admin/templates');
+
+const [template] = await db.select().from(templates).where(eq(templates.id, id)).limit(1);
+if (!template) return Astro.redirect('/admin/templates');
+
+const allNodes = await db
+    .select()
+    .from(dagNodes)
+    .where(
+        and(
+            eq(dagNodes.entityId, id),
+            eq(dagNodes.entityType, 'template'),
+            or(
+                eq(dagNodes.nodeType, 'publish'),
+                and(eq(dagNodes.nodeType, 'draft'), gt(dagNodes.state, -1)),
+            ),
+        )
+    );
+
+const templateTitle = (template.content as any)?.root?.props?.title || 'Untitled';
+
+const serializedNodes: DagNodeData[] = allNodes.map(n => ({
+    id: n.id,
+    nodeType: n.nodeType as 'publish' | 'draft',
+    name: n.name,
+    createdAt: n.createdAt.toISOString(),
+    parentId: n.parentId,
+    content: n.content as Record<string, unknown>,
+    state: n.state,
+}));
+---
+
+<AdminLayout>
+    <div class="flex items-center gap-2 border-b border-base-300 pt-2 pb-4 text-sm">
+        <a href="/admin/templates" class="text-base-content/50 hover:text-base-content transition-colors">Templates</a>
+        <span class="text-base-content/30">/</span>
+        <span class="text-base-content/50">History</span>
+        <span class="text-base-content/30">/</span>
+        <span class="font-semibold truncate max-w-64" title={templateTitle}>{templateTitle}</span>
+    </div>
+
+    <div class="mt-4">
+        <HistoryView
+            client:only="react"
+            entityType="template"
+            entityId={id}
+            currentContent={template.content as Record<string, unknown>}
+            nodes={serializedNodes}
+        />
+    </div>
+</AdminLayout>

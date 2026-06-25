@@ -254,6 +254,46 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/drafts/create",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/drafts/create.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/drafts/delete/[draftId]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/drafts/delete/[draftId].ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/pages/drafts/edit/[draftId]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/pages/drafts/edit/[draftId].astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/pages/drafts/update/[draftId]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/pages/drafts/update/[draftId].ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/templates/drafts/edit/[draftId]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/templates/drafts/edit/[draftId].astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/templates/drafts/update/[draftId]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/templates/drafts/update/[draftId].ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/pages/history/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/pages/history/[id].astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/templates/history/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/templates/history/[id].astro",
+        });
+
+        injectRoute({
           pattern: "/admin/profile",
           entrypoint: "@holtbosse/purplepanda/pages/admin/profile/index.astro",
         });

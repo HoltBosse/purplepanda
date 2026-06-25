@@ -1,0 +1,25 @@
+---
+import AdminBareLayout from '../../../../../layouts/AdminBareLayout.astro';
+import TemplatePuckEditor from '../../../../../components/TemplatePuckEditor';
+import { getDb } from '../../../../../db/db.js';
+import { dagNodes } from '../../../../../db/schema.js';
+import { eq } from 'drizzle-orm';
+import type { Data } from '@puckeditor/core';
+
+const db = getDb();
+const { draftId } = Astro.params;
+
+const [draft] = await db.select().from(dagNodes).where(eq(dagNodes.id, draftId!)).limit(1);
+if (!draft || draft.nodeType !== 'draft' || draft.entityType !== 'template' || draft.state === -1) {
+    return Astro.redirect('/admin/templates');
+}
+
+const saveUrl = `/admin/templates/drafts/update/${draftId}`;
+---
+<AdminBareLayout>
+    <TemplatePuckEditor
+        client:only="react"
+        saveUrl={saveUrl}
+        initialData={draft.content as Data}
+    />
+</AdminBareLayout>

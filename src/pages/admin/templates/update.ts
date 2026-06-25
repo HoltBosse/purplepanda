@@ -1,14 +1,8 @@
 import type { APIContext } from "astro";
 import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
-import { validateForm, createUserAlertMessageFromArray, getFieldByName, formDataToRecord } from "../../../form/index.js";
-import { createFormFlashSession } from "../../../form/session.js";
-import { getProfileForm } from "../profile/form.js";
-import { getAllFields } from "../../../form/index.js";
 import { getDb } from "../../../db/db.js";
-import { templates } from "../../../db/schema.js";
-import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
-import { get } from "node:http";
-import { hash } from "../../../password/index.js";
+import { templates, dagNodes } from "../../../db/schema.js";
+import { eq, and, desc, getTableColumns, type InferSelectModel } from 'drizzle-orm';
 import * as z from "zod";
 
 export async function POST(context: APIContext): Promise<Response> {
@@ -67,14 +61,30 @@ export async function POST(context: APIContext): Promise<Response> {
         return context.redirect(redirectUrl);
     }
 
-    if(isNewTemplate) {
-        template.content = JSON.parse(contentResult.data);
-        template.state = 1;
+    const parsedContent = JSON.parse(contentResult.data);
 
+    if(isNewTemplate) {
+        template.content = parsedContent;
+        template.state = 1;
         await db.insert(templates).values(template).returning();
     } else {
-        await db.update(templates).set({ content: JSON.parse(contentResult.data) }).where(eq(templates.id, template.id));
+        await db.update(templates).set({ content: parsedContent }).where(eq(templates.id, template.id));
     }
+
+    const [latestPublishNode] = await db
+        .select()
+        .from(dagNodes)
+        .where(and(eq(dagNodes.entityType, 'template'), eq(dagNodes.entityId, template.id), eq(dagNodes.nodeType, 'publish')))
+        .orderBy(desc(dagNodes.createdAt))
+        .limit(1);
+
+    await db.insert(dagNodes).values({
+        entityType: 'template',
+        entityId: template.id,
+        parentId: latestPublishNode?.id ?? null,
+        content: parsedContent,
+        nodeType: 'publish',
+    });
 
     let message = "Template updated successfully.";
     if(isNewTemplate) {

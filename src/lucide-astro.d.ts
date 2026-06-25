@@ -41,3 +41,7 @@ export declare const LogOut: AstroComponent;
 export declare const Folder: AstroComponent;
 export declare const Settings: AstroComponent;
 export declare const ExternalLink: AstroComponent;
+export declare const EllipsisVertical: AstroComponent;
+export declare const FilePen: AstroComponent;
+export declare const Trash2: AstroComponent;
+export declare const GitBranch: AstroComponent;
