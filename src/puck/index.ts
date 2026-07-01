@@ -1,7 +1,7 @@
 import type { Config, Fields } from "@puckeditor/core";
 export { ClientComponentDataWrapper, wrapConfigWithClientDataResolvers } from "./client-data-wrapper.js";
 
-export type { ComponentConfig } from "@puckeditor/core";
+export type { ComponentConfig, Slot } from "@puckeditor/core";
 
 type Awaitable<TValue> = TValue | Promise<TValue>;
 

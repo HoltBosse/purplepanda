@@ -16,6 +16,10 @@
       "types": "./dist/puck/index.d.ts",
       "default": "./dist/puck/index.js"
     },
+    "./puck/prefab": {
+      "types": "./dist/puck/prefab/index.d.ts",
+      "default": "./dist/puck/prefab/index.js"
+    },
     "./puck/media": {
       "types": "./dist/puck/media/index.d.ts",
       "default": "./dist/puck/media/index.js"
