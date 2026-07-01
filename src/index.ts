@@ -369,6 +369,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/media/api/lookup",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/media/api/lookup.ts",
+        });
+
+        injectRoute({
           pattern: "/admin/settings",
           entrypoint: "@holtbosse/purplepanda/pages/admin/settings/index.astro",
         });
