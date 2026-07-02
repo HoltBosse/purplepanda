@@ -65,10 +65,37 @@
   max-width: 100%;
 }
 
+/* @puckeditor/core's bundled CSS doesn't style the tiptap Placeholder extension
+   (@tiptap/extensions), so its data-placeholder attribute/classes render invisibly
+   without this rule. */
+.Puck .rich-text .is-empty::before,
+.Puck .rich-text .is-editor-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--puck-color-text-subtle);
+  pointer-events: none;
+}
+
+/* Rich prefab (puck/prefab/Rich.tsx): the canvas renders the rich-text field's
+   static HTML, not a live tiptap instance, so the Placeholder extension above
+   never applies there. Rich.tsx only adds the "rich-placeholder-wrap" class
+   while puck.isEditing is true, so this never shows on the published site.
+   ".rich-text:empty" covers untouched content (defaultProps.content === ""),
+   and "> p:only-child:empty" covers content cleared back to a single empty
+   paragraph (tiptap serializes that as "<p></p>", not "" ). Not scoped to
+   .Puck: the canvas is a mirrored iframe with no .Puck ancestor. */
+.rich-placeholder-wrap:has(.rich-text:empty)::before,
+.rich-placeholder-wrap:has(.rich-text > p:only-child:empty)::before {
+  content: "Type something...";
+  display: block;
+  color: currentColor;
+  opacity: 0.4;
+}
+
 /* targeted hacks around specific things */
 @media (prefers-color-scheme: dark), (data-theme="dark") {
   .Puck {
-    --puck-color-text-subtle: var(--color-base-content);
     --puck-color-border: color-mix(in oklab, var(--color-base-content) 10%, transparent);
 
     [data-puck-publish] {
