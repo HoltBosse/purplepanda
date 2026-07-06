@@ -1,0 +1,101 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getDb } from '../../../db/db.js';
+import { tags } from '../../../db/schema.js';
+import { CircleCheck, CircleX, CornerDownRight } from '@lucide/astro';
+import { desc, type InferSelectModel } from 'drizzle-orm';
+
+type Tag = InferSelectModel<typeof tags>;
+
+const db = getDb();
+const allTags = await db.select().from(tags).orderBy(desc(tags.id));
+
+// Group tags by parent so children are listed directly under their parent,
+// preserving the existing (desc by id) order within each group.
+const tagIds = new Set(allTags.map(tag => tag.id));
+const childrenByParent = new Map<string, Tag[]>();
+for (const tag of allTags) {
+    const parentKey = tag.parentTag && tagIds.has(tag.parentTag) ? tag.parentTag : 'root';
+    if (!childrenByParent.has(parentKey)) childrenByParent.set(parentKey, []);
+    childrenByParent.get(parentKey)!.push(tag);
+}
+
+const orderedTags: { tag: Tag; depth: number }[] = [];
+function addChildren(parentKey: string, depth: number, visited: Set<string>) {
+    for (const child of childrenByParent.get(parentKey) ?? []) {
+        if (visited.has(child.id)) continue;
+        orderedTags.push({ tag: child, depth });
+        addChildren(child.id, depth + 1, new Set(visited).add(child.id));
+    }
+}
+addChildren('root', 1, new Set());
+---
+
+<AdminLayout>
+	<div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
+        <h1 class="text-2xl font-semibold">Tags</h1>
+        <a href="/admin/tags/new" class="btn btn-primary">New</a>
+    </div>
+    <form id="bulk-form" method="POST"></form>
+    <table class="table p-2 bg-base-100 rounded-lg">
+        <thead>
+            <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
+                <th colspan="2">
+                    <div class="flex items-center gap-2">
+                        <button form="bulk-form" type="submit" formaction="/admin/tags/bulk/publish" class="btn btn-xs btn-outline btn-accent">Enable</button>
+                        <button form="bulk-form" type="submit" formaction="/admin/tags/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Disable</button>
+                        <button form="bulk-form" type="submit" formaction="/admin/tags/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+                    </div>
+                </th>
+            </tr>
+            <tr class="[table:has(.row-select:checked)_&]:hidden">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
+                <th class="w-px whitespace-nowrap">State</th>
+                <th>Title</th>
+            </tr>
+        </thead>
+        <tbody>
+            {orderedTags.map(({ tag, depth }) => (
+                <tr>
+                    <td>
+                        <label>
+                            <input
+                                form="bulk-form"
+                                type="checkbox"
+                                class="checkbox row-select"
+                                name="selected[]"
+                                value={tag.id}
+                            />
+                        </label>
+                    </td>
+                    <td class="w-px whitespace-nowrap">
+                        <form action={`/admin/tags/toggle/${tag.id}`} method="POST">
+                            <button class="btn btn-square" type="submit">
+                                {tag.state === 1 ? <CircleCheck size={20} class="text-green-500" /> : <CircleX size={20} class="text-red-500" />}
+                            </button>
+                        </form>
+                    </td>
+                    <td>
+                        <a href={`/admin/tags/edit/${tag.id}`}>
+                            <div class="font-bold flex items-center gap-1">
+                                {depth > 1 && <span class="whitespace-pre">{' '.repeat((depth - 2) * 2)}</span>}
+                                {depth > 1 && <CornerDownRight size={14} class="text-base-content/50 shrink-0" />}
+                                <span class="link-info link-hover">{tag.title}</span>
+                            </div>
+                        </a>
+                    </td>
+                </tr>
+            ))}
+        </tbody>
+    </table>
+    <script>import '../../../scripts/select-all'</script>
+</AdminLayout>

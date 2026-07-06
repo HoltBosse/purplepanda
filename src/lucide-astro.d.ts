@@ -45,3 +45,4 @@ export declare const EllipsisVertical: AstroComponent;
 export declare const FilePen: AstroComponent;
 export declare const Trash2: AstroComponent;
 export declare const GitBranch: AstroComponent;
+export declare const CornerDownRight: AstroComponent;

@@ -1,0 +1,58 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import Form from '../../../form/Form.astro';
+import { getAllFields } from '../../../form/index.js';
+import { getDb } from '../../../db/db.js';
+import { tags } from '../../../db/schema.js';
+import { eq, ne, getTableColumns, type InferSelectModel } from 'drizzle-orm';
+import { getTagForm } from './form.js';
+import { createFormFlashSession } from '../../../form/session.js';
+
+const db = getDb();
+const { id } = Astro.params;
+
+let tag: InferSelectModel<typeof tags>;
+if (id) {
+    const [existing] = await db.select().from(tags).where(eq(tags.id, id)).limit(1);
+    if (!existing) {
+        throw new Error('Tag not found');
+    }
+    tag = existing;
+} else {
+    tag = Object.fromEntries(
+        Object.entries(getTableColumns(tags)).map(([key, col]: [string, any]) => {
+            let value: unknown;
+            if (col.defaultFn !== undefined) value = col.defaultFn();
+            else if (col.default !== undefined) value = col.default;
+            else if (col.dataType === 'number') value = 0;
+            else value = '';
+            return [key, value];
+        })
+    ) as InferSelectModel<typeof tags>;
+}
+
+const allTags = id
+    ? await db.select().from(tags).where(ne(tags.id, id))
+    : await db.select().from(tags);
+const parentOptions = [{ value: '', label: 'None' }, ...allTags.map(t => ({ value: t.id, label: t.title }))];
+
+const fields = getAllFields();
+const formFlash = createFormFlashSession(Astro.session);
+const flash = await formFlash.get('tag') ?? {};
+await formFlash.delete('tag');
+
+const url = id ? `/admin/tags/update/${id}` : '/admin/tags/update';
+const form = getTagForm(tag, fields, url, parentOptions, flash);
+const isNew = !id;
+---
+
+<AdminLayout>
+    <Form form={form} fields={fields}>
+        <div slot="before-fields" class="flex items-center justify-between align-middle pt-2">
+            <h1 class="text-2xl font-semibold">{isNew ? 'New Tag' : 'Edit Tag'}</h1>
+            <div class="flex items-center gap-2">
+                <button class="btn btn-primary">Save</button>
+            </div>
+        </div>
+    </Form>
+</AdminLayout>

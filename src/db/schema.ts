@@ -64,6 +64,13 @@ export const redirects = pgTable("redirects", {
   to: varchar("to", { length: 2048 }).notNull(),
 });
 
+export const tags = pgTable("tags", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  state: integer("state").notNull().default(1),
+  title: varchar("title", { length: 255 }).notNull(),
+  parentTag: uuid("parent_tag").references((): any => tags.id),
+});
+
 export const dagNodes = pgTable("dag_nodes", {
   id: uuid("id").defaultRandom().primaryKey(),
   state: integer("state").notNull().default(1), // 1 = active, -1 = deleted

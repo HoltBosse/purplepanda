@@ -557,6 +557,41 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/tags",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/tags/index.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/tags/new",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/tags/new.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/tags/edit/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/tags/new.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/tags/update/",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/tags/update.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/tags/update/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/tags/update.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/tags/toggle/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/tags/toggle.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/tags/bulk/[action]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/tags/bulk/[action].ts",
+        });
+
+        injectRoute({
           pattern: "/admin/[...path]",
           entrypoint: "@holtbosse/purplepanda/pages/admin/404.astro",
         });
