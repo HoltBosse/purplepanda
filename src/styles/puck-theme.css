@@ -77,6 +77,15 @@
   pointer-events: none;
 }
 
+/* Rich prefab (puck/prefab/Rich.tsx): the canvas's copy of .rich-text is wrapped
+   in our "prose" class (see Rich.tsx render()), which styles links, but the
+   sidebar's live tiptap editing surface is Puck's generic field UI and never
+   gets that wrapper, so links there would otherwise render unstyled. */
+.Puck .rich-text a {
+  color: var(--puck-color-interactive);
+  text-decoration: underline;
+}
+
 /* Rich prefab (puck/prefab/Rich.tsx): the canvas renders the rich-text field's
    static HTML, not a live tiptap instance, so the Placeholder extension above
    never applies there. Rich.tsx only adds the "rich-placeholder-wrap" class

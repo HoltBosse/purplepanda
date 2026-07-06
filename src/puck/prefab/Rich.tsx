@@ -1,5 +1,5 @@
 import type { ComponentConfig } from "@puckeditor/core";
-import type { ReactNode } from "react";
+import type { ReactNode, SyntheticEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Placeholder } from '@tiptap/extensions';
@@ -7,7 +7,7 @@ import { RichTextMenu } from "@puckeditor/core";
 import type { Editor } from "@tiptap/react";
 import { Superscript as SuperscriptExtension } from "@tiptap/extension-superscript";
 import { Subscript as SubscriptExtension } from "@tiptap/extension-subscript";
-import { ChevronDown, Subscript, Superscript } from "lucide-react";
+import { ChevronDown, Link as LinkIcon, Subscript, Superscript } from "lucide-react";
 
 type RichProps = {
   content: ReactNode;
@@ -125,6 +125,104 @@ function SuperSubMenu({
   );
 }
 
+function LinkMenu({
+  editor,
+  isLink,
+  readOnly,
+}: {
+  editor: Editor | null;
+  isLink?: boolean;
+  readOnly?: boolean;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [url, setUrl] = useState("");
+  const [newTab, setNewTab] = useState(false);
+
+  const openDialog = () => {
+    const attrs = editor?.getAttributes("link") ?? {};
+    setUrl(typeof attrs.href === "string" ? attrs.href : "");
+    setNewTab(attrs.target === "_blank");
+    dialogRef.current?.showModal();
+  };
+
+  const applyLink = (event: SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = url.trim();
+    const chain = editor?.chain().focus().extendMarkRange("link");
+    if (!trimmed) chain?.unsetLink().run();
+    else chain?.setLink({ href: trimmed, target: newTab ? "_blank" : null }).run();
+    dialogRef.current?.close();
+  };
+
+  const removeLink = () => {
+    editor?.chain().focus().extendMarkRange("link").unsetLink().run();
+    dialogRef.current?.close();
+  };
+
+  return (
+    <>
+      <RichTextMenu.Control
+        icon={<LinkIcon />}
+        active={!!isLink}
+        disabled={!!readOnly}
+        onClick={openDialog}
+        title="Link"
+      />
+      {createPortal(
+        <dialog
+          ref={dialogRef}
+          className="fixed inset-0 m-auto w-80 rounded-md border border-gray-200 bg-white p-4 shadow-lg backdrop:bg-black/30 dark:border-gray-700 dark:bg-gray-800"
+          onClick={(event) => {
+            if (event.target === dialogRef.current) dialogRef.current?.close();
+          }}
+        >
+          <form onSubmit={applyLink} className="flex flex-col gap-3">
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">
+              URL
+              <input
+                type="text"
+                autoFocus
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+                className="mt-1 block w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-900"
+              />
+            </label>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">
+              Open in
+              <select
+                value={newTab ? "_blank" : "_self"}
+                onChange={(event) => setNewTab(event.target.value === "_blank")}
+                className="mt-1 block w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-900"
+              >
+                <option value="_self">Current tab</option>
+                <option value="_blank">New tab</option>
+              </select>
+            </label>
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                {isLink && (
+                  <button type="button" className="btn btn-xs btn-error" onClick={removeLink}>
+                    Remove
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" className="btn btn-xs" onClick={() => dialogRef.current?.close()}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-xs btn-primary">
+                  Apply
+                </button>
+              </div>
+            </div>
+          </form>
+        </dialog>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 function RichTextMenuScrollFade({ children }: { children: ReactNode }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [showLeftFade, setShowLeftFade] = useState(false);
@@ -175,6 +273,7 @@ const Rich: ComponentConfig<RichProps> = {
       type: "richtext",
       options: {
         heading: { levels: [1, 2, 3, 4] },
+        link: { openOnClick: false, HTMLAttributes: { target: null } },
       },
       tiptap: {
         extensions: [
@@ -185,6 +284,7 @@ const Rich: ComponentConfig<RichProps> = {
         selector: (ctx) => ({
           isSuperscript: !!ctx.editor?.isActive("superscript"),
           isSubscript: !!ctx.editor?.isActive("subscript"),
+          isLink: !!ctx.editor?.isActive("link"),
         }),
       },
       renderMenu: ({ children, editor, editorState, readOnly }) => (
@@ -199,6 +299,7 @@ const Rich: ComponentConfig<RichProps> = {
                 isSubscript={!!editorState?.isSubscript}
                 readOnly={!!readOnly}
               />
+              <LinkMenu editor={editor} isLink={!!editorState?.isLink} readOnly={!!readOnly} />
             </RichTextMenu.Group>
           </RichTextMenu>
         </RichTextMenuScrollFade>
