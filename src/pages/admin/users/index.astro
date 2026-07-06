@@ -2,14 +2,24 @@
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { createHash } from 'node:crypto';
 import { getDb } from '../../../db/db.js';
-import { users } from '../../../db/schema.js';
+import { users, roles, userRoles } from '../../../db/schema.js';
 import { CircleCheck, CircleX } from '@lucide/astro';
 import { capitalize } from '../../../string';
 import { desc, eq, gt } from 'drizzle-orm';
 
 const db = getDb();
 const allUsers = await db.select().from(users).where(gt(users.state, -1)).orderBy(desc(users.id));
-//console.log(allUsers);
+
+const userRoleRows = await db
+    .select({ userId: userRoles.userId, title: roles.title })
+    .from(userRoles)
+    .innerJoin(roles, eq(userRoles.roleId, roles.id));
+
+const rolesByUser = new Map<string, string[]>();
+for (const row of userRoleRows) {
+    if (!rolesByUser.has(row.userId)) rolesByUser.set(row.userId, []);
+    rolesByUser.get(row.userId)!.push(row.title);
+}
 ---
 
 <AdminLayout>
@@ -84,9 +94,14 @@ const allUsers = await db.select().from(users).where(gt(users.state, -1)).orderB
                         </a>
                     </td>
                     <td>
-                        thingssss
-                        <br />
-                        <span class="badge badge-ghost badge-sm">Desktop Support Technician</span>
+                        <div class="flex flex-wrap gap-1">
+                            {(rolesByUser.get(user.id) ?? []).map(title => (
+                                <span class="badge badge-ghost badge-sm">{title}</span>
+                            ))}
+                            {(rolesByUser.get(user.id) ?? []).length === 0 && (
+                                <span class="text-sm opacity-50">No roles</span>
+                            )}
+                        </div>
                     </td>
                 </tr>
             ))}

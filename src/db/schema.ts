@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, integer, jsonb, timestamp, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -70,6 +70,21 @@ export const tags = pgTable("tags", {
   title: varchar("title", { length: 255 }).notNull(),
   parentTag: uuid("parent_tag").references((): any => tags.id),
 });
+
+export const roles = pgTable("roles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  state: integer("state").notNull().default(1),
+  title: varchar("title", { length: 255 }).notNull(),
+  adminAccess: boolean("admin_access").notNull().default(false),
+});
+
+export const userRoles = pgTable("user_roles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  roleId: uuid("role_id").notNull().references(() => roles.id),
+}, (t) => [
+  uniqueIndex("user_roles_user_id_role_id_idx").on(t.userId, t.roleId),
+]);
 
 export const dagNodes = pgTable("dag_nodes", {
   id: uuid("id").defaultRandom().primaryKey(),

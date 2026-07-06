@@ -362,6 +362,41 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/users/roles",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/users/roles/index.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/users/roles/new",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/users/roles/new.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/users/roles/edit/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/users/roles/new.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/users/roles/update/",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/users/roles/update.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/users/roles/update/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/users/roles/update.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/users/roles/toggle/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/users/roles/toggle.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/users/roles/bulk/[action]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/users/roles/bulk/[action].ts",
+        });
+
+        injectRoute({
           pattern: "/admin/media",
           entrypoint: "@holtbosse/purplepanda/pages/admin/media/index.astro",
         });

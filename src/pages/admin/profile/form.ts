@@ -7,7 +7,7 @@ type User = InferSelectModel<typeof users>;
 
 const inputClassList = "w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200";
 
-export function getProfileForm(user: User, fields: Record<string, any>, redirectUrl: string, flash: Record<string, string> = {}, showCurrentPassword: boolean = false): FormSection {
+export function getProfileForm(user: User, fields: Record<string, any>, redirectUrl: string, flash: Record<string, string> = {}, showCurrentPassword: boolean = false, roleOptions: { value: string; label: string }[] = [], selectedRoleIds: string[] = []): FormSection {
 	return {
 		id: 'profile-form',
 		title: 'Profile',
@@ -126,7 +126,34 @@ export function getProfileForm(user: User, fields: Record<string, any>, redirect
 						],
 					}
 				]
-			}
+			},
+			...(roleOptions.length > 0 ? [{
+				id: 'roles-group-wrapper',
+				name: 'roles-group-wrapper',
+				type: "Group",
+				fields: fields,
+				classList: "p-6 bg-base-100 rounded-lg",
+				groupFields: [
+					{
+						id: 'roles-group-header',
+						name: 'roles-group-header',
+						type: 'Html',
+						markup: '<h2 class="text-lg font-medium">Roles</h2>',
+					},
+					{
+						id: 'roles',
+						name: 'roles[]',
+						label: 'Roles',
+						type: 'Select',
+						classList: inputClassList,
+						optionsClassList: "bg-base-100 text-base-content",
+						options: roleOptions,
+						value: selectedRoleIds as unknown as string,
+						multiple: true,
+						description: 'Hold Ctrl (Windows) or Cmd (Mac) to select multiple roles.',
+					},
+				],
+			}] : []),
 		],
 		props: {
 			action: redirectUrl,

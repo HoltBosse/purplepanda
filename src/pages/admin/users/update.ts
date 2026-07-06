@@ -5,10 +5,13 @@ import { createFormFlashSession } from "../../../form/session.js";
 import { getProfileForm } from "../profile/form.js";
 import { getAllFields } from "../../../form/index.js";
 import { getDb } from "../../../db/db.js";
-import { users } from "../../../db/schema.js";
+import { users, userRoles } from "../../../db/schema.js";
 import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
 import { get } from "node:http";
 import { hash } from "../../../password/index.js";
+import * as z from "zod";
+
+const roleIdsSchema = z.array(z.string().uuid());
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -119,6 +122,14 @@ export async function POST(context: APIContext): Promise<Response> {
         await db.insert(users).values(user).returning();
     } else {
         await db.update(users).set({ fname, lname, email, password: user.password }).where(eq(users.id, user.id));
+    }
+
+    const roleIdsResult = roleIdsSchema.safeParse(formData.getAll('roles[]').map(String));
+    const roleIds = roleIdsResult.success ? roleIdsResult.data : [];
+
+    await db.delete(userRoles).where(eq(userRoles.userId, user.id));
+    if (roleIds.length > 0) {
+        await db.insert(userRoles).values(roleIds.map(roleId => ({ userId: user.id, roleId })));
     }
 
     await formFlash.delete('newuser');

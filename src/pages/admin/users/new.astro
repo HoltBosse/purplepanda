@@ -3,7 +3,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import Form from '../../../form/Form.astro';
 import { getAllFields } from '../../../form/index.js';
 import { getDb } from '../../../db/db.js';
-import { users } from '../../../db/schema.js';
+import { users, roles, userRoles } from '../../../db/schema.js';
 import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
 import { getProfileForm } from '../profile/form.js';
 import { createFormFlashSession } from '../../../form/session.js';
@@ -38,12 +38,19 @@ if(id) {
 	) as InferSelectModel<typeof users>;
 }
 
+const allRoles = await db.select().from(roles);
+const roleOptions = allRoles.map(role => ({ value: role.id, label: role.title }));
+
+const selectedRoleIds = id
+	? (await db.select({ roleId: userRoles.roleId }).from(userRoles).where(eq(userRoles.userId, id))).map(r => r.roleId)
+	: [];
+
 const fields = getAllFields();
 const formFlash = createFormFlashSession(Astro.session);
 const flash = await formFlash.get('profile') ?? {};
 await formFlash.delete('profile');
 const url = id ? `/admin/users/update/${id}` : '/admin/users/update';
-const form = getProfileForm(user, fields, url, flash, false);
+const form = getProfileForm(user, fields, url, flash, false, roleOptions, selectedRoleIds);
 ---
 
 <AdminLayout>

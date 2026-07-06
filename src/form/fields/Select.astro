@@ -7,10 +7,12 @@ interface Props extends ComponentProps<typeof BaseField> {
   classList?: string;
   optionsClassList?: string;
   options: { value: string; label: string }[];
+  multiple?: boolean;
 }
 
-const { placeholder, classList, optionsClassList, options, ...baseProps } = Astro.props;
+const { placeholder, classList, optionsClassList, options, multiple, ...baseProps } = Astro.props;
 const { id, name, value, required } = baseProps;
+const selectedValues = multiple ? (Array.isArray(value) ? value : value !== undefined ? [value] : []) : undefined;
 ---
 
 <BaseField {...baseProps}>
@@ -19,10 +21,11 @@ const { id, name, value, required } = baseProps;
         name={name}
         id={id}
         required={required}
+        multiple={multiple}
     >
-        {placeholder && <option class={optionsClassList} value="" disabled selected={value === undefined && !options.some(option => option.value === value)}>{placeholder}</option>}
+        {placeholder && !multiple && <option class={optionsClassList} value="" disabled selected={value === undefined && !options.some(option => option.value === value)}>{placeholder}</option>}
         {options.map((option) => (
-            <option class={optionsClassList} value={option.value} selected={option.value === value}>
+            <option class={optionsClassList} value={option.value} selected={multiple ? selectedValues!.includes(option.value) : option.value === value}>
                 {option.label}
             </option>
         ))}
