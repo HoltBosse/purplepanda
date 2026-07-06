@@ -7,7 +7,7 @@ import { RichTextMenu } from "@puckeditor/core";
 import type { Editor } from "@tiptap/react";
 import { Superscript as SuperscriptExtension } from "@tiptap/extension-superscript";
 import { Subscript as SubscriptExtension } from "@tiptap/extension-subscript";
-import { ChevronDown, Link as LinkIcon, Subscript, Superscript } from "lucide-react";
+import { ChevronDown, Link as LinkIcon, Subscript, Superscript } from "../icons.js";
 
 type RichProps = {
   content: ReactNode;

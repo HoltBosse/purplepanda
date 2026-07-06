@@ -155,6 +155,29 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
             define: {
               __PURPLE_PANDA__: JSON.stringify(true),
             },
+            optimizeDeps: {
+              // The Puck editor islands are mounted via client:only/client:load, so Vite's
+              // startup dependency scanner (which crawls static imports from page entry
+              // points) doesn't reliably discover them ahead of time. Without this, the
+              // first navigation to an editor page in a dev session triggers an on-demand
+              // re-optimization ("new dependencies optimized, reloading") of this entire
+              // list, which forces a full page reload mid-load. Listing them here makes
+              // Vite pre-bundle them at server startup instead.
+              include: [
+                "@puckeditor/core",
+                "@dnd-kit/dom",
+                "@dnd-kit/react",
+                "@dnd-kit/abstract",
+                "@dnd-kit/geometry",
+                "@dnd-kit/helpers",
+                "@dnd-kit/state",
+                "@tiptap/react",
+                "@tiptap/core",
+                "@tiptap/extension-subscript",
+                "@tiptap/extension-superscript",
+                "@tiptap/extensions",
+              ],
+            },
           },
         });
 
