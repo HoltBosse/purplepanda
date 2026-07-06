@@ -28,6 +28,11 @@ function getMimeType(buffer: Buffer): string {
     buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
     buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50
   ) return "image/webp";
+  // AVIF (ISOBMFF: ....ftypavif / ....ftypavis)
+  if (
+    buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70 &&
+    buffer[8] === 0x61 && buffer[9] === 0x76 && buffer[10] === 0x69 && (buffer[11] === 0x66 || buffer[11] === 0x73)
+  ) return "image/avif";
   // BMP
   if (buffer[0] === 0x42 && buffer[1] === 0x4d) return "image/bmp";
   // TIFF (little-endian)
@@ -55,6 +60,10 @@ export const GET: APIRoute = async ({ params, request, rewrite }) => {
   const w = z.number().int().positive().optional().safeParse(searchParams.get("w") ? Number(searchParams.get("w")) : undefined);
   const h = z.number().int().positive().optional().safeParse(searchParams.get("h") ? Number(searchParams.get("h")) : undefined);
   const q = z.number().int().min(1).max(100).optional().safeParse(searchParams.get("q") ? Number(searchParams.get("q")) : undefined);
+  const x1 = z.number().int().min(0).optional().safeParse(searchParams.get("x1") ? Number(searchParams.get("x1")) : undefined);
+  const y1 = z.number().int().min(0).optional().safeParse(searchParams.get("y1") ? Number(searchParams.get("y1")) : undefined);
+  const x2 = z.number().int().optional().safeParse(searchParams.get("x2") ? Number(searchParams.get("x2")) : undefined);
+  const y2 = z.number().int().optional().safeParse(searchParams.get("y2") ? Number(searchParams.get("y2")) : undefined);
 
   const id = parsed.data;
   const db = getDb();
@@ -75,14 +84,29 @@ export const GET: APIRoute = async ({ params, request, rewrite }) => {
   const mediaPath = getMediaPath();
   const filePath = join(mediaPath, id.slice(0, 2), id.slice(2, 4), id);
 
-  if (fmt.success || w.success || h.success || q.success) {
+  if (fmt.success || w.success || h.success || q.success || x1.success || y1.success || x2.success || y2.success) {
     // #4: pass file path directly — sharp/libvips reads the file internally
     let image = sharp(filePath);
 
+    //handle crop params (x1,y1,x2,y2) if any are present
+    if(x1.success || y1.success || x2.success || y2.success) {
+      const metadata = await image.metadata();
+
+      const cropX1 = x1.success && x1.data !== undefined ? x1.data : 0;
+      const cropY1 = y1.success && y1.data !== undefined ? y1.data : 0;
+      //if x2/y2 are negative, treat them as offsets from the right/bottom edge of the image
+      const cropX2 = x2.success && x2.data !== undefined ? (x2.data < 0 ? (metadata.width ?? 0) + x2.data : x2.data) : metadata.width ?? undefined;
+      const cropY2 = y2.success && y2.data !== undefined ? (y2.data < 0 ? (metadata.height ?? 0) + y2.data : y2.data) : metadata.height ?? undefined;
+      
+      image = image.extract({ left: cropX1, top: cropY1, width: (cropX2 as number) - cropX1, height: (cropY2 as number) - cropY1 });
+    }
+
+    //handle resize params (w,h) if any are present
     if (w.success || h.success) {
       image = image.resize(w.success ? w.data : undefined, h.success ? h.data : undefined);
     }
 
+    //handle formatting
     if (fmt.success) {
       if (fmt.data === "jpeg") {
         image = image.jpeg({ quality: q.success ? q.data : 100 });
