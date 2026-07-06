@@ -55,6 +55,7 @@ export function getSettingsForm(): FormSection {
                                 })),
                                 placeholder: 'Select a template',
                                 classList: inputClassList,
+                                optionsClassList: "bg-base-100 text-base-content",
                                 required: true,
                                 validator: z.string().min(1, "Last name is required"),
                             },

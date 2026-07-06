@@ -5,10 +5,11 @@ import BaseField from "../BaseField.astro";
 interface Props extends ComponentProps<typeof BaseField> {
   placeholder?: string;
   classList?: string;
+  optionsClassList?: string;
   options: { value: string; label: string }[];
 }
 
-const { placeholder, classList, options, ...baseProps } = Astro.props;
+const { placeholder, classList, optionsClassList, options, ...baseProps } = Astro.props;
 const { id, name, value, required } = baseProps;
 ---
 
@@ -19,9 +20,9 @@ const { id, name, value, required } = baseProps;
         id={id}
         required={required}
     >
-        {placeholder && <option value="" disabled selected={value === undefined && !options.some(option => option.value === value)}>{placeholder}</option>}
+        {placeholder && <option class={optionsClassList} value="" disabled selected={value === undefined && !options.some(option => option.value === value)}>{placeholder}</option>}
         {options.map((option) => (
-            <option value={option.value} selected={option.value === value}>
+            <option class={optionsClassList} value={option.value} selected={option.value === value}>
                 {option.label}
             </option>
         ))}

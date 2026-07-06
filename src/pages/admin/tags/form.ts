@@ -50,6 +50,7 @@ export function getTagForm(tag: Tag, fields: Record<string, any>, actionUrl: str
                                 label: 'Parent tag',
                                 type: 'Select',
                                 classList: inputClassList,
+                                optionsClassList: "bg-base-100 text-base-content",
                                 options: parentOptions,
                                 value: flash['parentTag'] ?? tag.parentTag ?? '',
                             },
