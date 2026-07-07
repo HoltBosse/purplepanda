@@ -25,6 +25,7 @@ export async function POST(context: APIContext): Promise<Response> {
                 let value: unknown;
                 if (col.defaultFn !== undefined) value = col.defaultFn();
                 else if (col.default !== undefined) value = col.default;
+                else if (!col.notNull) value = null;
                 else if (col.dataType === 'number') value = 0;
                 else value = '';
                 return [key, value];
