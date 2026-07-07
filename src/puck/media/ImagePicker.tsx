@@ -7,11 +7,15 @@ import type { CropperImage } from "cropperjs";
 
 /*
   TODO:
-  * folders within the media library, pagination
   * upload support from media picker, may require porting some of the existing upload stuff into react land
 */
 
 export type MediaRef = { id: string; title: string; alt: string };
+
+export type MediaFolder = { id: string; name: string };
+
+// One entry in the picker's folder breadcrumb trail; the root has a null id.
+type FolderCrumb = { id: string | null; name: string };
 
 export type CropBox = { x1: number; y1: number; x2: number; y2: number };
 
@@ -173,8 +177,14 @@ function ImagePickerField({
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [images, setImages] = useState<MediaRef[]>([]);
+  const [folders, setFolders] = useState<MediaFolder[]>([]);
+  const [folderPath, setFolderPath] = useState<FolderCrumb[]>([{ id: null, name: "Root" }]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [fetching, setFetching] = useState(false);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
+
+  const currentFolderId = folderPath[folderPath.length - 1]?.id ?? null;
 
   const focusDialogRef = useRef<HTMLDialogElement>(null);
   const focusAreaRef = useRef<HTMLDivElement>(null);
@@ -189,11 +199,21 @@ function ImagePickerField({
   // cropper instances stacked in the same container.
   const cropOpeningRef = useRef(false);
 
-  const fetchImages = useCallback(async (q: string) => {
+  // A search spans every folder (no folder scoping, no folders returned); browsing without a search
+  // lists the folders and images inside the current folder, paginated.
+  const fetchImages = useCallback(async (q: string, folderId: string | null, p: number) => {
     setFetching(true);
-    const params = q ? `?search=${encodeURIComponent(q)}` : "";
-    const res = await fetch(`/admin/media/api/lookup${params}`, { credentials: "same-origin" });
-    if (res.ok) setImages(await res.json());
+    const params = new URLSearchParams();
+    if (q) params.set("search", q);
+    else if (folderId) params.set("folder", folderId);
+    params.set("page", String(p));
+    const res = await fetch(`/admin/media/api/lookup?${params.toString()}`, { credentials: "same-origin" });
+    if (res.ok) {
+      const data = (await res.json()) as { folders: MediaFolder[]; images: MediaRef[]; totalPages: number };
+      setFolders(q ? [] : data.folders);
+      setImages(data.images);
+      setTotalPages(data.totalPages);
+    }
     setFetching(false);
   }, []);
 
@@ -226,18 +246,39 @@ function ImagePickerField({
     };
   }, [value?.id]);
 
-  // Fetch when dialog opens or query changes; debounce search, immediate on open
+  // Fetch when the dialog opens, the query changes, or the user navigates folders/pages; debounce
+  // search typing, immediate otherwise.
   useEffect(() => {
     if (!isOpen) return;
     const delay = query ? 300 : 0;
-    const t = setTimeout(() => fetchImages(query), delay);
+    const t = setTimeout(() => fetchImages(query, currentFolderId, page), delay);
     return () => clearTimeout(t);
-  }, [isOpen, query, fetchImages]);
+  }, [isOpen, query, currentFolderId, page, fetchImages]);
 
   const openDialog = () => {
     setQuery("");
+    setFolderPath([{ id: null, name: "Root" }]);
+    setPage(1);
+    setFolders([]);
+    setImages([]);
     setIsOpen(true);
     dialogRef.current?.showModal();
+  };
+
+  // Changing the search resets to the first page; a non-empty query also flattens away folders.
+  const onQueryChange = (q: string) => {
+    setQuery(q);
+    setPage(1);
+  };
+
+  const openFolder = (folder: MediaFolder) => {
+    setFolderPath((path) => [...path, { id: folder.id, name: folder.name }]);
+    setPage(1);
+  };
+
+  const goToCrumb = (index: number) => {
+    setFolderPath((path) => path.slice(0, index + 1));
+    setPage(1);
   };
 
   const select = (img: MediaRef) => {
@@ -498,49 +539,124 @@ function ImagePickerField({
             type="search"
             placeholder="Search images..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => onQueryChange(e.target.value)}
             className="input input-bordered w-full mb-4"
             autoFocus
           />
+
+          {!query && folderPath.length > 1 && (
+            <div className="flex flex-wrap items-center gap-1 text-sm text-base-content/70 mb-3">
+              {folderPath.map((crumb, index) => (
+                <div key={crumb.id ?? "root"} className="flex items-center gap-1">
+                  {index > 0 && <span aria-hidden="true" className="text-base-content/40">&gt;</span>}
+                  <button
+                    type="button"
+                    onClick={() => goToCrumb(index)}
+                    className={`hover:text-primary ${
+                      index === folderPath.length - 1 ? "font-semibold text-base-content" : ""
+                    }`}
+                  >
+                    {crumb.name}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="min-h-48 max-h-[60vh] overflow-y-auto">
             {fetching ? (
               <div className="flex items-center justify-center py-12">
                 <span className="loading loading-spinner loading-lg" />
               </div>
-            ) : images.length === 0 ? (
+            ) : folders.length === 0 && images.length === 0 ? (
               <p className="text-center text-base-content/50 py-12">No images found</p>
             ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                {images.map((img) => (
-                  <button
-                    key={img.id}
-                    type="button"
-                    onClick={() => select(img)}
-                    className={`group relative rounded-lg overflow-hidden border-2 transition-colors hover:border-primary focus:outline-none focus:border-primary ${
-                      value?.id === img.id ? "border-primary" : "border-base-300"
-                    }`}
-                  >
-                    <img
-                      src={`/image/${img.id}?fmt=webp&w=100&q=80`}
-                      alt={img.alt}
-                      className="w-full h-28 object-cover"
-                    />
-                    <div className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-white text-xs truncate text-left">
-                      {img.title || img.id}
-                    </div>
-                    {value?.id === img.id && (
-                      <div className="absolute top-1.5 right-1.5 bg-primary text-primary-content rounded-full p-0.5">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-3">
-                          <path fillRule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
+              <>
+                {folders.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                    {folders.map((folder) => (
+                      <button
+                        key={folder.id}
+                        type="button"
+                        onClick={() => openFolder(folder)}
+                        className="flex items-center gap-3 rounded-lg border border-base-300 bg-base-100 p-3 text-left transition-colors hover:border-primary hover:bg-base-200 focus:outline-none focus:border-primary"
+                      >
+                        <div className="flex items-center justify-center rounded bg-info p-2 text-white shrink-0">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="size-4"
+                          >
+                            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+                          </svg>
+                        </div>
+                        <span className="min-w-0 break-words text-sm font-medium">{folder.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {images.length > 0 && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                    {images.map((img) => (
+                      <button
+                        key={img.id}
+                        type="button"
+                        onClick={() => select(img)}
+                        className={`group relative rounded-lg overflow-hidden border-2 transition-colors hover:border-primary focus:outline-none focus:border-primary ${
+                          value?.id === img.id ? "border-primary" : "border-base-300"
+                        }`}
+                      >
+                        <img
+                          src={`/image/${img.id}?fmt=webp&w=100&q=80`}
+                          alt={img.alt}
+                          className="w-full h-28 object-cover"
+                        />
+                        <div className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-white text-xs truncate text-left">
+                          {img.title || img.id}
+                        </div>
+                        {value?.id === img.id && (
+                          <div className="absolute top-1.5 right-1.5 bg-primary text-primary-content rounded-full p-0.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-3">
+                              <path fillRule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
+
+          {!fetching && totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 mt-4">
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Prev
+              </button>
+              <span className="text-sm text-base-content/70">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </button>
+            </div>
+          )}
 
           <div className="modal-action">
             <button type="button" className="btn" onClick={() => dialogRef.current?.close()}>
