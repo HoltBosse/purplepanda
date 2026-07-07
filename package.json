@@ -66,6 +66,7 @@
     "@tiptap/extensions": "^3.27.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "cropperjs": "^2.1.1",
     "daisyui": "^5.5.19",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",

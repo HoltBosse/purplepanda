@@ -1,14 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { ComponentConfig } from "@puckeditor/core";
+// Type-only: cropperjs defines custom elements (`class X extends HTMLElement`) at module
+// scope, which throws under SSR. It must only ever be loaded via dynamic import in the browser.
+import type Cropper from "cropperjs";
+import type { CropperImage } from "cropperjs";
 
-/* 
+/*
   TODO:
-  * make cropping button work, this requires a cropping ui + support in the media serving api
   * folders within the media library, pagination
   * upload support from media picker, may require porting some of the existing upload stuff into react land
 */
 
 export type MediaRef = { id: string; title: string; alt: string };
+
+export type CropBox = { x1: number; y1: number; x2: number; y2: number };
 
 export type ImageConfig = MediaRef & {
   // null means "100%" (auto); otherwise a pixel value bounded by the image's natural size
@@ -16,7 +21,104 @@ export type ImageConfig = MediaRef & {
   height: number | null;
   // null means the browser default ("50% 50%"); otherwise "xx% xx%" for CSS object-position
   objectPosition: string | null;
+  // null means uncropped; otherwise pixel bounds (in the original image's natural size) to extract
+  crop: CropBox | null;
 };
+
+// Appends/removes the crop query params (x1/y1/x2/y2) the media serving API understands.
+function withCropParams(url: string, crop: CropBox | null): string {
+  const [path = "", query = ""] = url.split("?");
+  const params = new URLSearchParams(query);
+  params.delete("x1");
+  params.delete("y1");
+  params.delete("x2");
+  params.delete("y2");
+  if (crop) {
+    params.set("x1", String(crop.x1));
+    params.set("y1", String(crop.y1));
+    params.set("x2", String(crop.x2));
+    params.set("y2", String(crop.y2));
+  }
+  const qs = params.toString();
+  return qs ? `${path}?${qs}` : path;
+}
+
+const CROP_MAX_WIDTH = 640;
+const CROP_MAX_HEIGHT = 480;
+
+// The crop dialog renders the image scaled down to fit the modal; selection coordinates read
+// from cropperjs are in that scaled-down space, so this factor converts them back to the
+// original image's natural pixel coordinates (what the media API's x1/y1/x2/y2 expect).
+function getCropDisplaySize(natural: { width: number; height: number }) {
+  const scale = Math.min(1, CROP_MAX_WIDTH / natural.width, CROP_MAX_HEIGHT / natural.height);
+  return { scale, width: Math.round(natural.width * scale), height: Math.round(natural.height * scale) };
+}
+
+// A cropper-canvas sized exactly to the display dimensions, with a freeform (no fixed aspect
+// ratio) resizable/movable selection defaulting to a centered half-width/half-height box.
+function buildCropTemplate(width: number, height: number): string {
+  return (
+    `<cropper-canvas background style="width:${width}px;height:${height}px">` +
+    "<cropper-image></cropper-image>" +
+    "<cropper-shade></cropper-shade>" +
+    '<cropper-handle action="select" plain></cropper-handle>' +
+    '<cropper-selection initial-coverage="0.5" movable resizable outlined>' +
+    '<cropper-grid role="grid" bordered covered></cropper-grid>' +
+    "<cropper-crosshair centered></cropper-crosshair>" +
+    '<cropper-handle action="move" theme-color="rgba(255, 255, 255, 0.35)"></cropper-handle>' +
+    '<cropper-handle action="n-resize"></cropper-handle>' +
+    '<cropper-handle action="e-resize"></cropper-handle>' +
+    '<cropper-handle action="s-resize"></cropper-handle>' +
+    '<cropper-handle action="w-resize"></cropper-handle>' +
+    '<cropper-handle action="ne-resize"></cropper-handle>' +
+    '<cropper-handle action="nw-resize"></cropper-handle>' +
+    '<cropper-handle action="se-resize"></cropper-handle>' +
+    '<cropper-handle action="sw-resize"></cropper-handle>' +
+    "</cropper-selection>" +
+    "</cropper-canvas>"
+  );
+}
+
+// cropperjs centers/scales the image within the canvas itself (which can letterbox it rather
+// than filling the canvas exactly, e.g. from sub-pixel rounding), so the mapping between
+// selection coordinates (relative to the canvas) and natural image pixels can't just assume the
+// canvas and image line up 1:1 — it has to be measured from the actual rendered rects.
+function getCropTransform(cropper: Cropper, natural: { width: number; height: number }) {
+  const canvasEl = cropper.getCropperCanvas();
+  const imageEl = cropper.getCropperImage();
+  if (!canvasEl || !imageEl) return null;
+  const canvasRect = canvasEl.getBoundingClientRect();
+  const imageRect = imageEl.getBoundingClientRect();
+  if (imageRect.width === 0 || imageRect.height === 0) return null;
+  return {
+    offsetX: imageRect.left - canvasRect.left,
+    offsetY: imageRect.top - canvasRect.top,
+    scaleX: natural.width / imageRect.width,
+    scaleY: natural.height / imageRect.height,
+  };
+}
+
+// cropperjs's own initial-centering math (CropperImage.$center, triggered automatically once the
+// image loads) can leave the image visibly offset within the canvas instead of filling it exactly,
+// even though the canvas is sized to the image's own aspect ratio. Since the canvas and image
+// share that aspect ratio by construction, the correct transform is just "scale to fit, anchored
+// at the image's own top-left" — set it directly rather than relying on $center to get it right.
+// Uses the actually-loaded image's own natural size (cropperImage.$image), not the original's
+// full natural size, since the dialog loads a server-resized (w=1000) preview of the image.
+function fillCropCanvas(cropperImage: CropperImage, dispWidth: number) {
+  const loadedWidth = cropperImage.$image.naturalWidth;
+  const loadedHeight = cropperImage.$image.naturalHeight;
+  if (!loadedWidth || !loadedHeight) return;
+  const scale = dispWidth / loadedWidth;
+  const originX = loadedWidth / 2;
+  const originY = loadedHeight / 2;
+  // $setTransform is a no-op unless one of these flags is set; toggle translatable on just for
+  // this call, matching how $center itself temporarily overrides it for non-interactive images.
+  const wasTranslatable = cropperImage.translatable;
+  cropperImage.translatable = true;
+  cropperImage.$setTransform(scale, 0, 0, scale, originX * (scale - 1), originY * (scale - 1));
+  cropperImage.translatable = wasTranslatable;
+}
 
 export type ImagePickerProps = {
   image: ImageConfig | null;
@@ -30,6 +132,8 @@ function ImageDisplay({ image }: { image: ImageConfig }) {
   }, [image.id]);
 
   const base = `/image/${image.id}`;
+  const webpSrc = withCropParams(`${base}?fmt=webp`, image.crop);
+  const pngSrc = withCropParams(`${base}?fmt=png`, image.crop);
 
   return (
     <div className="relative min-h-12">
@@ -39,10 +143,10 @@ function ImageDisplay({ image }: { image: ImageConfig }) {
         </div>
       )}
       <picture>
-        <source srcSet={`${base}?fmt=webp`} type="image/webp" />
-        <source srcSet={`${base}?fmt=png`} type="image/png" />
+        <source srcSet={webpSrc} type="image/webp" />
+        <source srcSet={pngSrc} type="image/png" />
         <img
-          src={`${base}?fmt=png`}
+          src={pngSrc}
           style={{
             objectFit: "cover",
             objectPosition: image.objectPosition ?? "50% 50%",
@@ -76,6 +180,15 @@ function ImagePickerField({
   const focusAreaRef = useRef<HTMLDivElement>(null);
   const [focusPos, setFocusPos] = useState({ x: 50, y: 50 });
 
+  const cropDialogRef = useRef<HTMLDialogElement>(null);
+  const cropContainerRef = useRef<HTMLDivElement>(null);
+  const cropImgRef = useRef<HTMLImageElement>(null);
+  const cropperRef = useRef<Cropper | null>(null);
+  // Guards against openCropDialog running twice concurrently (e.g. rapid double-clicks while the
+  // dynamic import of cropperjs is still resolving), which would otherwise spin up multiple
+  // cropper instances stacked in the same container.
+  const cropOpeningRef = useRef(false);
+
   const fetchImages = useCallback(async (q: string) => {
     setFetching(true);
     const params = q ? `?search=${encodeURIComponent(q)}` : "";
@@ -93,7 +206,10 @@ function ImagePickerField({
     return () => dialog.removeEventListener("close", onClose);
   }, []);
 
-  // Load the full-size image to determine the natural dimensions the sliders are bounded by
+  // Determine the image's natural pixel dimensions (used to bound the sizing sliders and for the
+  // crop dialog's coordinate math). This image is never displayed, only measured, so request the
+  // smallest possible transfer — quality doesn't affect the decoded width/height, only the resize
+  // (w/h) params would, so a heavily-compressed webp still reports the correct natural size.
   useEffect(() => {
     if (!value?.id) {
       setNaturalSize(null);
@@ -104,7 +220,7 @@ function ImagePickerField({
     img.onload = () => {
       if (!cancelled) setNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
     };
-    img.src = `/image/${value.id}?fmt=png`;
+    img.src = `/image/${value.id}?fmt=webp&q=1`;
     return () => {
       cancelled = true;
     };
@@ -125,7 +241,7 @@ function ImagePickerField({
   };
 
   const select = (img: MediaRef) => {
-    onChange({ ...img, width: null, height: null, objectPosition: null });
+    onChange({ ...img, width: null, height: null, objectPosition: null, crop: null });
     dialogRef.current?.close();
   };
 
@@ -171,6 +287,100 @@ function ImagePickerField({
     focusDialogRef.current?.close();
   };
 
+  // Escape-key close (or any native dialog close) must also tear down the cropper instance,
+  // since it mutates the DOM directly (inserts a cropper-canvas next to the hidden <img>).
+  useEffect(() => {
+    const dialog = cropDialogRef.current;
+    if (!dialog) return;
+    const onClose = () => {
+      cropperRef.current?.destroy();
+      cropperRef.current = null;
+    };
+    dialog.addEventListener("close", onClose);
+    return () => dialog.removeEventListener("close", onClose);
+  }, []);
+
+  const openCropDialog = async () => {
+    if (!value || !naturalSize || cropOpeningRef.current) return;
+    const container = cropContainerRef.current;
+    const img = cropImgRef.current;
+    if (!container || !img) return;
+
+    const natural = naturalSize;
+    cropOpeningRef.current = true;
+    try {
+      cropperRef.current?.destroy();
+
+      const { width, height } = getCropDisplaySize(natural);
+      const { default: CropperCtor } = await import("cropperjs");
+      const cropper = new CropperCtor(img, { container, template: buildCropTemplate(width, height) });
+      cropperRef.current = cropper;
+
+      const selection = cropper.getCropperSelection();
+      const cropperImage = cropper.getCropperImage();
+      if (selection && cropperImage) {
+        // The library doesn't clamp the selection to the image on its own; reject any move/resize
+        // that would push it outside the image's actual rendered rect within the canvas (which may
+        // be letterboxed, so this can't just be measured against the canvas's own bounds).
+        selection.addEventListener("change", (event) => {
+          const { x, y, width: selWidth, height: selHeight } = (event as CustomEvent).detail;
+          const t = getCropTransform(cropper, natural);
+          if (!t) return;
+          const minX = t.offsetX;
+          const minY = t.offsetY;
+          const maxX = minX + natural.width / t.scaleX;
+          const maxY = minY + natural.height / t.scaleY;
+          const epsilon = 0.5;
+          if (x < minX - epsilon || y < minY - epsilon || x + selWidth > maxX + epsilon || y + selHeight > maxY + epsilon) {
+            event.preventDefault();
+          }
+        });
+
+        cropperImage.$ready(() => {
+          fillCropCanvas(cropperImage, width);
+
+          if (value.crop) {
+            const t = getCropTransform(cropper, natural);
+            if (!t) return;
+            const { x1, y1, x2, y2 } = value.crop;
+            selection.$change(
+              t.offsetX + x1 / t.scaleX,
+              t.offsetY + y1 / t.scaleY,
+              (x2 - x1) / t.scaleX,
+              (y2 - y1) / t.scaleY,
+            );
+          }
+        });
+      }
+
+      cropDialogRef.current?.showModal();
+    } finally {
+      cropOpeningRef.current = false;
+    }
+  };
+
+  const closeCropDialog = () => {
+    cropperRef.current?.destroy();
+    cropperRef.current = null;
+    cropDialogRef.current?.close();
+  };
+
+  const saveCrop = () => {
+    const natural = naturalSize;
+    const cropper = cropperRef.current;
+    if (!value || !natural || !cropper) return;
+    const selection = cropper.getCropperSelection();
+    if (!selection) return;
+    const t = getCropTransform(cropper, natural);
+    if (!t) return;
+    const x1 = Math.max(0, Math.round((selection.x - t.offsetX) * t.scaleX));
+    const y1 = Math.max(0, Math.round((selection.y - t.offsetY) * t.scaleY));
+    const x2 = Math.min(natural.width, Math.round((selection.x + selection.width - t.offsetX) * t.scaleX));
+    const y2 = Math.min(natural.height, Math.round((selection.y + selection.height - t.offsetY) * t.scaleY));
+    onChange({ ...value, crop: { x1, y1, x2, y2 } });
+    closeCropDialog();
+  };
+
   return (
     <>
       <div className="join w-full">
@@ -181,7 +391,12 @@ function ImagePickerField({
         >
           <span className="truncate">{value ? value.title || value.id : "Select an image..."}</span>
         </button>
-        <button type="button" className="btn btn-outline join-item px-2">
+        <button
+          type="button"
+          onClick={openCropDialog}
+          disabled={!value || !naturalSize}
+          className="btn btn-outline join-item px-2"
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -354,7 +569,7 @@ function ImagePickerField({
                 className="relative inline-block cursor-crosshair touch-none select-none"
               >
                 <img
-                  src={`/image/${value.id}?fmt=png`}
+                  src={withCropParams(`/image/${value.id}?fmt=png&w=1000&q=80`, value.crop)}
                   alt={value.alt}
                   draggable={false}
                   className="block max-h-[60vh] max-w-full"
@@ -396,6 +611,35 @@ function ImagePickerField({
           onClick={() => focusDialogRef.current?.close()}
           aria-label="Close"
         />
+      </dialog>
+
+      <dialog ref={cropDialogRef} className="modal">
+        <div className="modal-box w-11/12 max-w-4xl">
+          <h3 className="font-bold text-lg mb-4">Crop Image</h3>
+
+          {value && (
+            <div className="flex justify-center bg-base-200 rounded-lg p-2">
+              <div ref={cropContainerRef} className="relative">
+                <img
+                  ref={cropImgRef}
+                  src={withCropParams(`/image/${value.id}?fmt=png&w=1000&q=80`, null)}
+                  alt={value.alt}
+                  style={{ display: "none" }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="modal-action">
+            <button type="button" className="btn" onClick={closeCropDialog}>
+              Cancel
+            </button>
+            <button type="button" className="btn btn-primary" onClick={saveCrop}>
+              Save
+            </button>
+          </div>
+        </div>
+        <button type="button" className="modal-backdrop" onClick={closeCropDialog} aria-label="Close" />
       </dialog>
     </>
   );
