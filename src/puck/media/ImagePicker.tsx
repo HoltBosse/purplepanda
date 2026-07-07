@@ -128,7 +128,7 @@ export type ImagePickerProps = {
   image: ImageConfig | null;
 };
 
-function ImageDisplay({ image }: { image: ImageConfig }) {
+function ImageDisplay({ image, isEditing }: { image: ImageConfig; isEditing: boolean }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -141,7 +141,7 @@ function ImageDisplay({ image }: { image: ImageConfig }) {
 
   return (
     <div className="relative min-h-12">
-      {loading && (
+      {(loading && isEditing) && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-base-200/50">
           <span className="loading loading-spinner loading-xl" />
         </div>
@@ -774,7 +774,7 @@ const ImagePicker: ComponentConfig<ImagePickerProps> = {
   defaultProps: {
     image: null,
   },
-  render: ({ image }: ImagePickerProps) => {
+  render: ({ image, puck }) => {
     if (!image?.id) {
       return (
         <div className="rounded-lg border-2 border-dashed border-base-300 bg-base-200 p-6 text-center text-base-content/50">
@@ -783,7 +783,7 @@ const ImagePicker: ComponentConfig<ImagePickerProps> = {
       );
     }
 
-    return <ImageDisplay image={image} />;
+    return <ImageDisplay image={image} isEditing={puck.isEditing} />;
   },
 };
 
