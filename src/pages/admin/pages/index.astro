@@ -3,13 +3,13 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
 import { pages, dagNodes } from '../../../db/schema.js';
 import { CircleCheck, CircleX, EllipsisVertical, FilePen, Trash2, GitBranch, CornerDownRight } from '@lucide/astro';
-import { desc, isNull, and, eq, type InferSelectModel } from 'drizzle-orm';
+import { desc, isNull, and, eq, gt, type InferSelectModel } from 'drizzle-orm';
 
 type Page = InferSelectModel<typeof pages>;
 
 const db = getDb();
 const [allPages, allDrafts] = await Promise.all([
-    db.select().from(pages).where(isNull(pages.contentType)).orderBy(desc(pages.id)),
+    db.select().from(pages).where(and(isNull(pages.contentType), gt(pages.state, -1))).orderBy(desc(pages.id)),
     db.select().from(dagNodes).where(and(eq(dagNodes.entityType, 'page'), eq(dagNodes.nodeType, 'draft'), eq(dagNodes.state, 1))).orderBy(desc(dagNodes.createdAt)),
 ]);
 
