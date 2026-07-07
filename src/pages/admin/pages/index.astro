@@ -2,8 +2,10 @@
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
 import { pages, dagNodes } from '../../../db/schema.js';
-import { CircleCheck, CircleX, EllipsisVertical, FilePen, Trash2, GitBranch } from '@lucide/astro';
-import { desc, isNull, and, eq } from 'drizzle-orm';
+import { CircleCheck, CircleX, EllipsisVertical, FilePen, Trash2, GitBranch, CornerDownRight } from '@lucide/astro';
+import { desc, isNull, and, eq, type InferSelectModel } from 'drizzle-orm';
+
+type Page = InferSelectModel<typeof pages>;
 
 const db = getDb();
 const [allPages, allDrafts] = await Promise.all([
@@ -20,6 +22,27 @@ const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, 
     }
     return acc;
 }, {});
+
+// Group pages by parent so children are listed directly under their parent,
+// preserving the existing (desc by id) order within each group.
+const pageIds = new Set(allPages.map(page => page.id));
+const childrenByParent = new Map<string, Page[]>();
+for (const page of allPages) {
+    const parentPage = (page.content as any)?.root?.props?.parentPage;
+    const parentKey = parentPage && pageIds.has(parentPage) ? parentPage : 'root';
+    if (!childrenByParent.has(parentKey)) childrenByParent.set(parentKey, []);
+    childrenByParent.get(parentKey)!.push(page);
+}
+
+const orderedPages: { page: Page; depth: number }[] = [];
+function addChildren(parentKey: string, depth: number, visited: Set<string>) {
+    for (const child of childrenByParent.get(parentKey) ?? []) {
+        if (visited.has(child.id)) continue;
+        orderedPages.push({ page: child, depth });
+        addChildren(child.id, depth + 1, new Set(visited).add(child.id));
+    }
+}
+addChildren('root', 1, new Set());
 ---
 
 <AdminLayout>
@@ -56,7 +79,7 @@ const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, 
             </tr>
         </thead>
         <tbody>
-            {allPages.map(page => {
+            {orderedPages.map(({ page, depth }) => {
                 const drafts = draftsByPageId[page.id] ?? [];
                 return (
                     <tr>
@@ -80,7 +103,11 @@ const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, 
                         </td>
                         <td>
                             <a href={`/admin/pages/edit/${page.id}`}>
-                                <div class="font-bold link link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</div>
+                                <div class="font-bold flex items-center gap-1">
+                                    {depth > 1 && <span class="whitespace-pre">{' '.repeat((depth - 2) * 2)}</span>}
+                                    {depth > 1 && <CornerDownRight size={14} class="text-base-content/50 shrink-0" />}
+                                    <span class="link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</span>
+                                </div>
                             </a>
                         </td>
                         <td class="w-px whitespace-nowrap">
