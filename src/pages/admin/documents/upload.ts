@@ -5,6 +5,7 @@ import { getDocumentPath } from "../../../document/document.js";
 import { documents } from "../../../db/schema.js";
 import * as z from "zod";
 import fs from "fs";
+import { addAction } from "../../../actions/index.js";
 
 const toSlug = (title: string) =>
     title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -22,6 +23,8 @@ export async function POST(context: APIContext): Promise<Response> {
         return context.redirect("/admin/documents");
     }
 
+    const userId = await context.session?.get("userId");
+
     for (let i = 0; i < file.data.length; i++) {
         const [inserted] = await db.insert(documents).values({
             title: title.data[i]!,
@@ -35,6 +38,7 @@ export async function POST(context: APIContext): Promise<Response> {
         }
 
         const docId = inserted.id;
+        await addAction("documentcreate", { id: docId }, userId);
         const documentPath = getDocumentPath();
         const dir = `${documentPath}/${docId.slice(0, 2)}/${docId.slice(2, 4)}`;
 

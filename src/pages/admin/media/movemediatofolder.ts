@@ -12,6 +12,7 @@ import { get } from "node:http";
 import { hash } from "../../../password/index.js";
 import * as z from "zod";
 import fs from "fs";
+import { addAction } from "../../../actions/index.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -47,6 +48,14 @@ export async function POST(context: APIContext): Promise<Response> {
         }
     }
 
+    const existingMedia = await db
+        .select({ id: mediaschema.id, folder: mediaschema.folder })
+        .from(mediaschema)
+        .where(inArray(mediaschema.id, media.data));
+    const oldFolderById = new Map(existingMedia.map((m) => [m.id, m.folder]));
+
+    const userId = await context.session?.get("userId");
+
     //update media items to have the new folder
     for(let i = 0; i < media.data.length; i++) {
         if(media && media.success && media.data && media.data[i]) {
@@ -61,6 +70,12 @@ export async function POST(context: APIContext): Promise<Response> {
                 await addAlertToSession(context.session, alert);
                 return context.redirect(folder.data ? `/admin/media/${folder.data}` : "/admin/media");
             }
+
+            await addAction("mediamove", {
+                id: updatedMedia.id,
+                oldFolderId: oldFolderById.get(media.data[i]!) ?? null,
+                newFolderId: folder.data,
+            }, userId);
 
             continue;
         }

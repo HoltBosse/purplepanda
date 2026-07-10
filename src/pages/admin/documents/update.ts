@@ -6,6 +6,7 @@ import { documents } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
 import * as z from "zod";
 import fs from "fs";
+import { addAction } from "../../../actions/index.js";
 
 const toSlug = (title: string) =>
     title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -41,6 +42,9 @@ export async function POST(context: APIContext): Promise<Response> {
         const buffer = await (file as File).arrayBuffer();
         await fs.promises.writeFile(`${dir}/${id.data}`, Buffer.from(buffer));
     }
+
+    const userId = await context.session?.get("userId");
+    await addAction("documentupdate", { id: id.data }, userId);
 
     const alert = createAlert(alertType.success, "Document updated successfully.");
     await addAlertToSession(context.session, alert);

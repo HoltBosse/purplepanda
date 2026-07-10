@@ -3,6 +3,7 @@ import { getDb } from "../../db/db.js";
 import {users} from "../../db/schema.js";
 import { eq } from 'drizzle-orm';
 import { hash, verify } from '../../password/index.js';
+import { addAction } from '../../actions/index.js';
 
 const ADMIN_PASSWORD = "password";
 
@@ -28,5 +29,6 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   await context.session?.set("userId", user.id);
+  await addAction("adminlogin", { method: "password" }, user.id);
   return context.redirect("/admin");
 }

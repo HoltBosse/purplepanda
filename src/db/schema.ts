@@ -94,6 +94,14 @@ export const userRoles = pgTable("user_roles", {
   uniqueIndex("user_roles_user_id_role_id_idx").on(t.userId, t.roleId),
 ]);
 
+export const userActions = pgTable("user_actions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").references(() => users.id),
+  date: timestamp("date").defaultNow().notNull(),
+  type: varchar("type", { length: 255 }).notNull(),
+  data: jsonb("data").notNull(),
+});
+
 export const dagNodes = pgTable("dag_nodes", {
   id: uuid("id").defaultRandom().primaryKey(),
   state: integer("state").notNull().default(1), // 1 = active, -1 = deleted

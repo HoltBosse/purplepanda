@@ -12,6 +12,7 @@ import { get } from "node:http";
 import { hash } from "../../../password/index.js";
 import * as z from "zod";
 import fs from "fs";
+import { addAction } from "../../../actions/index.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -51,6 +52,9 @@ export async function POST(context: APIContext): Promise<Response> {
     //console.log("Inserting media into database starting soon...");
     //console.log(file);
 
+    const uploadedIds: string[] = [];
+    const updatedIds: string[] = [];
+
     //loop over files, insert into media table. take the returned uuid from the db and save the file to the mediaPath with the uuid split into /cc/cc/cccc-cc..... format, making the folders if they dont exist
     for(let i = 0; i < file.data.length; i++) {
         if(id && id.success && id.data && id.data[i]) {
@@ -68,6 +72,7 @@ export async function POST(context: APIContext): Promise<Response> {
                 return context.redirect(`/admin/media${redirectFolderId ? `/${redirectFolderId}` : ""}`);
             }
 
+            updatedIds.push(updatedMedia.id);
             continue;
         }
 
@@ -86,6 +91,7 @@ export async function POST(context: APIContext): Promise<Response> {
         }
 
         const mediaId = insertedMedia.id;
+        uploadedIds.push(mediaId);
         const mediaPath = getMediaPath();
         const mediaIdPath = `${mediaId.slice(0, 2)}/${mediaId.slice(2, 4)}/${mediaId}`;
         const fullMediaPath = `${mediaPath}/${mediaIdPath}`;
@@ -96,6 +102,14 @@ export async function POST(context: APIContext): Promise<Response> {
         //save file to disk
         const buffer = await file.data[i]!.arrayBuffer();
         await fs.promises.writeFile(fullMediaPath, Buffer.from(buffer));
+    }
+
+    const userId = await context.session?.get("userId");
+    if(uploadedIds.length > 0) {
+        await addAction("mediaupload", { ids: uploadedIds }, userId);
+    }
+    if(updatedIds.length > 0) {
+        await addAction("mediaupdate", { ids: updatedIds }, userId);
     }
 
     let message = "Media uploaded successfully.";

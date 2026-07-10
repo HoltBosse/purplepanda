@@ -4,6 +4,7 @@ import { getDb } from "../../../db/db.js";
 import { pages, dagNodes } from "../../../db/schema.js";
 import { eq, and, desc, getTableColumns, type InferSelectModel } from 'drizzle-orm';
 import * as z from "zod";
+import { addAction } from "../../../actions/index.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -68,13 +69,16 @@ export async function POST(context: APIContext): Promise<Response> {
         .orderBy(desc(dagNodes.createdAt))
         .limit(1);
 
-    await db.insert(dagNodes).values({
+    const [publishNode] = await db.insert(dagNodes).values({
         entityType: 'page',
         entityId: page.id,
         parentId: latestPublishNode?.id ?? null,
         content: parsedContent,
         nodeType: 'publish',
-    });
+    }).returning();
+
+    const userId = await context.session?.get("userId");
+    await addAction(isNewPage ? "pagecreate" : "pageupdate", { id: page.id, version: publishNode?.id ?? null }, userId);
 
     const alert = createAlert(alertType.success, isNewPage ? "Page created successfully." : "Page updated successfully.");
     await addAlertToSession(context.session, alert);

@@ -4,6 +4,7 @@ import { getDb } from "../../../db/db.js";
 import { templates, dagNodes } from "../../../db/schema.js";
 import { eq, and, desc, getTableColumns, type InferSelectModel } from 'drizzle-orm';
 import * as z from "zod";
+import { addAction } from "../../../actions/index.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     console.log("POST request received for template update");
@@ -78,13 +79,16 @@ export async function POST(context: APIContext): Promise<Response> {
         .orderBy(desc(dagNodes.createdAt))
         .limit(1);
 
-    await db.insert(dagNodes).values({
+    const [publishNode] = await db.insert(dagNodes).values({
         entityType: 'template',
         entityId: template.id,
         parentId: latestPublishNode?.id ?? null,
         content: parsedContent,
         nodeType: 'publish',
-    });
+    }).returning();
+
+    const userId = await context.session?.get("userId");
+    await addAction(isNewTemplate ? "templatecreate" : "templateupdate", { id: template.id, version: publishNode?.id ?? null }, userId);
 
     let message = "Template updated successfully.";
     if(isNewTemplate) {

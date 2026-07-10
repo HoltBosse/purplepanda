@@ -4,6 +4,7 @@ import { getDb } from "../../../db/db.js";
 import { forms } from "../../../db/schema.js";
 import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
 import * as z from "zod";
+import { addAction } from "../../../actions/index.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -57,6 +58,9 @@ export async function POST(context: APIContext): Promise<Response> {
     } else {
         await db.update(forms).set({ content: JSON.parse(contentResult.data) }).where(eq(forms.id, form.id));
     }
+
+    const userId = await context.session?.get("userId");
+    await addAction(isNewForm ? "formcreate" : "formupdate", { id: form.id, version: null }, userId);
 
     const alert = createAlert(alertType.success, isNewForm ? "Form created successfully." : "Form updated successfully.");
     await addAlertToSession(context.session, alert);

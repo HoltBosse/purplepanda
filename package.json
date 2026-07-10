@@ -38,6 +38,10 @@
       "types": "./dist/db/schema.d.ts",
       "default": "./dist/db/schema.js"
     },
+    "./actions": {
+      "types": "./dist/actions/index.d.ts",
+      "default": "./dist/actions/index.js"
+    },
     "./form/*": "./src/form/*"
   },
   "scripts": {
