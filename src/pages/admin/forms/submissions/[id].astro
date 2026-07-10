@@ -1,0 +1,120 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { getDb } from '../../../../db/db.js';
+import { formSubmissions, forms } from '../../../../db/schema.js';
+import { eq } from 'drizzle-orm';
+
+const db = getDb();
+const { id } = Astro.params;
+
+if (!id) return Astro.redirect('/admin/forms/submissions');
+
+const [submission] = await db
+    .select({
+        id: formSubmissions.id,
+        createdAt: formSubmissions.createdAt,
+        data: formSubmissions.data,
+        formContent: forms.content,
+    })
+    .from(formSubmissions)
+    .innerJoin(forms, eq(formSubmissions.formId, forms.id))
+    .where(eq(formSubmissions.id, id))
+    .limit(1);
+
+if (!submission) return Astro.redirect('/admin/forms/submissions');
+
+const formName = (submission.formContent as any)?.root?.props?.name || 'Untitled';
+
+function formatDate(date: Date): string {
+    return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function isFileValue(value: unknown): value is { name: string; size: number; type: string } {
+    return !!value && typeof value === 'object' && 'name' in value && 'size' in value && 'type' in value;
+}
+
+// Walk the form's Puck content tree to find each field's choice options (Select,
+// RadioGroup) or checkbox label, so submitted codes (e.g. "option-1") can be
+// resolved back to the human-readable label the visitor actually saw.
+type FieldOption = { label: string; value: string };
+const optionsByFieldName: Record<string, FieldOption[]> = {};
+const checkboxLabelByFieldName: Record<string, string> = {};
+
+function collectFieldMeta(node: unknown): void {
+    if (Array.isArray(node)) {
+        node.forEach(collectFieldMeta);
+        return;
+    }
+    if (!node || typeof node !== 'object') return;
+
+    const props = (node as any).props;
+    if (props && typeof props.name === 'string') {
+        if (Array.isArray(props.options)) {
+            optionsByFieldName[props.name] = props.options;
+        } else if (typeof props.checkboxLabel === 'string') {
+            checkboxLabelByFieldName[props.name] = props.checkboxLabel;
+        }
+    }
+
+    Object.values(node).forEach(collectFieldMeta);
+}
+
+collectFieldMeta(submission.formContent);
+
+function resolveDisplayValue(key: string, raw: unknown): string {
+    if (checkboxLabelByFieldName[key] !== undefined) return checkboxLabelByFieldName[key];
+    const options = optionsByFieldName[key];
+    if (options) return options.find((opt) => opt.value === raw)?.label ?? String(raw ?? '');
+    return String(raw ?? '');
+}
+
+function formatValue(key: string, value: unknown): string {
+    if (Array.isArray(value)) return value.map((v) => formatValue(key, v)).join(', ');
+    if (isFileValue(value)) return `${value.name} (${value.type || 'unknown type'}, ${formatBytes(value.size)})`;
+    return resolveDisplayValue(key, value);
+}
+
+const fields = Object.entries(submission.data as Record<string, unknown>);
+---
+
+<AdminLayout>
+    <div class="flex items-center gap-2 border-b border-base-300 pt-2 pb-4 text-sm">
+        <a href="/admin/forms/submissions" class="text-base-content/50 hover:text-base-content transition-colors">Submissions</a>
+        <span class="text-base-content/30">/</span>
+        <span class="font-semibold truncate max-w-64" title={formName}>{formName}</span>
+    </div>
+
+    <div class="mt-4 flex items-center justify-between align-middle pb-4">
+        <h1 class="text-2xl font-semibold">{formName}</h1>
+        <span class="text-base-content/60 text-sm">Submitted {formatDate(submission.createdAt)}</span>
+    </div>
+
+    <table class="table p-2 bg-base-100 rounded-lg">
+        <thead>
+            <tr>
+                <th>Field</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            {fields.map(([key, value]) => (
+                <tr>
+                    <td class="w-px whitespace-nowrap font-medium">{key}</td>
+                    <td class="whitespace-pre-wrap break-words">{formatValue(key, value)}</td>
+                </tr>
+            ))}
+        </tbody>
+    </table>
+</AdminLayout>

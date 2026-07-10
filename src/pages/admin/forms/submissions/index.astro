@@ -1,0 +1,54 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { getDb } from '../../../../db/db.js';
+import { formSubmissions, forms } from '../../../../db/schema.js';
+import { eq, desc, gt } from 'drizzle-orm';
+
+const db = getDb();
+const submissions = await db
+    .select({
+        id: formSubmissions.id,
+        createdAt: formSubmissions.createdAt,
+        formContent: forms.content,
+    })
+    .from(formSubmissions)
+    .innerJoin(forms, eq(formSubmissions.formId, forms.id))
+    .where(gt(formSubmissions.state, -1))
+    .orderBy(desc(formSubmissions.createdAt));
+
+function formatDate(date: Date): string {
+    return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+---
+
+<AdminLayout>
+    <div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
+        <h1 class="text-2xl font-semibold">Form Submissions</h1>
+    </div>
+    <table class="table p-2 bg-base-100 rounded-lg">
+        <thead>
+            <tr>
+                <th>Form</th>
+                <th class="w-px whitespace-nowrap">Submitted</th>
+            </tr>
+        </thead>
+        <tbody>
+            {submissions.map(submission => (
+                <tr>
+                    <td>
+                        <a href={`/admin/forms/submissions/${submission.id}`} class="font-bold link link-info link-hover">
+                            {(submission.formContent as any)?.root?.props?.name || 'Untitled'}
+                        </a>
+                    </td>
+                    <td class="w-px whitespace-nowrap">{formatDate(submission.createdAt)}</td>
+                </tr>
+            ))}
+        </tbody>
+    </table>
+</AdminLayout>

@@ -9,19 +9,29 @@ import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { filterConfigByLocation } from "../index.js";
 
 const hostConfig = (externalPuckConfig as Config) ?? ({} as Config);
-
-const formRenderConfig: Config = {
-  ...filterConfigByLocation(hostConfig, "form"),
-  root: {
-    render: (props: any) => createElement("form", { className: "form-embed" }, props.children),
-  },
-};
+const filteredFormConfig = filterConfigByLocation(hostConfig, "form");
 
 export async function getFormHtml(id: string): Promise<string | null> {
   const db = getDb();
   const result = await db.select({ content: forms.content }).from(forms).where(eq(forms.id, id)).limit(1);
   if (!result[0]) return null;
-  return renderToStaticMarkup(
+
+  const formRenderConfig: Config = {
+    ...filteredFormConfig,
+    root: {
+      render: (props: any) =>
+        createElement(
+          "form",
+          { className: "form-embed", method: "post", action: `/purplepanda/forms/${id}/submit` },
+          props.children,
+        ),
+    },
+  };
+
+  const html = renderToStaticMarkup(
     createElement(Render, { config: formRenderConfig, data: result[0].content as Data }),
   );
+
+  const hasFileInput = /type=(["'])file\1/i.test(html);
+  return hasFileInput ? html.replace("<form ", '<form enctype="multipart/form-data" ') : html;
 }

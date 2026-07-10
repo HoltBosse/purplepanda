@@ -50,6 +50,14 @@ export const forms = pgTable("forms", {
   content: jsonb("content").notNull(),
 });
 
+export const formSubmissions = pgTable("form_submissions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  state: integer("state").notNull().default(1),
+  formId: uuid("form_id").notNull().references(() => forms.id),
+  data: jsonb("data").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const documents = pgTable("documents", {
   id: uuid("id").defaultRandom().primaryKey(),
   state: integer("state").notNull().default(1),

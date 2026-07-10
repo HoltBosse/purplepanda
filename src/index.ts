@@ -553,7 +553,12 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
 
         injectRoute({
           pattern: "/admin/forms/submissions",
-          entrypoint: "@holtbosse/purplepanda/pages/admin/forms/submissions.astro",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/forms/submissions/index.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/forms/submissions/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/forms/submissions/[id].astro",
         });
 
         injectRoute({
@@ -639,6 +644,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         injectRoute({
           pattern: "/image/[id]",
           entrypoint: "@holtbosse/purplepanda/pages/image/[id].ts",
+        });
+
+        injectRoute({
+          pattern: "/purplepanda/forms/[id]/submit",
+          entrypoint: "@holtbosse/purplepanda/pages/purplepanda/forms/[id]/submit.ts",
         });
 
         addMiddleware({
