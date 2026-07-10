@@ -1,0 +1,69 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getDb } from '../../../db/db.js';
+import { userActions, users } from '../../../db/schema.js';
+import { desc, eq, sql } from 'drizzle-orm';
+import { z } from 'zod';
+import Pagination from '../../../components/Pagination.astro';
+
+const db = getDb();
+
+const itemsPerPage = 10;
+const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);
+let page = 1;
+if (pageData.success) {
+    page = pageData.data;
+}
+const offset = (page - 1) * itemsPerPage;
+
+const actions = await db
+    .select({
+        id: userActions.id,
+        type: userActions.type,
+        date: userActions.date,
+        userFname: users.fname,
+        userLname: users.lname,
+        userEmail: users.email,
+    })
+    .from(userActions)
+    .leftJoin(users, eq(userActions.userId, users.id))
+    .orderBy(desc(userActions.date))
+    .limit(itemsPerPage)
+    .offset(offset);
+
+const totalActions = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(userActions)
+    .then(result => result[0]?.count ?? 0);
+const totalPages = Math.ceil(totalActions / itemsPerPage);
+---
+
+<AdminLayout>
+	<div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
+        <h1 class="text-2xl font-semibold">Audit Log</h1>
+    </div>
+    <table class="table p-2 bg-base-100 rounded-lg">
+        <thead>
+            <tr>
+                <th>Action</th>
+                <th>User</th>
+                <th class="w-px whitespace-nowrap">Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {actions.map((action) => (
+                <tr>
+                    <td class="font-bold">{action.type}</td>
+                    <td>{action.userEmail ? `${action.userFname} ${action.userLname}` : 'System'}</td>
+                    <td class="w-px whitespace-nowrap">{action.date.toLocaleString()}</td>
+                </tr>
+            ))}
+        </tbody>
+    </table>
+
+    {totalActions - actions.length > 0 &&
+        <div class="pt-6 pb-6 flex items-center justify-center">
+            <Pagination currentPage={page} totalPages={totalPages} basePath="/admin/audit/" />
+        </div>
+    }
+</AdminLayout>

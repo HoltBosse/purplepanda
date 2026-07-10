@@ -432,6 +432,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/audit",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/audit/index.astro",
+        });
+
+        injectRoute({
           pattern: "/admin/settings",
           entrypoint: "@holtbosse/purplepanda/pages/admin/settings/index.astro",
         });
