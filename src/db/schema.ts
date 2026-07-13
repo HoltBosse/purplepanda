@@ -105,7 +105,7 @@ export const userActions = pgTable("user_actions", {
 export const dagNodes = pgTable("dag_nodes", {
   id: uuid("id").defaultRandom().primaryKey(),
   state: integer("state").notNull().default(1), // 1 = active, -1 = deleted
-  entityType: varchar("entity_type", { length: 50 }).notNull(), // 'page' | 'template'
+  entityType: varchar("entity_type", { length: 50 }).notNull(), // 'page' | 'template' | 'content'
   entityId: uuid("entity_id").notNull(),
   parentId: uuid("parent_id").references((): any => dagNodes.id),
   content: jsonb("content").notNull(),

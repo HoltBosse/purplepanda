@@ -1,7 +1,7 @@
 import type { APIContext } from "astro";
 import { createAlert, alertType, addAlertToSession } from "../../../../alert/index.js";
 import { getDb } from "../../../../db/db.js";
-import { dagNodes } from "../../../../db/schema.js";
+import { dagNodes, pages } from "../../../../db/schema.js";
 import { eq, inArray } from 'drizzle-orm';
 
 export async function POST(context: APIContext): Promise<Response> {
@@ -25,7 +25,15 @@ export async function POST(context: APIContext): Promise<Response> {
 
     await db.update(dagNodes).set({ state: -1 }).where(inArray(dagNodes.id, chainIds));
 
-    const redirectTo = tip.entityType === "page" ? "/admin/pages" : "/admin/templates";
+    let redirectTo: string;
+    if (tip.entityType === "page") {
+        redirectTo = "/admin/pages";
+    } else if (tip.entityType === "content") {
+        const [entity] = await db.select().from(pages).where(eq(pages.id, tip.entityId)).limit(1);
+        redirectTo = entity?.contentType ? `/admin/content/${entity.contentType}` : "/admin/content";
+    } else {
+        redirectTo = "/admin/templates";
+    }
     const alert = createAlert(alertType.success, "Draft deleted.");
     await addAlertToSession(context.session, alert);
     return context.redirect(redirectTo);

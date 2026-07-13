@@ -1,0 +1,41 @@
+---
+import AdminBareLayout from '../../../../../layouts/AdminBareLayout.astro';
+import ContentPuckEditor from '../../../../../components/ContentPuckEditor';
+import { getDb } from '../../../../../db/db.js';
+import { settings, templates, pages, dagNodes } from '../../../../../db/schema.js';
+import { eq, sql } from 'drizzle-orm';
+import type { Data } from '@puckeditor/core';
+
+const db = getDb();
+const { draftId } = Astro.params;
+
+const [draft] = await db.select().from(dagNodes).where(eq(dagNodes.id, draftId!)).limit(1);
+if (!draft || draft.nodeType !== 'draft' || draft.entityType !== 'content' || draft.state === -1) {
+    return Astro.redirect('/admin/content');
+}
+
+const [entity] = await db.select().from(pages).where(eq(pages.id, draft.entityId)).limit(1);
+if (!entity || !entity.contentType) {
+    return Astro.redirect('/admin/content');
+}
+
+const saveUrl = `/admin/content/drafts/update/${draftId}`;
+
+const [defaultTemplate] = await db
+    .select()
+    .from(settings)
+    .leftJoin(templates, sql`(${templates.id})::text = (${settings.value} #>> '{}')`)
+    .where(eq(settings.key, 'default_template'))
+    .limit(1);
+
+const templateData = defaultTemplate?.templates?.content as Data | undefined;
+---
+<AdminBareLayout>
+    <ContentPuckEditor
+        client:only="react"
+        contentTypeId={entity.contentType}
+        saveUrl={saveUrl}
+        initialData={draft.content as Data}
+        {...(templateData ? { templateData } : {})}
+    />
+</AdminBareLayout>

@@ -1,8 +1,8 @@
 import type { APIContext } from "astro";
 import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
 import { getDb } from "../../../db/db.js";
-import { pages } from "../../../db/schema.js";
-import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
+import { pages, dagNodes } from "../../../db/schema.js";
+import { eq, and, desc, getTableColumns, type InferSelectModel } from 'drizzle-orm';
 import * as z from "zod";
 import { addAction } from "../../../actions/index.js";
 
@@ -56,17 +56,34 @@ export async function POST(context: APIContext): Promise<Response> {
         return context.redirect(isNew ? `/admin/content/${typeId}/new` : `/admin/content/${typeId}/edit/${pageId}`);
     }
 
+    const parsedContent = JSON.parse(contentResult.data);
+
     if (isNew) {
-        page.content = JSON.parse(contentResult.data);
+        page.content = parsedContent;
         page.state = 1;
         page.contentType = typeId;
         await db.insert(pages).values(page).returning();
     } else {
-        await db.update(pages).set({ content: JSON.parse(contentResult.data) }).where(eq(pages.id, page.id));
+        await db.update(pages).set({ content: parsedContent }).where(eq(pages.id, page.id));
     }
 
+    const [latestPublishNode] = await db
+        .select()
+        .from(dagNodes)
+        .where(and(eq(dagNodes.entityType, 'content'), eq(dagNodes.entityId, page.id), eq(dagNodes.nodeType, 'publish')))
+        .orderBy(desc(dagNodes.createdAt))
+        .limit(1);
+
+    const [publishNode] = await db.insert(dagNodes).values({
+        entityType: 'content',
+        entityId: page.id,
+        parentId: latestPublishNode?.id ?? null,
+        content: parsedContent,
+        nodeType: 'publish',
+    }).returning();
+
     const userId = await context.session?.get("userId");
-    await addAction(isNew ? "contentcreate" : "contentupdate", { id: page.id, version: null }, userId);
+    await addAction(isNew ? "contentcreate" : "contentupdate", { id: page.id, version: publishNode?.id ?? null }, userId);
 
     const alert = createAlert(alertType.success, isNew ? "Content created successfully." : "Content updated successfully.");
     await addAlertToSession(context.session, alert);

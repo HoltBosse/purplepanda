@@ -522,6 +522,26 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/content/drafts/edit/[draftId]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/content/drafts/edit/[draftId].astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/content/drafts/update/[draftId]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/content/drafts/update/[draftId].ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/content/preview/[draftId]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/content/preview/[draftId].astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/content/history/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/content/history/[id].astro",
+        });
+
+        injectRoute({
           pattern: "/admin/forms/api/lookup",
           entrypoint: "@holtbosse/purplepanda/pages/admin/forms/api/lookup.ts",
         });
