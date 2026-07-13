@@ -771,10 +771,98 @@ export const imageField: CustomField<ImageConfig | null> = {
   ),
 };
 
+export type ImageSizeOverride = { width: number | null; height: number | null };
+
+// A cap for the size sliders below. Unlike ImagePickerField's own Sizing section, this control
+// isn't attached to any one photo (it's setting a size shared across every item in a
+// collection), so there's no natural width/height to bound the slider by — a fixed generous cap
+// is used instead.
+const SIZE_OVERRIDE_SLIDER_MAX = 2000;
+
+// Same "slider + 100% checkbox" pattern as ImagePickerField's Sizing section, but standalone:
+// edits a plain { width, height } pair rather than a full image, for pinning a collection-wide
+// size that's independent of whichever image was used to design the card template.
+function ImageSizeOverrideField({
+  value,
+  onChange,
+}: {
+  value: ImageSizeOverride | null;
+  onChange: (value: ImageSizeOverride) => void;
+}) {
+  const current = value ?? { width: null, height: null };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-end gap-2">
+        <div className="flex flex-1 flex-col gap-1">
+          <span className="text-xs text-base-content/60">Width</span>
+          <input
+            type="range"
+            className="range range-primary w-full"
+            value={current.width ?? SIZE_OVERRIDE_SLIDER_MAX}
+            min={0}
+            max={SIZE_OVERRIDE_SLIDER_MAX}
+            disabled={current.width == null}
+            onChange={(e) => onChange({ ...current, width: Number(e.target.value) })}
+          />
+        </div>
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-xs text-base-content/60">100%</span>
+          <input
+            type="checkbox"
+            className="checkbox checkbox-sm"
+            checked={current.width == null}
+            onChange={(e) => onChange({ ...current, width: e.target.checked ? null : SIZE_OVERRIDE_SLIDER_MAX / 2 })}
+          />
+        </div>
+      </div>
+      <div className="flex items-end gap-2">
+        <div className="flex flex-1 flex-col gap-1">
+          <span className="text-xs text-base-content/60">Height</span>
+          <input
+            type="range"
+            className="range range-primary w-full"
+            value={current.height ?? SIZE_OVERRIDE_SLIDER_MAX}
+            min={0}
+            max={SIZE_OVERRIDE_SLIDER_MAX}
+            disabled={current.height == null}
+            onChange={(e) => onChange({ ...current, height: Number(e.target.value) })}
+          />
+        </div>
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-xs text-base-content/60">100%</span>
+          <input
+            type="checkbox"
+            className="checkbox checkbox-sm"
+            checked={current.height == null}
+            onChange={(e) => onChange({ ...current, height: e.target.checked ? null : SIZE_OVERRIDE_SLIDER_MAX / 2 })}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const imageSizeOverrideField: CustomField<ImageSizeOverride | null> = {
+  type: "custom",
+  render: ({ value, onChange }) => <ImageSizeOverrideField value={value} onChange={onChange} />,
+};
+
 const ImagePicker: ComponentConfig<ImagePickerProps> = {
   label: "Image",
   bindableFields: {
-    image: { label: "Image", fieldTypes: ["custom"] },
+    image: {
+      label: "Image",
+      fieldTypes: ["custom"],
+      // The picture itself varies per item, but sizing is usually a design decision — let width
+      // and height be pinned to one shared value (set with the same slider/checkbox control used
+      // above) instead of varying with whatever size each item's own image happens to have.
+      overridable: {
+        label: "Size",
+        keys: ["width", "height"],
+        field: imageSizeOverrideField,
+      },
+    },
   },
   fields: {
     image: imageField,

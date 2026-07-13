@@ -66,6 +66,22 @@ function bindingFieldName(propName: string): string {
   return `bind_${propName}`;
 }
 
+// Field name for the "same for every item?" toggle for an object-valued bound prop's overridable
+// group (e.g. `override_image`). Only injected once the prop itself is bound.
+function overrideToggleFieldName(propName: string): string {
+  return `override_${propName}`;
+}
+
+// Field name for the pinned override value itself (e.g. `override_image_value`), rendered with
+// `meta.overridable.field`'s own UI. Only injected once the toggle above is switched on.
+function overrideValueFieldName(propName: string): string {
+  return `override_${propName}_value`;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 // Wraps every component in a config so that:
 //  - any component declaring `bindableFields` gets a `bind_<prop>` select injected once it's
 //    nested (at any depth) inside a CardCollection's card template, populated from that
@@ -112,6 +128,7 @@ function wrapComponent(componentConfig: ComponentConfig, contentTypes: ContentTy
       const contentType = contentTypeId ? contentTypes.find((ct) => ct.id === contentTypeId) : undefined;
       if (!contentType) return baseFields;
 
+      const currentProps = (data.props ?? {}) as Record<string, unknown>;
       const bindingFields: Record<string, Field> = {};
       for (const [propName, meta] of Object.entries(bindable)) {
         bindingFields[bindingFieldName(propName)] = {
@@ -119,6 +136,22 @@ function wrapComponent(componentConfig: ComponentConfig, contentTypes: ContentTy
           label: `${meta.label} source`,
           options: [{ label: "— static value —", value: "" }, ...fieldOptionsForContentType(contentType, meta)],
         } as Field;
+
+        const isBound = isNonEmptyString(currentProps[bindingFieldName(propName)]);
+        if (isBound && meta.overridable) {
+          bindingFields[overrideToggleFieldName(propName)] = {
+            type: "radio",
+            label: `${meta.overridable.label}: same for every item?`,
+            options: [
+              { label: "Use each item's value", value: "" },
+              { label: "Same for every item", value: "template" },
+            ],
+          } as Field;
+
+          if (currentProps[overrideToggleFieldName(propName)] === "template") {
+            bindingFields[overrideValueFieldName(propName)] = meta.overridable.field;
+          }
+        }
       }
 
       return { ...baseFields, ...bindingFields };
@@ -159,10 +192,26 @@ function wrapComponent(componentConfig: ComponentConfig, contentTypes: ContentTy
       if (!item) return originalRender(props as never);
 
       const resolved: Record<string, unknown> = { ...props };
-      for (const propName of Object.keys(bindable)) {
+      for (const [propName, meta] of Object.entries(bindable)) {
         const boundFieldName = props[bindingFieldName(propName)];
-        if (isNonEmptyString(boundFieldName) && Object.prototype.hasOwnProperty.call(item, boundFieldName)) {
-          resolved[propName] = item[boundFieldName];
+        if (!isNonEmptyString(boundFieldName) || !Object.prototype.hasOwnProperty.call(item, boundFieldName)) {
+          continue;
+        }
+
+        const boundValue = item[boundFieldName];
+        const overrideValue = props[overrideValueFieldName(propName)];
+        const overrideOn = meta.overridable && props[overrideToggleFieldName(propName)] === "template";
+
+        if (overrideOn && isPlainObject(boundValue) && isPlainObject(overrideValue)) {
+          const merged = { ...boundValue };
+          for (const key of meta.overridable!.keys) {
+            if (Object.prototype.hasOwnProperty.call(overrideValue, key)) {
+              merged[key] = overrideValue[key];
+            }
+          }
+          resolved[propName] = merged;
+        } else {
+          resolved[propName] = boundValue;
         }
       }
 

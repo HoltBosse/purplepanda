@@ -38,6 +38,20 @@ export type BindableFieldMeta = {
   // Restricts which content-type field kinds may be bound to this prop (matched against the
   // content type field's Puck `type`, e.g. "text" | "custom" | ...). Omit to allow any field.
   fieldTypes?: Field["type"][];
+  // For object-valued bound props (e.g. ImagePicker's `image`), lets a group of sub-keys be
+  // pinned to a value the author sets directly — with its own field UI — instead of varying per
+  // item. E.g. every image in a collection can share the same width/height even though the
+  // image itself is bound per item. Once the prop is bound, a "same for every item?" toggle
+  // appears below the "<field> source" dropdown; switching it on reveals `field` to set the
+  // pinned value, which gets merged into the bound value at `keys` for every rendered item.
+  overridable?: {
+    label: string;
+    // Sub-property names on the bound value that `field`'s value supplies.
+    keys: string[];
+    // Puck field used to edit the pinned value. Its own value shape should be an object
+    // containing (at least) `keys`.
+    field: Field;
+  };
 };
 
 type ConfigWithDataResolvers<TConfig extends Config> = Omit<TConfig, "components"> & {
