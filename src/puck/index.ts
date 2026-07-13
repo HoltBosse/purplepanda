@@ -26,6 +26,7 @@ export type ContentType = {
   id: string;
   title: string,
   fields: Fields;
+  baseUrl?: string;
 };
 
 type ConfigWithDataResolvers<TConfig extends Config> = Omit<TConfig, "components"> & {
