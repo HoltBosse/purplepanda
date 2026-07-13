@@ -577,6 +577,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/forms/history/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/forms/history/[id].astro",
+        });
+
+        injectRoute({
           pattern: "/admin/forms/bulk/[action]",
           entrypoint: "@holtbosse/purplepanda/pages/admin/forms/bulk/[action].ts",
         });

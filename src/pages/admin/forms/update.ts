@@ -1,8 +1,8 @@
 import type { APIContext } from "astro";
 import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
 import { getDb } from "../../../db/db.js";
-import { forms } from "../../../db/schema.js";
-import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
+import { forms, dagNodes } from "../../../db/schema.js";
+import { eq, and, desc, getTableColumns, type InferSelectModel } from 'drizzle-orm';
 import * as z from "zod";
 import { addAction } from "../../../actions/index.js";
 
@@ -51,16 +51,33 @@ export async function POST(context: APIContext): Promise<Response> {
         return context.redirect(isNewForm ? "/admin/forms/new" : `/admin/forms/edit/${formId}`);
     }
 
+    const parsedContent = JSON.parse(contentResult.data);
+
     if (isNewForm) {
-        form.content = JSON.parse(contentResult.data);
+        form.content = parsedContent;
         form.state = 1;
         await db.insert(forms).values(form).returning();
     } else {
-        await db.update(forms).set({ content: JSON.parse(contentResult.data) }).where(eq(forms.id, form.id));
+        await db.update(forms).set({ content: parsedContent }).where(eq(forms.id, form.id));
     }
 
+    const [latestPublishNode] = await db
+        .select()
+        .from(dagNodes)
+        .where(and(eq(dagNodes.entityType, 'form'), eq(dagNodes.entityId, form.id), eq(dagNodes.nodeType, 'publish')))
+        .orderBy(desc(dagNodes.createdAt))
+        .limit(1);
+
+    const [publishNode] = await db.insert(dagNodes).values({
+        entityType: 'form',
+        entityId: form.id,
+        parentId: latestPublishNode?.id ?? null,
+        content: parsedContent,
+        nodeType: 'publish',
+    }).returning();
+
     const userId = await context.session?.get("userId");
-    await addAction(isNewForm ? "formcreate" : "formupdate", { id: form.id, version: null }, userId);
+    await addAction(isNewForm ? "formcreate" : "formupdate", { id: form.id, version: publishNode?.id ?? null }, userId);
 
     const alert = createAlert(alertType.success, isNewForm ? "Form created successfully." : "Form updated successfully.");
     await addAlertToSession(context.session, alert);

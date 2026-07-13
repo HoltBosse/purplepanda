@@ -1,0 +1,62 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import HistoryView from '../../../../components/HistoryView';
+import type { DagNodeData } from '../../../../components/HistoryView';
+import { getDb } from '../../../../db/db.js';
+import { forms, dagNodes } from '../../../../db/schema.js';
+import { eq, and, or, gt } from 'drizzle-orm';
+
+const db = getDb();
+const { id } = Astro.params;
+
+if (!id) return Astro.redirect('/admin/forms');
+
+const [form] = await db.select().from(forms).where(eq(forms.id, id)).limit(1);
+if (!form) return Astro.redirect('/admin/forms');
+
+const allNodes = await db
+    .select()
+    .from(dagNodes)
+    .where(
+        and(
+            eq(dagNodes.entityId, id),
+            eq(dagNodes.entityType, 'form'),
+            or(
+                eq(dagNodes.nodeType, 'publish'),
+                and(eq(dagNodes.nodeType, 'draft'), gt(dagNodes.state, -1)),
+            ),
+        )
+    );
+
+const formName = (form.content as any)?.root?.props?.name || 'Untitled';
+
+const serializedNodes: DagNodeData[] = allNodes.map(n => ({
+    id: n.id,
+    nodeType: n.nodeType as 'publish' | 'draft',
+    name: n.name,
+    createdAt: n.createdAt.toISOString(),
+    parentId: n.parentId,
+    content: n.content as Record<string, unknown>,
+    state: n.state,
+}));
+---
+
+<AdminLayout>
+    <div class="flex items-center gap-2 border-b border-base-300 pt-2 pb-4 text-sm">
+        <a href="/admin/forms" class="text-base-content/50 hover:text-base-content transition-colors">Forms</a>
+        <span class="text-base-content/30">/</span>
+        <span class="text-base-content/50">History</span>
+        <span class="text-base-content/30">/</span>
+        <span class="font-semibold truncate max-w-64" title={formName}>{formName}</span>
+    </div>
+
+    <div class="mt-4">
+        <HistoryView
+            client:only="react"
+            entityType="form"
+            entityId={id}
+            currentContent={form.content as Record<string, unknown>}
+            nodes={serializedNodes}
+        />
+    </div>
+</AdminLayout>
