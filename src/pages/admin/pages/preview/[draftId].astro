@@ -1,0 +1,52 @@
+---
+import '../../../../styles/global.css';
+import { getDb } from '../../../../db/db.js';
+import { settings, templates, dagNodes } from '../../../../db/schema.js';
+import { eq, sql } from 'drizzle-orm';
+import type { Data } from '@puckeditor/core';
+import externalPuckConfig from 'virtual:purplepanda/puck-config';
+import { resolveDataForSSR } from '../../../../puck/server-data-wrapper.js';
+import PageRenderer from '../../../../components/PageRenderer.js';
+
+const db = getDb();
+const { draftId } = Astro.params;
+
+if (!draftId) return Astro.redirect('/admin/pages');
+
+const [draft] = await db.select().from(dagNodes).where(eq(dagNodes.id, draftId)).limit(1);
+if (!draft || draft.nodeType !== 'draft' || draft.entityType !== 'page' || draft.state === -1) {
+    return Astro.redirect('/admin/pages');
+}
+
+const templateSetting = await db
+    .select()
+    .from(settings)
+    .leftJoin(templates, sql`(${templates.id})::text = (${settings.value} #>> '{}')`)
+    .where(eq(settings.key, 'default_template'))
+    .limit(1)
+    .then(rows => rows[0]);
+
+const config = externalPuckConfig ?? {};
+
+const [pageData, templateData] = await Promise.all([
+    resolveDataForSSR(config, draft.content as Data),
+    templateSetting?.templates?.content
+        ? resolveDataForSSR(config, templateSetting.templates.content as Data)
+        : Promise.resolve(undefined),
+]);
+
+const title: string = (pageData as any)?.root?.props?.title ?? '';
+---
+
+<!DOCTYPE html>
+<html lang="en" data-theme="false">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title}</title>
+</head>
+<body>
+    <PageRenderer pageData={pageData} templateData={templateData} />
+</body>
+</html>

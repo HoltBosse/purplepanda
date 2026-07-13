@@ -297,6 +297,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/pages/preview/[draftId]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/pages/preview/[draftId].astro",
+        });
+
+        injectRoute({
           pattern: "/admin/templates/drafts/edit/[draftId]",
           entrypoint: "@holtbosse/purplepanda/pages/admin/templates/drafts/edit/[draftId].astro",
         });
