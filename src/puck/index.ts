@@ -1,5 +1,7 @@
-import type { Config, Fields } from "@puckeditor/core";
+import type { Config, Field, Fields } from "@puckeditor/core";
 export { ClientComponentDataWrapper, wrapConfigWithClientDataResolvers } from "./client-data-wrapper.js";
+export { wrapConfigWithDataBinding, ItemContext, useBoundItem } from "./data-binding.js";
+export type { BoundItem } from "./data-binding.js";
 
 export type { ComponentConfig, Slot } from "@puckeditor/core";
 
@@ -29,6 +31,15 @@ export type ContentType = {
   baseUrl?: string;
 };
 
+// Declares a component's own prop as eligible for data-binding when the component is nested
+// inside a CardCollection's card template. See ./data-binding.js for how this is consumed.
+export type BindableFieldMeta = {
+  label: string;
+  // Restricts which content-type field kinds may be bound to this prop (matched against the
+  // content type field's Puck `type`, e.g. "text" | "custom" | ...). Omit to allow any field.
+  fieldTypes?: Field["type"][];
+};
+
 type ConfigWithDataResolvers<TConfig extends Config> = Omit<TConfig, "components"> & {
   components: {
     [TName in keyof TConfig["components"]]: ComponentWithDataResolver<TConfig["components"][TName]>;
@@ -40,6 +51,7 @@ declare module "@puckeditor/core" {
   interface ComponentConfigExtensions {
     data?: (fields: any) => Awaitable<Record<string, unknown>>;
     locations?: Location | Location[];
+    bindableFields?: Record<string, BindableFieldMeta>;
   }
 }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { ComponentConfig } from "@puckeditor/core";
+import type { ComponentConfig, CustomField } from "@puckeditor/core";
 // Type-only: cropperjs defines custom elements (`class X extends HTMLElement`) at module
 // scope, which throws under SSR. It must only ever be loaded via dynamic import in the browser.
 import type Cropper from "cropperjs";
@@ -761,15 +761,23 @@ function ImagePickerField({
   );
 }
 
+// Reusable field for content types that need an image field of the same shape used here, so
+// items of that type can be bound to by ImagePicker's `image` prop when nested in a card
+// template (see bindableFields below and ../data-binding.js).
+export const imageField: CustomField<ImageConfig | null> = {
+  type: "custom",
+  render: ({ value, onChange }) => (
+    <ImagePickerField value={value} onChange={onChange} />
+  ),
+};
+
 const ImagePicker: ComponentConfig<ImagePickerProps> = {
   label: "Image",
+  bindableFields: {
+    image: { label: "Image", fieldTypes: ["custom"] },
+  },
   fields: {
-    image: {
-      type: "custom",
-      render: ({ value, onChange }) => (
-        <ImagePickerField value={value} onChange={onChange} />
-      ),
-    },
+    image: imageField,
   },
   defaultProps: {
     image: null,

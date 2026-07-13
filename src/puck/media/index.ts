@@ -1,3 +1,3 @@
-export { default as ImagePicker } from "./ImagePicker.js";
+export { default as ImagePicker, imageField } from "./ImagePicker.js";
 
-export type { ImagePickerProps, MediaRef } from "./ImagePicker.js";
+export type { ImagePickerProps, MediaRef, ImageConfig } from "./ImagePicker.js";

@@ -268,6 +268,9 @@ function RichTextMenuScrollFade({ children }: { children: ReactNode }) {
 }
 
 const Rich: ComponentConfig<RichProps> = {
+  bindableFields: {
+    content: { label: "Text", fieldTypes: ["text", "textarea", "richtext"] },
+  },
   fields: {
     content: {
       type: "richtext",

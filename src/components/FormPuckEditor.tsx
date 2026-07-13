@@ -2,7 +2,7 @@ import type { Config, Data } from "@puckeditor/core";
 import { useMemo } from "react";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
-import { filterConfigByLocation } from "../puck/index.js";
+import { filterConfigByLocation, wrapConfigWithDataBinding } from "../puck/index.js";
 import PuckEditor from "./PuckEditor.js";
 
 const baseConfig: Config = {
@@ -34,7 +34,7 @@ const mergedConfig: Config = {
   },
 };
 
-const config = wrapConfigWithClientDataResolvers(filterConfigByLocation(mergedConfig, "form"));
+const config = wrapConfigWithClientDataResolvers(wrapConfigWithDataBinding(filterConfigByLocation(mergedConfig, "form")));
 
 const defaultInitialData: Data = { content: [], root: { props: {} } };
 

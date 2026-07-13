@@ -1,8 +1,9 @@
 import type { Config, Data } from "@puckeditor/core";
 import { Render } from "@puckeditor/core";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
+import { wrapConfigWithDataBinding } from "../puck/index.js";
 
-const hostConfig: Partial<Config> = externalPuckConfig ?? {};
+const hostConfig: Partial<Config> = wrapConfigWithDataBinding((externalPuckConfig ?? {}) as Config);
 
 const renderConfig: Config = {
   ...hostConfig,

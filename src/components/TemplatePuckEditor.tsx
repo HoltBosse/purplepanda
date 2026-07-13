@@ -1,7 +1,7 @@
 import type { Config, Data } from "@puckeditor/core";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
-import { filterConfigByLocation } from "../puck/index.js";
+import { filterConfigByLocation, wrapConfigWithDataBinding } from "../puck/index.js";
 import PuckEditor from "./PuckEditor.js";
 
 const baseConfig: Config = {
@@ -53,7 +53,7 @@ const mergedConfig: Config = {
   },
 };
 
-const config = wrapConfigWithClientDataResolvers(filterConfigByLocation(mergedConfig, "template"));
+const config = wrapConfigWithClientDataResolvers(wrapConfigWithDataBinding(filterConfigByLocation(mergedConfig, "template")));
 
 const defaultInitialData: Data = {
   content: [{ type: "TemplateSlot", props: { id: "TemplateSlot-default" } }],
