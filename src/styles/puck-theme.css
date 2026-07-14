@@ -102,13 +102,28 @@
   opacity: 0.4;
 }
 
+[data-puck-save] {
+  background-color: transparent;
+  color: var(--puck-color-text);
+  border: 2px solid var(--puck-color-border);
+
+  &:hover {
+    background-color: #ffffffe0;
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+}
+
 /* targeted hacks around specific things */
 @media (prefers-color-scheme: dark), (data-theme="dark") {
   .Puck {
     --puck-color-border: color-mix(in oklab, var(--color-base-content) 10%, transparent);
 
-    [data-puck-publish] {
-        color: var(--puck-color-text);
+    [data-puck-publish], [data-puck-save] {
+      color: var(--puck-color-text);
+    }
+
+    [data-puck-save]:hover {
+      background-color: rgba(255, 255, 255, 0.1);
     }
   }
 }

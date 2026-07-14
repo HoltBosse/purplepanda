@@ -47,11 +47,12 @@ interface PagePuckEditorProps {
   templateData?: Data;
   saveUrl?: string;
   onPublish?: (data: Data) => void;
+  onSave?: (data: Data) => void;
   pages?: PageOption[];
   rootConfig?: { label?: string; fields?: Fields; defaultProps?: Record<string, unknown> };
 }
 
-export default function PagePuckEditor({ initialData, templateData, saveUrl = "/admin/pages/update", onPublish, pages = [], rootConfig }: PagePuckEditorProps = {}) {
+export default function PagePuckEditor({ initialData, templateData, saveUrl = "/admin/pages/update", onPublish, onSave, pages = [], rootConfig }: PagePuckEditorProps = {}) {
   const defaultSave = (data: Data) => {
     const form = document.createElement("form");
     form.method = "POST";
@@ -104,7 +105,10 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
     };
   }, [pages, rootConfig]);
 
-  const optionalProps = templateData ? { templateData } : {};
+  const optionalProps = {
+    ...(templateData ? { templateData } : {}),
+    ...(onSave ? { onSave } : {}),
+  };
 
   return (
     <PuckEditor

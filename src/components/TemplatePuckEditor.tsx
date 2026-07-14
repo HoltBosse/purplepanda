@@ -65,6 +65,7 @@ interface TemplatePuckEditorProps {
   saveUrl?: string;
   templateData?: Data;
   onPublish?: (data: Data) => void;
+  onSave?: (data: Data) => void;
 }
 
 export default function TemplatePuckEditor({
@@ -72,6 +73,7 @@ export default function TemplatePuckEditor({
   saveUrl = "/admin/templates/update",
   templateData,
   onPublish,
+  onSave,
 }: TemplatePuckEditorProps = {}) {
   const defaultSave = (data: Data) => {
     const form = document.createElement("form");
@@ -89,7 +91,10 @@ export default function TemplatePuckEditor({
     form.submit();
   };
 
-  const optionalProps = templateData ? { templateData } : {};
+  const optionalProps = {
+    ...(templateData ? { templateData } : {}),
+    ...(onSave ? { onSave } : {}),
+  };
 
   return (
     <PuckEditor

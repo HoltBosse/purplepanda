@@ -1,37 +1,59 @@
-import { Puck } from "@puckeditor/core";
+import { Button, Puck, usePuck } from "@puckeditor/core";
 import "@puckeditor/core/puck.css";
 import "../styles/puck-theme.css";
 import type { Config, Data, Overrides, PuckContext } from "@puckeditor/core";
 import { Render } from "@puckeditor/core";
 import React, { cloneElement, isValidElement, useEffect, useMemo } from "react";
+import { Save } from "../puck/icons.js";
 
 const ROOT_SLOT_NAME = "default-zone";
 
-export const overrides: Partial<Overrides<Config>> = {
-  headerActions: ({ children }) => {
-    if (isValidElement(children)) {
-      return cloneElement(children as any, { "data-puck-publish": "" });
-    }
+function createOverrides(onSave?: (data: Data) => void): Partial<Overrides<Config>> {
+  return {
+    headerActions: ({ children }) => {
+      const { appState } = usePuck();
 
-    return <>{children}</>;
-  },
+      const saveButton = onSave ? (
+        <Button data-puck-save icon={<Save size="14px" />} onClick={() => onSave(appState.data)}>
+          Save
+        </Button>
+      ) : null;
 
-  iframe: ({ children, document }) => {
-    useEffect(() => {
-      if (document) {
-        document.documentElement.setAttribute("data-theme", "false");
+      if (isValidElement(children)) {
+        return (
+          <>
+            {saveButton}
+            {cloneElement(children as any, { "data-puck-publish": "" })}
+          </>
+        );
       }
-    }, [document]);
 
-    return <>{children}</>;
-  },
-};
+      return (
+        <>
+          {saveButton}
+          {children}
+        </>
+      );
+    },
+
+    iframe: ({ children, document }) => {
+      useEffect(() => {
+        if (document) {
+          document.documentElement.setAttribute("data-theme", "false");
+        }
+      }, [document]);
+
+      return <>{children}</>;
+    },
+  };
+}
 
 interface PuckEditorProps {
   config: Config;
   data: Data;
   templateData?: Data;
   onPublish: (data: Data) => void;
+  onSave?: (data: Data) => void;
 }
 
 function hasTemplateSlot(value: unknown): boolean {
@@ -63,7 +85,8 @@ function ensureTemplateSlot(data: Data): Data {
   };
 }
 
-export default function PuckEditor({ config, data, templateData, onPublish }: PuckEditorProps) {
+export default function PuckEditor({ config, data, templateData, onPublish, onSave }: PuckEditorProps) {
+  const overrides = useMemo(() => createOverrides(onSave), [onSave]);
   const normalizedTemplateData = templateData ? ensureTemplateSlot(templateData) : undefined;
   const segments: Array<Data["content"] | "__SLOT__"> = [];
 
