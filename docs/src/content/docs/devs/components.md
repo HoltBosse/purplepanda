@@ -8,7 +8,7 @@ description: How to set up a your first component.
 ```js
 import { TextInput, Textarea, Select, Checkbox, RadioGroup } from "@holtbosse/purplepanda/puck/form-fields";
 import { FormEmbed } from "@holtbosse/purplepanda/puck/form";
-import { Grid, Flex, Space, Rich } from "@holtbosse/purplepanda/puck/prefab";
+import { Grid, Flex, Space, Rich, CardCollection, Margin } from "@holtbosse/purplepanda/puck/prefab";
 import { ImagePicker } from "@holtbosse/purplepanda/puck/media";
 ```
 
