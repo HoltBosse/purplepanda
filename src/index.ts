@@ -302,16 +302,6 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
-          pattern: "/admin/templates/drafts/edit/[draftId]",
-          entrypoint: "@holtbosse/purplepanda/pages/admin/templates/drafts/edit/[draftId].astro",
-        });
-
-        injectRoute({
-          pattern: "/admin/templates/drafts/update/[draftId]",
-          entrypoint: "@holtbosse/purplepanda/pages/admin/templates/drafts/update/[draftId].ts",
-        });
-
-        injectRoute({
           pattern: "/admin/pages/history/[id]",
           entrypoint: "@holtbosse/purplepanda/pages/admin/pages/history/[id].astro",
         });

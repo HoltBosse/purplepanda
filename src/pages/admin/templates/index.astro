@@ -1,25 +1,12 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
-import { templates, dagNodes } from '../../../db/schema.js';
-import { CircleCheck, CircleX, EllipsisVertical, FilePen, Trash2, GitBranch } from '@lucide/astro';
-import { desc, and, eq, ne } from 'drizzle-orm';
+import { templates } from '../../../db/schema.js';
+import { CircleCheck, CircleX, GitBranch } from '@lucide/astro';
+import { desc, ne } from 'drizzle-orm';
 
 const db = getDb();
-const [allTemplates, allDrafts] = await Promise.all([
-    db.select().from(templates).where(ne(templates.state, -1)).orderBy(desc(templates.id)),
-    db.select().from(dagNodes).where(and(eq(dagNodes.entityType, 'template'), eq(dagNodes.nodeType, 'draft'), eq(dagNodes.state, 1))).orderBy(desc(dagNodes.createdAt)),
-]);
-
-const draftsByTemplateId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, draft) => {
-    const bucket = acc[draft.entityId];
-    if (bucket !== undefined) {
-        bucket.push(draft);
-    } else {
-        acc[draft.entityId] = [draft];
-    }
-    return acc;
-}, {});
+const allTemplates = await db.select().from(templates).where(ne(templates.state, -1)).orderBy(desc(templates.id));
 ---
 
 <AdminLayout>
@@ -56,137 +43,39 @@ const draftsByTemplateId = allDrafts.reduce<Record<string, typeof allDrafts>>((a
             </tr>
         </thead>
         <tbody>
-            {allTemplates.map(template => {
-                const drafts = draftsByTemplateId[template.id] ?? [];
-                return (
-                    <tr>
-                        <td>
-                            <label>
-                                <input
-                                    form="bulk-form"
-                                    type="checkbox"
-                                    class="checkbox row-select"
-                                    name="selected[]"
-                                    value={template.id}
-                                />
-                            </label>
-                        </td>
-                        <td class="w-px whitespace-nowrap">
-                            <form action={`/admin/templates/toggle/${template.id}`} method="POST">
-                                <button class="btn btn-square" type="submit">
-                                    {template.state === 1 ? <CircleCheck size={20} class="text-green-500" /> : <CircleX size={20} class="text-red-500" />}
-                                </button>
-                            </form>
-                        </td>
-                        <td>
-                            <a href={`/admin/templates/edit/${template.id}`}>
-                                <div class="font-bold link link-info link-hover">{(template.content as any)?.root?.props?.title || 'Untitled'}</div>
-                            </a>
-                        </td>
-                        <td class="w-px whitespace-nowrap">
-                            <div class="dropdown dropdown-end">
-                                <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square">
-                                    <EllipsisVertical size={16} />
-                                </div>
-                                <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow-lg border border-base-300">
-                                    {drafts.length > 0 ? (
-                                        <>
-                                            <li class="menu-title text-xs text-base-content/60 px-2 py-1">Drafts</li>
-                                            {drafts.map(draft => (
-                                                <li>
-                                                    <div class="flex items-center gap-1 pr-1">
-                                                        <a href={`/admin/templates/drafts/edit/${draft.id}`} class="flex items-center gap-2 flex-1 min-w-0" title={draft.name}>
-                                                            <FilePen size={14} class="shrink-0" />
-                                                            <span class="truncate min-w-0">{draft.name}</span>
-                                                        </a>
-                                                        <form method="POST" action={`/admin/drafts/delete/${draft.id}`}>
-                                                            <button type="submit" class="btn btn-ghost btn-xs btn-square text-error shrink-0" title="Delete draft">
-                                                                <Trash2 size={12} />
-                                                            </button>
-                                                        </form>
-                                                    </div>
-                                                </li>
-                                            ))}
-                                            <li><hr class="my-1 border-base-300" /></li>
-                                        </>
-                                    ) : null}
-                                    <li>
-                                        <button
-                                            type="button"
-                                            class="gap-2"
-                                            data-create-draft
-                                            data-entity-id={template.id}
-                                            data-entity-type="template"
-                                        >
-                                            <FilePen size={14} />
-                                            Create new draft
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <a href={`/admin/templates/history/${template.id}`} class="gap-2">
-                                            <GitBranch size={14} />
-                                            History
-                                        </a>
-                                    </li>
-                                </ul>
-                            </div>
-                        </td>
-                    </tr>
-                );
-            })}
+            {allTemplates.map(template => (
+                <tr>
+                    <td>
+                        <label>
+                            <input
+                                form="bulk-form"
+                                type="checkbox"
+                                class="checkbox row-select"
+                                name="selected[]"
+                                value={template.id}
+                            />
+                        </label>
+                    </td>
+                    <td class="w-px whitespace-nowrap">
+                        <form action={`/admin/templates/toggle/${template.id}`} method="POST">
+                            <button class="btn btn-square" type="submit">
+                                {template.state === 1 ? <CircleCheck size={20} class="text-green-500" /> : <CircleX size={20} class="text-red-500" />}
+                            </button>
+                        </form>
+                    </td>
+                    <td>
+                        <a href={`/admin/templates/edit/${template.id}`}>
+                            <div class="font-bold link link-info link-hover">{(template.content as any)?.root?.props?.title || 'Untitled'}</div>
+                        </a>
+                    </td>
+                    <td class="w-px whitespace-nowrap">
+                        <a href={`/admin/templates/history/${template.id}`} class="btn btn-ghost btn-sm btn-square" title="History">
+                            <GitBranch size={16} />
+                        </a>
+                    </td>
+                </tr>
+            ))}
         </tbody>
     </table>
-
-    <!-- Create Draft Modal -->
-    <dialog id="create-draft-modal" class="modal">
-        <div class="modal-box">
-            <h3 class="font-bold text-lg mb-4">Create New Draft</h3>
-            <form method="POST" action="/admin/drafts/create" id="create-draft-form">
-                <input type="hidden" name="entityId" id="draft-entity-id" />
-                <input type="hidden" name="entityType" id="draft-entity-type" />
-                <div class="form-control">
-                    <label class="label" for="draft-name">
-                        <span class="label-text">Draft Name</span>
-                    </label>
-                    <input
-                        type="text"
-                        id="draft-name"
-                        name="name"
-                        class="input input-bordered w-full"
-                        placeholder="e.g. Navbar refresh"
-                        required
-                        autocomplete="off"
-                        maxlength="20"
-                    />
-                </div>
-                <div class="modal-action mt-6">
-                    <button type="button" class="btn btn-ghost" id="cancel-draft-btn">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create Draft</button>
-                </div>
-            </form>
-        </div>
-        <form method="dialog" class="modal-backdrop">
-            <button>close</button>
-        </form>
-    </dialog>
-
     <script>import '../../../scripts/select-all'</script>
-    <script>
-        const modal = document.getElementById('create-draft-modal') as HTMLDialogElement;
-        const entityIdInput = document.getElementById('draft-entity-id') as HTMLInputElement;
-        const entityTypeInput = document.getElementById('draft-entity-type') as HTMLInputElement;
-        const nameInput = document.getElementById('draft-name') as HTMLInputElement;
-        const cancelBtn = document.getElementById('cancel-draft-btn');
-
-        document.querySelectorAll<HTMLButtonElement>('[data-create-draft]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                entityIdInput.value = btn.dataset.entityId ?? '';
-                entityTypeInput.value = btn.dataset.entityType ?? '';
-                nameInput.value = '';
-                modal.showModal();
-            });
-        });
-
-        cancelBtn?.addEventListener('click', () => modal.close());
-    </script>
 </AdminLayout>
