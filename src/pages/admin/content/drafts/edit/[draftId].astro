@@ -20,6 +20,7 @@ if (!entity || !entity.contentType) {
 }
 
 const saveUrl = `/admin/content/drafts/update/${draftId}`;
+const draftPublishUrl = `/admin/content/drafts/publish/${draftId}`;
 
 const [defaultTemplate] = await db
     .select()
@@ -35,7 +36,9 @@ const templateData = defaultTemplate?.templates?.content as Data | undefined;
         client:only="react"
         contentTypeId={entity.contentType}
         saveUrl={saveUrl}
+        draftPublishUrl={draftPublishUrl}
         initialData={draft.content as Data}
+        isDraft
         {...(templateData ? { templateData } : {})}
     />
 </AdminBareLayout>

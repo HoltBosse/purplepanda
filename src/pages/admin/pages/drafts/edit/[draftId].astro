@@ -15,6 +15,7 @@ if (!draft || draft.nodeType !== 'draft' || draft.entityType !== 'page' || draft
 }
 
 const saveUrl = `/admin/pages/drafts/update/${draftId}`;
+const draftPublishUrl = `/admin/pages/drafts/publish/${draftId}`;
 
 const [defaultTemplate, allPages] = await Promise.all([
     db
@@ -40,8 +41,10 @@ const pageOptions = allPages.map(p => ({ id: p.id, title: p.title ?? '' }));
     <PagePuckEditor
         client:only="react"
         saveUrl={saveUrl}
+        draftPublishUrl={draftPublishUrl}
         initialData={draft.content as Data}
         pages={pageOptions}
+        isDraft
         {...(templateData ? { templateData } : {})}
     />
 </AdminBareLayout>

@@ -8,7 +8,9 @@ interface ContentPuckEditorProps {
   initialData?: Data;
   templateData?: Data;
   saveUrl?: string;
+  draftPublishUrl?: string;
   onPublish?: (data: Data) => void;
+  isDraft?: boolean;
 }
 
 export default function ContentPuckEditor({
@@ -16,7 +18,9 @@ export default function ContentPuckEditor({
   initialData,
   templateData,
   saveUrl = "/admin/content/update",
+  draftPublishUrl,
   onPublish,
+  isDraft,
 }: ContentPuckEditorProps) {
   const contentType = useMemo(
     () => (externalPuckConfig?.contentTypes ?? []).find(ct => ct.id === contentTypeId),
@@ -33,6 +37,8 @@ export default function ContentPuckEditor({
     ...(templateData !== undefined ? { templateData } : {}),
     ...(onPublish !== undefined ? { onPublish } : {}),
     ...(rootConfig !== undefined ? { rootConfig } : {}),
+    ...(isDraft !== undefined ? { isDraft } : {}),
+    ...(draftPublishUrl !== undefined ? { draftPublishUrl } : {}),
   };
 
   return (

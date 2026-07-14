@@ -46,13 +46,15 @@ interface PagePuckEditorProps {
   initialData?: Data;
   templateData?: Data;
   saveUrl?: string;
+  draftPublishUrl?: string;
   onPublish?: (data: Data) => void;
   onSave?: (data: Data) => void;
+  isDraft?: boolean;
   pages?: PageOption[];
   rootConfig?: { label?: string; fields?: Fields; defaultProps?: Record<string, unknown> };
 }
 
-export default function PagePuckEditor({ initialData, templateData, saveUrl = "/admin/pages/update", onPublish, onSave, pages = [], rootConfig }: PagePuckEditorProps = {}) {
+export default function PagePuckEditor({ initialData, templateData, saveUrl = "/admin/pages/update", draftPublishUrl, onPublish, onSave, isDraft = false, pages = [], rootConfig }: PagePuckEditorProps = {}) {
   const defaultSave = (data: Data) => {
     const form = document.createElement("form");
     form.method = "POST";
@@ -68,6 +70,35 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
     document.body.appendChild(form);
     form.submit();
   };
+
+  const defaultDraftPublish = (data: Data) => {
+    if (!draftPublishUrl) {
+      return;
+    }
+
+    if (!confirm("Are you sure you want to make this draft live?")) {
+      return;
+    }
+
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = draftPublishUrl;
+    form.style.display = "none";
+
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "content";
+    input.value = JSON.stringify(data);
+    form.appendChild(input);
+
+    document.body.appendChild(form);
+    form.submit();
+  };
+
+  // Editing a draft chains a new draft dag node rather than publishing, so the
+  // default save action belongs on the Save button, not Puck's Publish button.
+  const resolvedOnPublish = isDraft ? (onPublish ?? defaultDraftPublish) : (onPublish ?? defaultSave);
+  const resolvedOnSave = isDraft ? (onSave ?? defaultSave) : onSave;
   const configWithRootFields = useMemo(() => {
     if (rootConfig) {
       return {
@@ -107,14 +138,14 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
 
   const optionalProps = {
     ...(templateData ? { templateData } : {}),
-    ...(onSave ? { onSave } : {}),
+    ...(resolvedOnSave ? { onSave: resolvedOnSave } : {}),
   };
 
   return (
     <PuckEditor
       config={configWithRootFields}
       data={initialData ?? defaultInitialData}
-      onPublish={onPublish ?? defaultSave}
+      onPublish={resolvedOnPublish}
       {...optionalProps}
     />
   );
