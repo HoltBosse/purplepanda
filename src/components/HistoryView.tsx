@@ -511,7 +511,7 @@ export default function HistoryView({
       </div>
 
       {/* ── Side-by-side renders (below timeline) ── */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <RenderPanel
           label="Current"
           badge="live"
