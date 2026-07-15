@@ -2,7 +2,7 @@ import type { APIContext } from "astro";
 import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
 import { getDb } from "../../../db/db.js";
 import { pages, templates, dagNodes } from "../../../db/schema.js";
-import { eq, and, desc, count } from 'drizzle-orm';
+import { eq, and, desc, count, gt } from 'drizzle-orm';
 import * as z from "zod";
 import { MAX_DRAFTS_PER_ENTITY } from "../../../dag/index.js";
 
@@ -10,6 +10,9 @@ const schema = z.object({
     entityType: z.enum(["page", "template", "content"]),
     entityId: z.string().uuid(),
     name: z.string().min(1).max(20),
+    // When set, the draft branches off this specific dagNode (its content and
+    // lineage) instead of the entity's current live content / latest publish.
+    sourceNodeId: z.string().uuid().optional(),
 });
 
 export async function POST(context: APIContext): Promise<Response> {
@@ -20,6 +23,7 @@ export async function POST(context: APIContext): Promise<Response> {
         entityType: formData.get("entityType"),
         entityId: formData.get("entityId"),
         name: formData.get("name"),
+        sourceNodeId: formData.get("sourceNodeId") || undefined,
     });
 
     if (!result.success) {
@@ -28,7 +32,7 @@ export async function POST(context: APIContext): Promise<Response> {
         return context.redirect("/admin/pages");
     }
 
-    const { entityType, entityId, name } = result.data;
+    const { entityType, entityId, name, sourceNodeId } = result.data;
 
     let redirectBack: string;
     let draftEditBase: string;
@@ -73,17 +77,42 @@ export async function POST(context: APIContext): Promise<Response> {
         return context.redirect(redirectBack);
     }
 
-    const [latestPublishNode] = await db
-        .select()
-        .from(dagNodes)
-        .where(and(eq(dagNodes.entityType, entityType), eq(dagNodes.entityId, entityId), eq(dagNodes.nodeType, 'publish')))
-        .orderBy(desc(dagNodes.createdAt))
-        .limit(1);
+    let parentId: string | null;
+
+    if (sourceNodeId) {
+        const [sourceNode] = await db
+            .select()
+            .from(dagNodes)
+            .where(and(
+                eq(dagNodes.id, sourceNodeId),
+                eq(dagNodes.entityType, entityType),
+                eq(dagNodes.entityId, entityId),
+                gt(dagNodes.state, -1),
+            ))
+            .limit(1);
+
+        if (!sourceNode) {
+            const alert = createAlert(alertType.error, "Source version not found.");
+            await addAlertToSession(context.session, alert);
+            return context.redirect(redirectBack);
+        }
+
+        content = sourceNode.content;
+        parentId = sourceNode.id;
+    } else {
+        const [latestPublishNode] = await db
+            .select()
+            .from(dagNodes)
+            .where(and(eq(dagNodes.entityType, entityType), eq(dagNodes.entityId, entityId), eq(dagNodes.nodeType, 'publish')))
+            .orderBy(desc(dagNodes.createdAt))
+            .limit(1);
+        parentId = latestPublishNode?.id ?? null;
+    }
 
     const inserted = await db.insert(dagNodes).values({
         entityType,
         entityId,
-        parentId: latestPublishNode?.id ?? null,
+        parentId,
         content: content as any,
         nodeType: 'draft',
         name,

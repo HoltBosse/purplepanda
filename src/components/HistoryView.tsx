@@ -8,6 +8,7 @@ import React, {
 import { createPortal } from "react-dom";
 import type { Data } from "@puckeditor/core";
 import PageRenderer from "./PageRenderer.js";
+import GitBranchPlus from "lucide-react/dist/esm/icons/git-branch-plus.mjs";
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
@@ -178,6 +179,121 @@ function PreviewFrame({ children }: { children: React.ReactNode }) {
   );
 }
 
+// ─── CreateDraftDialog ───────────────────────────────────────────────────────
+
+// Submits a real POST (rather than fetch) so the server's redirect to
+// /admin/{type}/drafts/edit/{id} — or, on failure, its session-flashed error
+// alert — is followed by the browser exactly as it is from the pages/content
+// list views. Mirrors the hidden-form pattern in PagePuckEditor.tsx.
+function submitCreateDraft(
+  entityType: string,
+  entityId: string,
+  name: string,
+  sourceNodeId: string | null
+) {
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = "/admin/drafts/create";
+  form.style.display = "none";
+
+  const fields: Record<string, string> = { entityType, entityId, name };
+  if (sourceNodeId !== null) fields.sourceNodeId = sourceNodeId;
+
+  for (const [key, value] of Object.entries(fields)) {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = key;
+    input.value = value;
+    form.appendChild(input);
+  }
+
+  document.body.appendChild(form);
+  form.submit();
+}
+
+function CreateDraftDialog({
+  dialogRef,
+  entityType,
+  entityId,
+  sourceNode,
+}: {
+  dialogRef: React.RefObject<HTMLDialogElement | null>;
+  entityType: string;
+  entityId: string;
+  sourceNode: DagNodeData | null;
+}) {
+  const [name, setName] = useState("");
+  const hydrated = useHydrated();
+
+  const close = () => dialogRef.current?.close();
+
+  const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    submitCreateDraft(entityType, entityId, name.trim(), sourceNode?.id ?? null);
+  };
+
+  const sourceKindLabel = sourceNode
+    ? sourceNode.nodeType === "draft"
+      ? `Draft · ${sourceNode.name ?? ""}`
+      : "Publish"
+    : null;
+
+  return (
+    <dialog ref={dialogRef} className="modal">
+      <div className="modal-box">
+        <h3 className="font-bold text-lg mb-4">Create Draft</h3>
+        <form onSubmit={handleSubmit}>
+          {sourceNode && (
+            <p className="text-xs text-base-content/50 mb-4">
+              Branching from:{" "}
+              <span className="font-medium text-base-content/70">
+                {sourceKindLabel} ·{" "}
+                {hydrated ? (
+                  formatDate(sourceNode.createdAt)
+                ) : (
+                  <span className="inline-block h-3 w-24 align-middle rounded bg-base-300 animate-pulse" />
+                )}
+              </span>
+            </p>
+          )}
+          <div className="form-control">
+            <label className="label" htmlFor="create-draft-from-name">
+              <span className="label-text">Draft Name</span>
+            </label>
+            <input
+              type="text"
+              id="create-draft-from-name"
+              className="input input-bordered w-full"
+              placeholder="e.g. Homepage redesign"
+              required
+              autoComplete="off"
+              autoFocus
+              maxLength={20}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div className="modal-action mt-6">
+            <button type="button" className="btn btn-ghost" onClick={close}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary">
+              Create Draft
+            </button>
+          </div>
+        </form>
+      </div>
+      <button
+        type="button"
+        className="modal-backdrop"
+        onClick={close}
+        aria-label="Close"
+      />
+    </dialog>
+  );
+}
+
 // ─── RenderPanel ─────────────────────────────────────────────────────────────
 
 function RenderPanel({
@@ -217,6 +333,7 @@ function RenderPanel({
 
 export default function HistoryView({
   entityType,
+  entityId,
   currentContent,
   nodes,
 }: HistoryViewProps) {
@@ -225,6 +342,8 @@ export default function HistoryView({
   const isDragging = useRef(false);
   const hydrated = useHydrated();
   const dateTimeZone = hydrated ? undefined : "UTC";
+  const createDraftDialogRef = useRef<HTMLDialogElement>(null);
+  const canCreateDraft = entityType === "page" || entityType === "content";
 
   const [selectedId, setSelectedId] = useState<string | null>(() => {
     const sorted = [...nodes].sort(
@@ -368,6 +487,16 @@ export default function HistoryView({
           <span className="ml-auto text-xs text-base-content/30 italic">
             Drag or click to compare
           </span>
+          {canCreateDraft && (
+            <button
+              type="button"
+              className="btn btn-xs btn-outline gap-1.5"
+              onClick={() => createDraftDialogRef.current?.showModal()}
+            >
+              <GitBranchPlus size={12} />
+              Create Draft From
+            </button>
+          )}
         </div>
 
         <div ref={containerRef} className="relative select-none overflow-x-auto">
@@ -547,6 +676,15 @@ export default function HistoryView({
           </div>
         )}
       </div>
+
+      {canCreateDraft && (
+        <CreateDraftDialog
+          dialogRef={createDraftDialogRef}
+          entityType={entityType}
+          entityId={entityId}
+          sourceNode={selectedNode}
+        />
+      )}
     </div>
   );
 }
