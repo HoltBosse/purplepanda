@@ -52,7 +52,7 @@ const serializedNodes: DagNodeData[] = allNodes.map(n => ({
 
     <div class="mt-4">
         <HistoryView
-            client:only="react"
+            client:load
             entityType="template"
             entityId={id}
             currentContent={template.content as Record<string, unknown>}

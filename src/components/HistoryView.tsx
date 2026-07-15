@@ -52,21 +52,35 @@ export interface HistoryViewProps {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function formatDate(iso: string): string {
+// Server and client can be in different timezones, which would make
+// locale-formatted dates mismatch during hydration. `timeZone` lets callers
+// pin a deterministic zone (e.g. "UTC") for the SSR / first-client-render
+// pass, then omit it to switch to the viewer's local time post-hydration.
+function formatDate(iso: string, timeZone?: string): string {
   return new Date(iso).toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
   });
 }
 
-function shortDate(iso: string): string {
+function shortDate(iso: string, timeZone?: string): string {
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
+    ...(timeZone ? { timeZone } : {}),
   });
+}
+
+// False during SSR and the first client render (so hydration matches),
+// true from the next render onward.
+function useHydrated(): boolean {
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  return hydrated;
 }
 
 // ─── Layout computation ───────────────────────────────────────────────────────
@@ -127,7 +141,7 @@ function RenderPanel({
   label: string;
   badge?: string;
   badgeClass?: string;
-  date?: string;
+  date?: React.ReactNode;
   content: Record<string, unknown>;
 }) {
   return (
@@ -164,6 +178,8 @@ export default function HistoryView({
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
   const isDragging = useRef(false);
+  const hydrated = useHydrated();
+  const dateTimeZone = hydrated ? undefined : "UTC";
 
   const [selectedId, setSelectedId] = useState<string | null>(() => {
     const sorted = [...nodes].sort(
@@ -174,13 +190,17 @@ export default function HistoryView({
   });
 
   const [cursorX, setCursorX] = useState<number | null>(null);
+  const [measured, setMeasured] = useState(false);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
-      if (entry) setContainerWidth(entry.contentRect.width);
+      if (entry) {
+        setContainerWidth(entry.contentRect.width);
+        setMeasured(true);
+      }
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -310,6 +330,11 @@ export default function HistoryView({
             <div className="flex items-center justify-center h-20 text-base-content/30 text-sm italic">
               Save this {entityType} to create the first history entry.
             </div>
+          ) : !measured ? (
+            <div
+              className="w-full bg-base-300 animate-pulse"
+              style={{ height: svgHeight, display: "block" }}
+            />
           ) : (
             <svg
               width={svgW}
@@ -388,7 +413,7 @@ export default function HistoryView({
                 const isPublish = node.nodeType === "publish";
                 const fill = isPublish ? "#3b82f6" : "#8b5cf6";
                 const r = isSelected ? NODE_R + 3 : NODE_R;
-                const label = isPublish ? shortDate(node.createdAt) : shortDate(node.createdAt);
+                const label = shortDate(node.createdAt, dateTimeZone);
                 const labelY = isPublish ? node.y - NODE_R - 10 : node.y + NODE_R + 13;
 
                 return (
@@ -462,7 +487,13 @@ export default function HistoryView({
                 ? "badge-primary"
                 : "badge-warning"
             }
-            date={formatDate(selectedNode.createdAt)}
+            date={
+              hydrated ? (
+                formatDate(selectedNode.createdAt)
+              ) : (
+                <span className="inline-block h-3 w-24 align-middle rounded bg-base-300 animate-pulse" />
+              )
+            }
             content={selectedNode.content}
           />
         ) : (
