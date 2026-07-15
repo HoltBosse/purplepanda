@@ -5,9 +5,10 @@ import { getDb } from "../../db/db.js";
 import { media } from "../../db/schema.js";
 import { getMediaPath } from "../../media/media.js";
 import { createReadStream } from "node:fs";
-import { open } from "node:fs/promises";
+import { open, stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import sharp from 'sharp';
 import { has404Page } from 'virtual:purplepanda/has-404';
 
@@ -45,13 +46,19 @@ function getMimeType(buffer: Buffer): string {
   return "application/octet-stream";
 }
 
+function etagMatches(ifNoneMatch: string | null, etag: string): boolean {
+  if (!ifNoneMatch) return false;
+  if (ifNoneMatch.trim() === "*") return true;
+  return ifNoneMatch.split(",").some((tag) => tag.trim().replace(/^W\//, "") === etag);
+}
+
 export const GET: APIRoute = async ({ params, request, rewrite }) => {
   const parsed = uuidSchema.safeParse(params.id);
   if (!parsed.success) {
     if (has404Page) {
       return rewrite('/404');
     }
-    return new Response(null, { status: 404 });
+    return new Response(null, { status: 404, headers: { "Cache-Control": "no-store" } });
   }
 
   // Read image transform options from query params (GET-safe).
@@ -78,11 +85,43 @@ export const GET: APIRoute = async ({ params, request, rewrite }) => {
     if (has404Page) {
       return rewrite('/404');
     }
-    return new Response('Not Found', { status: 404 });
+    return new Response('Not Found', { status: 404, headers: { "Cache-Control": "no-store" } });
   }
 
   const mediaPath = getMediaPath();
   const filePath = join(mediaPath, id.slice(0, 2), id.slice(2, 4), id);
+
+  let fileStat: Awaited<ReturnType<typeof stat>>;
+  try {
+    fileStat = await stat(filePath);
+  } catch {
+    if (has404Page) return rewrite('/404');
+    return new Response('Not Found', { status: 404, headers: { "Cache-Control": "no-store" } });
+  }
+
+  // Only params that change the output bytes belong in the etag — the DB `state`
+  // filter above already turns a disabled image into a 404 before we get here.
+  const paramEntries: [string, string | number][] = [];
+  if (fmt.success && fmt.data !== undefined) paramEntries.push(["fmt", fmt.data]);
+  if (w.success && w.data !== undefined) paramEntries.push(["w", w.data]);
+  if (h.success && h.data !== undefined) paramEntries.push(["h", h.data]);
+  if (q.success && q.data !== undefined) paramEntries.push(["q", q.data]);
+  if (x1.success && x1.data !== undefined) paramEntries.push(["x1", x1.data]);
+  if (y1.success && y1.data !== undefined) paramEntries.push(["y1", y1.data]);
+  if (x2.success && x2.data !== undefined) paramEntries.push(["x2", x2.data]);
+  if (y2.success && y2.data !== undefined) paramEntries.push(["y2", y2.data]);
+  const paramString = paramEntries.map(([k, v]) => `${k}=${v}`).join("&");
+
+  const etag = `"${createHash("sha1")
+    .update(`${id}:${fileStat.mtimeMs}:${fileStat.size}:${paramString}`)
+    .digest("hex")}"`;
+
+  if (etagMatches(request.headers.get("if-none-match"), etag)) {
+    return new Response(null, {
+      status: 304,
+      headers: { "ETag": etag, "Cache-Control": "no-cache" },
+    });
+  }
 
   if (fmt.success || w.success || h.success || q.success || x1.success || y1.success || x2.success || y2.success) {
     // #4: pass file path directly — sharp/libvips reads the file internally
@@ -124,7 +163,7 @@ export const GET: APIRoute = async ({ params, request, rewrite }) => {
       outputBuffer = await image.toBuffer();
     } catch {
       if (has404Page) return rewrite('/404');
-      return new Response('Not Found', { status: 404 });
+      return new Response('Not Found', { status: 404, headers: { "Cache-Control": "no-store" } });
     }
 
     const mimeType = getMimeType(outputBuffer);
@@ -133,21 +172,16 @@ export const GET: APIRoute = async ({ params, request, rewrite }) => {
       headers: {
         "Content-Type": mimeType,
         "Content-Length": String(outputBuffer.byteLength),
+        "ETag": etag,
+        "Cache-Control": "no-cache",
       },
     });
   }
 
   // #2: stream directly — read only 12 magic bytes for MIME detection
-  let fh: Awaited<ReturnType<typeof open>>;
-  try {
-    fh = await open(filePath, 'r');
-  } catch {
-    if (has404Page) return rewrite('/404');
-    return new Response('Not Found', { status: 404 });
-  }
-
+  const fh = await open(filePath, 'r');
   const magicBuf = Buffer.alloc(12);
-  const [{ size }] = await Promise.all([fh.stat(), fh.read(magicBuf, 0, 12, 0)]);
+  await fh.read(magicBuf, 0, 12, 0);
   await fh.close();
 
   const mimeType = getMimeType(magicBuf);
@@ -157,7 +191,9 @@ export const GET: APIRoute = async ({ params, request, rewrite }) => {
     status: 200,
     headers: {
       "Content-Type": mimeType,
-      "Content-Length": String(size),
+      "Content-Length": String(fileStat.size),
+      "ETag": etag,
+      "Cache-Control": "no-cache",
     },
   });
 };
