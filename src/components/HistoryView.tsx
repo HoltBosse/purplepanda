@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useMemo,
 } from "react";
+import { createPortal } from "react-dom";
 import type { Data } from "@puckeditor/core";
 import PageRenderer from "./PageRenderer.js";
 
@@ -129,6 +130,54 @@ function computeLayout(nodes: DagNodeData[], svgWidth: number): LayoutResult {
   return { layout, branchNames, svgHeight };
 }
 
+// ─── PreviewFrame ────────────────────────────────────────────────────────────
+
+// Renders children inside an iframe (via portal) so the preview picks up the
+// site's own stylesheets and behaves like the actual page, rather than
+// inheriting styles/theme from the admin shell it's embedded in.
+function PreviewFrame({ children }: { children: React.ReactNode }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [mountNode, setMountNode] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const setup = () => {
+      const doc = iframe.contentDocument;
+      if (!doc) return;
+
+      doc.documentElement.setAttribute("data-theme", "false");
+      doc.body.style.margin = "0";
+
+      document
+        .querySelectorAll('link[rel="stylesheet"], style')
+        .forEach((node) => doc.head.appendChild(node.cloneNode(true)));
+
+      setMountNode(doc.body);
+    };
+
+    if (iframe.contentDocument?.readyState === "complete") {
+      setup();
+    } else {
+      iframe.addEventListener("load", setup);
+    }
+
+    return () => iframe.removeEventListener("load", setup);
+  }, []);
+
+  return (
+    <>
+      <iframe
+        ref={iframeRef}
+        title="Page preview"
+        style={{ width: "100%", height: "600px", border: "none", display: "block" }}
+      />
+      {mountNode ? createPortal(children, mountNode) : null}
+    </>
+  );
+}
+
 // ─── RenderPanel ─────────────────────────────────────────────────────────────
 
 function RenderPanel({
@@ -157,13 +206,9 @@ function RenderPanel({
           <span className="text-xs text-base-content/40 ml-auto">{date}</span>
         )}
       </div>
-      <div
-        className="overflow-y-auto"
-        style={{ maxHeight: "600px" }}
-        data-theme="false"
-      >
+      <PreviewFrame>
         <PageRenderer pageData={content as unknown as Data} />
-      </div>
+      </PreviewFrame>
     </div>
   );
 }
