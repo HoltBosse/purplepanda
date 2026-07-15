@@ -16,6 +16,16 @@ import { has404Page } from 'virtual:purplepanda/has-404';
 
 const uuidSchema = z.string().uuid();
 
+// A successful image response is fully determined by its id + transform params
+// (both baked into the URL and the ETag), so the same URL always yields the
+// same bytes until the underlying file changes. Letting the browser reuse it
+// for a short window turns the repeated fetches from history-timeline scrubbing
+// (which re-renders the same previews many times) into memory-cache hits — no
+// network round trip, no repeated `sharp` work — while the ETag still forces a
+// revalidation (304) once the window lapses. `private` keeps auth-gated admin
+// previews out of any shared/CDN cache.
+const IMAGE_CACHE_CONTROL = "private, max-age=300";
+
 //TODO: find something to replace this mess later
 function getMimeType(buffer: Buffer): string {
   // JPEG
@@ -119,7 +129,7 @@ export const GET: APIRoute = async ({ params, request, rewrite }) => {
   if (etagMatches(request.headers.get("if-none-match"), etag)) {
     return new Response(null, {
       status: 304,
-      headers: { "ETag": etag, "Cache-Control": "no-cache" },
+      headers: { "ETag": etag, "Cache-Control": IMAGE_CACHE_CONTROL },
     });
   }
 
@@ -173,7 +183,7 @@ export const GET: APIRoute = async ({ params, request, rewrite }) => {
         "Content-Type": mimeType,
         "Content-Length": String(outputBuffer.byteLength),
         "ETag": etag,
-        "Cache-Control": "no-cache",
+        "Cache-Control": IMAGE_CACHE_CONTROL,
       },
     });
   }
@@ -193,7 +203,7 @@ export const GET: APIRoute = async ({ params, request, rewrite }) => {
       "Content-Type": mimeType,
       "Content-Length": String(fileStat.size),
       "ETag": etag,
-      "Cache-Control": "no-cache",
+      "Cache-Control": IMAGE_CACHE_CONTROL,
     },
   });
 };

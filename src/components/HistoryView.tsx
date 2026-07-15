@@ -18,6 +18,27 @@ const PAD_X = 64;
 const NODE_R = 7;
 const MIN_COL_W = 56;
 
+// Y of the draft lane at index `i` (publish lives on MAIN_Y, drafts stack below).
+const laneY = (i: number) => MAIN_Y + LANE_GAP * (i + 1);
+
+// ─── Colors ────────────────────────────────────────────────────────────────────
+
+// Publish (blue) / draft (violet) palette, shared by the SVG marks and the HTML
+// lane-label pills so the two never drift. `line`/`label` are the solid mark
+// colors; `tintBg`/`tintBorder` are the translucent pill fill and border.
+const PUBLISH = {
+  line: "#3b82f6",
+  label: "#60a5fa",
+  tintBg: "rgba(59,130,246,0.1)",
+  tintBorder: "rgba(59,130,246,0.3)",
+} as const;
+const DRAFT = {
+  line: "#8b5cf6",
+  label: "#a78bfa",
+  tintBg: "rgba(139,92,246,0.1)",
+  tintBorder: "rgba(139,92,246,0.3)",
+} as const;
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface DagNodeData {
@@ -109,7 +130,6 @@ function computeLayout(nodes: DagNodeData[], svgWidth: number): LayoutResult {
     }
   }
 
-  const laneY = (branchIdx: number) => MAIN_Y + LANE_GAP * (branchIdx + 1);
   const svgHeight = MAIN_Y + LANE_GAP * (branchNames.length + 1) + 20;
 
   if (svgWidth <= 0 || nodes.length === 0) {
@@ -296,7 +316,10 @@ function CreateDraftDialog({
 
 // ─── RenderPanel ─────────────────────────────────────────────────────────────
 
-function RenderPanel({
+// Memoized so that changing the *compared* selection re-renders only that
+// panel — the unchanged "Current" panel (stable props, no `date`) skips its
+// Puck <Render> pass instead of re-reconciling on every selection commit.
+const RenderPanel = React.memo(function RenderPanel({
   label,
   badge,
   badgeClass,
@@ -327,34 +350,181 @@ function RenderPanel({
       </PreviewFrame>
     </div>
   );
+});
+
+// ─── LaneLabel ───────────────────────────────────────────────────────────────
+
+// A pill pinned to the left edge of the timeline viewport, marking a lane
+// (publish or a named draft branch). Fades in/out via `visible`.
+function LaneLabel({
+  top,
+  color,
+  visible,
+  children,
+}: {
+  top: number;
+  color: typeof PUBLISH | typeof DRAFT;
+  visible: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="absolute flex items-center justify-center rounded-full transition-opacity duration-300 ease-out"
+      style={{
+        left: 4,
+        top: top - 11,
+        width: 52,
+        height: 22,
+        fontSize: 9,
+        fontFamily: "ui-monospace,monospace",
+        fontWeight: 500,
+        color: color.label,
+        background: color.tintBg,
+        border: `0.5px solid ${color.tintBorder}`,
+        opacity: visible ? 1 : 0,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
-// ─── HistoryView ──────────────────────────────────────────────────────────────
+// ─── TimelineMarks ───────────────────────────────────────────────────────────
 
-export default function HistoryView({
+// The static graph geometry — lane guides, edges, and nodes. Kept in a memoized
+// component, separate from the playhead and lane labels, so the per-frame state
+// that changes during a drag (cursor position, scroll-driven label fades) only
+// re-renders the moving overlay, not all N nodes and edges. This subtree
+// re-renders only when the layout or the selected node actually changes.
+const TimelineMarks = React.memo(function TimelineMarks({
+  layout,
+  edges,
+  branchNames,
+  svgW,
+  selectedId,
+  dateTimeZone,
+  onSelectNode,
+}: {
+  layout: LayoutNode[];
+  edges: Edge[];
+  branchNames: string[];
+  svgW: number;
+  selectedId: string | null;
+  dateTimeZone: string | undefined;
+  onSelectNode: (id: string, x: number) => void;
+}) {
+  return (
+    <>
+      {/* Publish lane */}
+      <line
+        x1={PAD_X - 12} y1={MAIN_Y} x2={svgW - 16} y2={MAIN_Y}
+        stroke={PUBLISH.line} strokeWidth={0.5} strokeOpacity={0.18} strokeDasharray="4 5"
+      />
+
+      {/* Per-branch draft lanes */}
+      {branchNames.map((name, i) => (
+        <line key={name}
+          x1={PAD_X - 12} y1={laneY(i)} x2={svgW - 16} y2={laneY(i)}
+          stroke={DRAFT.line} strokeWidth={0.5} strokeOpacity={0.18} strokeDasharray="4 5"
+        />
+      ))}
+
+      {/* Edges */}
+      {edges.map((edge, i) => {
+        if (edge.kind === "main") {
+          return (
+            <line key={i}
+              x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2}
+              stroke={PUBLISH.line} strokeWidth={2} strokeLinecap="round" opacity={0.6}
+            />
+          );
+        }
+        if (edge.kind === "branch-line") {
+          return (
+            <line key={i}
+              x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2}
+              stroke={DRAFT.line} strokeWidth={1.5} strokeLinecap="round"
+              strokeDasharray="4 3" opacity={0.6}
+            />
+          );
+        }
+        const sdx = edge.x2 - edge.x1;
+        const cp = Math.abs(sdx) * 0.55;
+        const d = `M ${edge.x1} ${edge.y1} C ${edge.x1 + (sdx > 0 ? cp : -cp)} ${edge.y1} ${edge.x2 - (sdx > 0 ? cp : -cp)} ${edge.y2} ${edge.x2} ${edge.y2}`;
+        return (
+          <path key={i} d={d} stroke={DRAFT.line}
+            strokeWidth={1.5}
+            strokeDasharray={edge.kind === "branch-off" ? "4 3" : undefined}
+            fill="none" strokeLinecap="round" opacity={0.6}
+          />
+        );
+      })}
+
+      {/* Nodes */}
+      {layout.map((node) => {
+        const isSelected = node.id === selectedId;
+        const isPublish = node.nodeType === "publish";
+        const fill = isPublish ? PUBLISH.line : DRAFT.line;
+        const r = isSelected ? NODE_R + 3 : NODE_R;
+        const label = shortDate(node.createdAt, dateTimeZone);
+        const labelY = isPublish ? node.y - NODE_R - 10 : node.y + NODE_R + 13;
+
+        return (
+          <g key={node.id}
+            onClick={() => onSelectNode(node.id, node.x)}
+            style={{ cursor: "pointer" }}
+          >
+            {isSelected && (
+              <circle cx={node.x} cy={node.y} r={r + 4}
+                fill="none" stroke={fill} strokeWidth={1.5} opacity={0.3} />
+            )}
+            <circle cx={node.x} cy={node.y} r={r}
+              fill={fill}
+              stroke={isSelected ? "#fff" : "transparent"}
+              strokeWidth={2}
+              opacity={isSelected ? 1 : 0.65}
+            />
+            <text x={node.x} y={labelY}
+              textAnchor="middle" fontSize={9}
+              fill={isSelected ? "#e2e8f0" : "#64748b"}
+              fontFamily="ui-monospace, monospace"
+            >
+              {label}
+            </text>
+          </g>
+        );
+      })}
+    </>
+  );
+});
+
+// ─── TimelineGraph ───────────────────────────────────────────────────────────
+
+// Owns everything about the scroll position and drag gesture. This is
+// isolated from HistoryView specifically so that its high-frequency state
+// (scroll position while dragging can update on nearly every animation
+// frame) never re-renders the live preview panes below the timeline — those
+// should only re-render when the *selected node* actually changes.
+function TimelineGraph({
   entityType,
-  entityId,
-  currentContent,
   nodes,
-}: HistoryViewProps) {
+  selectedId,
+  onSelect,
+}: {
+  entityType: string;
+  nodes: DagNodeData[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
   const isDragging = useRef(false);
   const hydrated = useHydrated();
   const dateTimeZone = hydrated ? undefined : "UTC";
-  const createDraftDialogRef = useRef<HTMLDialogElement>(null);
-  const canCreateDraft = entityType === "page" || entityType === "content";
-
-  const [selectedId, setSelectedId] = useState<string | null>(() => {
-    const sorted = [...nodes].sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-    return sorted[0]?.id ?? null;
-  });
 
   const [cursorX, setCursorX] = useState<number | null>(null);
   const [measured, setMeasured] = useState(false);
+  const [scrollLeft, setScrollLeft] = useState(0);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -370,9 +540,20 @@ export default function HistoryView({
     return () => ro.disconnect();
   }, []);
 
+  // Narrow containers (mobile-ish widths) show fewer nodes at once so they
+  // stay legible; wider containers show more before scrolling kicks in.
+  const visibleNodeCount = containerWidth > 0 && containerWidth < 640 ? 4 : 12;
+  const colW =
+    containerWidth > 0
+      ? Math.max(
+          MIN_COL_W,
+          (containerWidth - PAD_X * 2) / Math.max(1, visibleNodeCount - 1)
+        )
+      : MIN_COL_W;
+
   const svgW = Math.max(
     containerWidth,
-    PAD_X * 2 + Math.max(0, nodes.length - 1) * MIN_COL_W
+    PAD_X * 2 + Math.max(0, nodes.length - 1) * colW
   );
 
   const { layout, branchNames, svgHeight } = useMemo(
@@ -386,6 +567,19 @@ export default function HistoryView({
     if (node) setCursorX(node.x);
   }, [layout, selectedId]);
 
+  // On first load the default selection is the most recent node (the
+  // rightmost one) — scroll it into view once so the graph doesn't open
+  // scrolled to the far left with the playhead off-screen.
+  const didInitialScroll = useRef(false);
+  useEffect(() => {
+    if (didInitialScroll.current) return;
+    if (!measured || layout.length === 0) return;
+    const container = containerRef.current;
+    if (!container) return;
+    didInitialScroll.current = true;
+    container.scrollLeft = container.scrollWidth - container.clientWidth;
+  }, [measured, layout]);
+
   const findNearest = useCallback(
     (x: number): LayoutNode | null => {
       if (layout.length === 0) return null;
@@ -397,43 +591,169 @@ export default function HistoryView({
     [layout]
   );
 
+  // Committing a selection swaps the preview panel's content, which reassigns
+  // the preview <img> srcs and kicks off image loads. We commit on a
+  // leading-edge throttle: the very first move commits immediately (so
+  // selecting feels instant), then at most once per interval while the drag
+  // keeps moving, plus a trailing commit when it settles. This keeps the
+  // preview live during a drag without reassigning the src every frame —
+  // reassigning faster than images can download would abort in-flight
+  // requests ("canceled") so none ever complete or populate the browser cache.
+  // The playhead (cursorX) still tracks the cursor immediately on every move.
+  const SELECT_THROTTLE_MS = 80;
+  const lastCommitAt = useRef(0);
+  const pendingId = useRef<string | null>(null);
+  const pendingTimer = useRef<number | null>(null);
+
+  const flushSelect = useCallback(() => {
+    if (pendingTimer.current !== null) {
+      window.clearTimeout(pendingTimer.current);
+      pendingTimer.current = null;
+    }
+    if (pendingId.current !== null) {
+      lastCommitAt.current = performance.now();
+      onSelect(pendingId.current);
+      pendingId.current = null;
+    }
+  }, [onSelect]);
+
+  const scheduleSelect = useCallback(
+    (id: string) => {
+      pendingId.current = id;
+      const elapsed = performance.now() - lastCommitAt.current;
+      if (elapsed >= SELECT_THROTTLE_MS) {
+        flushSelect(); // leading edge — commit right away
+      } else if (pendingTimer.current === null) {
+        pendingTimer.current = window.setTimeout(() => {
+          pendingTimer.current = null;
+          flushSelect(); // trailing edge — commit once the interval elapses
+        }, SELECT_THROTTLE_MS - elapsed);
+      }
+    },
+    [flushSelect]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (pendingTimer.current !== null) window.clearTimeout(pendingTimer.current);
+    };
+  }, []);
+
   const applyX = useCallback(
-    (svgX: number) => {
+    (svgX: number, immediate: boolean) => {
       const nearest = findNearest(svgX);
       if (nearest) {
         setCursorX(nearest.x);
-        setSelectedId(nearest.id);
+        if (immediate) {
+          pendingId.current = nearest.id;
+          flushSelect();
+        } else {
+          scheduleSelect(nearest.id);
+        }
       }
     },
-    [findNearest]
+    [findNearest, flushSelect, scheduleSelect]
   );
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent<SVGSVGElement>) => {
+  // Clicking a node commits it immediately and snaps the playhead to it.
+  // Stable identity keeps TimelineMarks' memo from re-rendering on cursor moves.
+  const onSelectNode = useCallback(
+    (id: string, x: number) => {
+      onSelect(id);
+      setCursorX(x);
+    },
+    [onSelect]
+  );
+
+  const svgRef = useRef<SVGSVGElement>(null);
+  const lastClientX = useRef<number | null>(null);
+  const autoScrollFrame = useRef<number | null>(null);
+
+  const updateFromClientX = useCallback(
+    (clientX: number, immediate = false) => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      applyX(clientX - rect.left, immediate);
+    },
+    [applyX]
+  );
+
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollFrame.current !== null) {
+      cancelAnimationFrame(autoScrollFrame.current);
+      autoScrollFrame.current = null;
+    }
+  }, []);
+
+  // While dragging, sliding the cursor near either edge of the visible
+  // viewport pans the graph in that direction (clamped to its ends) so
+  // long histories stay scrubbable without leaving the drag gesture.
+  const tickAutoScroll = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || !isDragging.current || lastClientX.current === null) {
+      autoScrollFrame.current = null;
+      return;
+    }
+
+    const rect = container.getBoundingClientRect();
+    const x = lastClientX.current;
+    const EDGE = 56;
+    const MAX_SPEED = 18;
+    let dx = 0;
+    if (x < rect.left + EDGE) {
+      dx = -MAX_SPEED * Math.min(1, (rect.left + EDGE - x) / EDGE);
+    } else if (x > rect.right - EDGE) {
+      dx = MAX_SPEED * Math.min(1, (x - (rect.right - EDGE)) / EDGE);
+    }
+
+    if (dx !== 0) {
+      const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
+      const next = Math.min(maxScroll, Math.max(0, container.scrollLeft + dx));
+      if (next !== container.scrollLeft) {
+        container.scrollLeft = next;
+        updateFromClientX(x);
+      }
+    }
+
+    autoScrollFrame.current = requestAnimationFrame(tickAutoScroll);
+  }, [updateFromClientX]);
+
+  // One code path for mouse, touch, and pen. `setPointerCapture` routes all
+  // subsequent move/up events for this pointer to the SVG even when the cursor
+  // leaves its bounds, so the drag survives straying outside (no window-level
+  // listeners needed) and ends reliably on release. `touchAction: none` on the
+  // SVG keeps touch from being stolen by the browser's own scroll/pan gesture.
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      e.currentTarget.setPointerCapture(e.pointerId);
       isDragging.current = true;
-      const rect = e.currentTarget.getBoundingClientRect();
-      applyX(e.clientX - rect.left);
+      lastClientX.current = e.clientX;
+      updateFromClientX(e.clientX, true);
+      if (autoScrollFrame.current === null) {
+        autoScrollFrame.current = requestAnimationFrame(tickAutoScroll);
+      }
     },
-    [applyX]
+    [updateFromClientX, tickAutoScroll]
   );
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<SVGSVGElement>) => {
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
       if (!isDragging.current) return;
-      const rect = e.currentTarget.getBoundingClientRect();
-      applyX(e.clientX - rect.left);
+      lastClientX.current = e.clientX;
+      updateFromClientX(e.clientX);
     },
-    [applyX]
+    [updateFromClientX]
   );
 
   const stopDrag = useCallback(() => {
     isDragging.current = false;
-  }, []);
+    lastClientX.current = null;
+    stopAutoScroll();
+    flushSelect();
+  }, [stopAutoScroll, flushSelect]);
 
-  useEffect(() => {
-    window.addEventListener("mouseup", stopDrag);
-    return () => window.removeEventListener("mouseup", stopDrag);
-  }, [stopDrag]);
+  useEffect(() => stopAutoScroll, [stopAutoScroll]);
 
   const layoutById = useMemo(
     () => new Map(layout.map((n) => [n.id, n])),
@@ -461,8 +781,141 @@ export default function HistoryView({
     });
   }, [layout, layoutById]);
 
+  const laneKeyOf = (node: LayoutNode) =>
+    node.nodeType === "publish" ? "publish" : (node.name ?? "draft");
+
+  // Drives the fade in/out of lane labels: a lane's label only shows while
+  // at least one of its nodes is scrolled into the visible viewport.
+  const laneVisible = useMemo(() => {
+    const viewStart = scrollLeft;
+    const viewEnd = scrollLeft + containerWidth;
+    const visible = new Set<string>();
+    for (const node of layout) {
+      if (node.x + NODE_R >= viewStart && node.x - NODE_R <= viewEnd) {
+        visible.add(laneKeyOf(node));
+      }
+    }
+    return visible;
+  }, [layout, scrollLeft, containerWidth]);
+
+  return (
+    <div className="relative">
+      {/* Scrolling is driven by dragging / edge auto-scroll, so the native
+          horizontal scrollbar is just visual noise — hide it cross-browser.
+          The ::-webkit-scrollbar rule can't be expressed inline, hence the
+          scoped <style>; scrollbarWidth/msOverflowStyle cover Firefox/IE. */}
+      <style>{`.pp-history-scroll::-webkit-scrollbar{display:none}`}</style>
+      <div
+        ref={containerRef}
+        className="pp-history-scroll select-none overflow-x-auto"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        onScroll={(e) => setScrollLeft(e.currentTarget.scrollLeft)}
+      >
+        {nodes.length === 0 ? (
+          <div className="flex items-center justify-center h-20 text-base-content/30 text-sm italic">
+            Save this {entityType} to create the first history entry.
+          </div>
+        ) : !measured ? (
+          <div
+            className="w-full bg-base-300 animate-pulse"
+            style={{ height: svgHeight, display: "block" }}
+          />
+        ) : (
+          <svg
+            ref={svgRef}
+            width={svgW}
+            height={svgHeight}
+            style={{
+              display: "block",
+              cursor: "crosshair",
+              touchAction: "none",
+            }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={stopDrag}
+            onPointerCancel={stopDrag}
+          >
+            <TimelineMarks
+              layout={layout}
+              edges={edges}
+              branchNames={branchNames}
+              svgW={svgW}
+              selectedId={selectedId}
+              dateTimeZone={dateTimeZone}
+              onSelectNode={onSelectNode}
+            />
+
+            {/* Playhead */}
+            {cursorX !== null && (() => {
+              const iconSize = 18;
+              const iconScale = iconSize / 24;
+              const iconCy = svgHeight / 2;
+              return (
+                <g style={{ pointerEvents: "none" }}>
+                  <line x1={cursorX} y1={0} x2={cursorX} y2={svgHeight}
+                    stroke="white" strokeWidth={1.5} strokeDasharray="5 4" opacity={0.45}
+                  />
+                  <g transform={`translate(${cursorX - iconSize / 2}, ${iconCy - iconSize / 2}) scale(${iconScale})`}>
+                    <rect x={-2} y={-2} width={28} height={28} rx={5} fill="rgba(10,10,16,0.55)" />
+                    <path d="m9 7-5 5 5 5" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" opacity={0.8} />
+                    <path d="m15 7 5 5-5 5" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" opacity={0.8} />
+                  </g>
+                </g>
+              );
+            })()}
+          </svg>
+        )}
+      </div>
+
+      {/* Lane labels: fixed to the left edge of the viewport (they live
+          outside the scrolling element entirely, so they never move on
+          scroll), faded in/out based on whether that lane currently has
+          any nodes in view. */}
+      {measured && nodes.length > 0 && (
+        <div className="absolute inset-0 pointer-events-none">
+          <LaneLabel top={MAIN_Y} color={PUBLISH} visible={laneVisible.has("publish")}>
+            publish
+          </LaneLabel>
+          {branchNames.map((name, i) => (
+            <LaneLabel key={name} top={laneY(i)} color={DRAFT} visible={laneVisible.has(name)}>
+              {name.length > 7 ? name.slice(0, 6) + "…" : name}
+            </LaneLabel>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── HistoryView ──────────────────────────────────────────────────────────────
+
+export default function HistoryView({
+  entityType,
+  entityId,
+  currentContent,
+  nodes,
+}: HistoryViewProps) {
+  const hydrated = useHydrated();
+  const createDraftDialogRef = useRef<HTMLDialogElement>(null);
+  const canCreateDraft = entityType === "page" || entityType === "content";
+
+  const [selectedId, setSelectedId] = useState<string | null>(() => {
+    const sorted = [...nodes].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    return sorted[0]?.id ?? null;
+  });
+
+  // The legend only needs to know whether any drafts exist; the authoritative
+  // ordered branch list is derived inside computeLayout (in TimelineGraph).
+  const hasDrafts = useMemo(
+    () => nodes.some((n) => n.nodeType === "draft"),
+    [nodes]
+  );
+
   const selectedNode =
-    selectedId !== null ? (layoutById.get(selectedId) ?? null) : null;
+    selectedId !== null ? (nodes.find((n) => n.id === selectedId) ?? null) : null;
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -470,7 +923,7 @@ export default function HistoryView({
 
       {/* ── Timeline ── */}
       <div className="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-        <div className="px-5 py-2.5 border-b border-base-300 flex items-center gap-3">
+        <div className="px-5 py-2.5 border-b border-base-300 flex flex-wrap items-center gap-x-3 gap-y-2">
           <span className="text-xs font-semibold text-base-content/50 uppercase tracking-wide">
             History
           </span>
@@ -478,165 +931,32 @@ export default function HistoryView({
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" />
             Published
           </span>
-          {branchNames.length > 0 && (
+          {hasDrafts && (
             <span className="flex items-center gap-1.5 text-xs text-base-content/40">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-violet-500" />
               Drafts
             </span>
           )}
-          <span className="ml-auto text-xs text-base-content/30 italic">
-            Drag or click to compare
-          </span>
-          {canCreateDraft && (
-            <button
-              type="button"
-              className="btn btn-xs btn-outline gap-1.5"
-              onClick={() => createDraftDialogRef.current?.showModal()}
-            >
-              <GitBranchPlus size={12} />
-              Create Draft From
-            </button>
-          )}
+          {/* Hint + action: their own full-width line on mobile, inline and
+              right-aligned from md up. */}
+          <div className="w-full md:w-auto md:ml-auto flex items-center gap-3">
+            <span className="text-xs text-base-content/30 italic">
+              Drag or click to compare
+            </span>
+            {canCreateDraft && (
+              <button
+                type="button"
+                className="btn btn-xs btn-outline gap-1.5"
+                onClick={() => createDraftDialogRef.current?.showModal()}
+              >
+                <GitBranchPlus size={12} />
+                Create Draft From
+              </button>
+            )}
+          </div>
         </div>
 
-        <div ref={containerRef} className="relative select-none overflow-x-auto">
-          {nodes.length === 0 ? (
-            <div className="flex items-center justify-center h-20 text-base-content/30 text-sm italic">
-              Save this {entityType} to create the first history entry.
-            </div>
-          ) : !measured ? (
-            <div
-              className="w-full bg-base-300 animate-pulse"
-              style={{ height: svgHeight, display: "block" }}
-            />
-          ) : (
-            <svg
-              width={svgW}
-              height={svgHeight}
-              style={{ display: "block", cursor: "crosshair" }}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={stopDrag}
-              onMouseLeave={stopDrag}
-            >
-              {/* Publish lane */}
-              <line
-                x1={PAD_X - 12} y1={MAIN_Y} x2={svgW - 16} y2={MAIN_Y}
-                stroke="#3b82f6" strokeWidth={0.5} strokeOpacity={0.18} strokeDasharray="4 5"
-              />
-              <rect x={4} y={MAIN_Y - 11} width={52} height={22} rx={11}
-                fill="rgba(59,130,246,0.1)" stroke="rgba(59,130,246,0.3)" strokeWidth={0.5} />
-              <text x={30} y={MAIN_Y} textAnchor="middle" dominantBaseline="central"
-                fontSize={9} fontFamily="ui-monospace,monospace" fontWeight={500} fill="#60a5fa">
-                publish
-              </text>
-
-              {/* Per-branch draft lanes */}
-              {branchNames.map((name, i) => {
-                const y = MAIN_Y + LANE_GAP * (i + 1);
-                return (
-                  <g key={name}>
-                    <line
-                      x1={PAD_X - 12} y1={y} x2={svgW - 16} y2={y}
-                      stroke="#8b5cf6" strokeWidth={0.5} strokeOpacity={0.18} strokeDasharray="4 5"
-                    />
-                    <rect x={4} y={y - 11} width={52} height={22} rx={11}
-                      fill="rgba(139,92,246,0.1)" stroke="rgba(139,92,246,0.3)" strokeWidth={0.5} />
-                    <text x={30} y={y} textAnchor="middle" dominantBaseline="central"
-                      fontSize={9} fontFamily="ui-monospace,monospace" fontWeight={500} fill="#a78bfa">
-                      {name.length > 7 ? name.slice(0, 6) + "…" : name}
-                    </text>
-                  </g>
-                );
-              })}
-
-              {/* Edges */}
-              {edges.map((edge, i) => {
-                if (edge.kind === "main") {
-                  return (
-                    <line key={i}
-                      x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2}
-                      stroke="#3b82f6" strokeWidth={2} strokeLinecap="round" opacity={0.6}
-                    />
-                  );
-                }
-                if (edge.kind === "branch-line") {
-                  return (
-                    <line key={i}
-                      x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2}
-                      stroke="#8b5cf6" strokeWidth={1.5} strokeLinecap="round"
-                      strokeDasharray="4 3" opacity={0.6}
-                    />
-                  );
-                }
-                const sdx = edge.x2 - edge.x1;
-                const cp = Math.abs(sdx) * 0.55;
-                const d = `M ${edge.x1} ${edge.y1} C ${edge.x1 + (sdx > 0 ? cp : -cp)} ${edge.y1} ${edge.x2 - (sdx > 0 ? cp : -cp)} ${edge.y2} ${edge.x2} ${edge.y2}`;
-                return (
-                  <path key={i} d={d} stroke="#8b5cf6"
-                    strokeWidth={1.5}
-                    strokeDasharray={edge.kind === "branch-off" ? "4 3" : undefined}
-                    fill="none" strokeLinecap="round" opacity={0.6}
-                  />
-                );
-              })}
-
-              {/* Nodes */}
-              {layout.map((node) => {
-                const isSelected = node.id === selectedId;
-                const isPublish = node.nodeType === "publish";
-                const fill = isPublish ? "#3b82f6" : "#8b5cf6";
-                const r = isSelected ? NODE_R + 3 : NODE_R;
-                const label = shortDate(node.createdAt, dateTimeZone);
-                const labelY = isPublish ? node.y - NODE_R - 10 : node.y + NODE_R + 13;
-
-                return (
-                  <g key={node.id}
-                    onClick={() => { setSelectedId(node.id); setCursorX(node.x); }}
-                    style={{ cursor: "pointer" }}
-                  >
-                    {isSelected && (
-                      <circle cx={node.x} cy={node.y} r={r + 4}
-                        fill="none" stroke={fill} strokeWidth={1.5} opacity={0.3} />
-                    )}
-                    <circle cx={node.x} cy={node.y} r={r}
-                      fill={fill}
-                      stroke={isSelected ? "#fff" : "transparent"}
-                      strokeWidth={2}
-                      opacity={isSelected ? 1 : 0.65}
-                    />
-                    <text x={node.x} y={labelY}
-                      textAnchor="middle" fontSize={9}
-                      fill={isSelected ? "#e2e8f0" : "#64748b"}
-                      fontFamily="ui-monospace, monospace"
-                    >
-                      {label}
-                    </text>
-                  </g>
-                );
-              })}
-
-              {/* Playhead */}
-              {cursorX !== null && (() => {
-                const iconSize = 18;
-                const iconScale = iconSize / 24;
-                const iconCy = svgHeight / 2;
-                return (
-                  <g style={{ pointerEvents: "none" }}>
-                    <line x1={cursorX} y1={0} x2={cursorX} y2={svgHeight}
-                      stroke="white" strokeWidth={1.5} strokeDasharray="5 4" opacity={0.45}
-                    />
-                    <g transform={`translate(${cursorX - iconSize / 2}, ${iconCy - iconSize / 2}) scale(${iconScale})`}>
-                      <rect x={-2} y={-2} width={28} height={28} rx={5} fill="rgba(10,10,16,0.55)" />
-                      <path d="m9 7-5 5 5 5" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" opacity={0.8} />
-                      <path d="m15 7 5 5-5 5" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" opacity={0.8} />
-                    </g>
-                  </g>
-                );
-              })()}
-            </svg>
-          )}
-        </div>
+        <TimelineGraph entityType={entityType} nodes={nodes} selectedId={selectedId} onSelect={setSelectedId} />
       </div>
 
       {/* ── Side-by-side renders (below timeline) ── */}
