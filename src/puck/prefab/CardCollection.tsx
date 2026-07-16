@@ -1,10 +1,12 @@
 import type { ComponentConfig, ComponentData, Config, CustomField, Field, ObjectField, Slot, SlotComponent } from "@puckeditor/core";
-import { usePuck } from "@puckeditor/core";
+import { createUsePuck } from "@puckeditor/core";
 import type { CSSProperties, ReactNode } from "react";
 import { Fragment, useState } from "react";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { ItemContext } from "../data-binding.js";
 import { Monitor, Smartphone, Tablet } from "../icons.js";
+
+const useTypedPuck = createUsePuck();
 
 export type CardCollectionItem = Record<string, unknown> & { id: string };
 
@@ -237,7 +239,8 @@ type EditingViewProps = Omit<CardCollectionProps, "cardTemplate"> & { cardTempla
 // non-interactive preview copies of the remaining items so the author can see how the collection
 // will actually repeat, without Puck getting confused by multiple DOM nodes claiming one id.
 function EditingView({ contentType, layout, cardTemplate: Content, items, id }: EditingViewProps) {
-  const { config, getItemById } = usePuck();
+  const config = useTypedPuck((state) => state.config);
+  const getItemById = useTypedPuck((state) => state.getItemById);
   const resolvedItems = items ?? [];
   const node = getItemById(id);
   const templateNodes = (((node?.props as Record<string, unknown> | undefined)?.cardTemplate as ComponentData[]) ?? []);
