@@ -3,10 +3,26 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
 import { redirects } from '../../../db/schema.js';
 import { CircleCheck, CircleX } from '@lucide/astro';
-import { desc } from 'drizzle-orm';
+import { desc, sql } from 'drizzle-orm';
+import { z } from 'zod';
+import Pagination from '../../../components/Pagination.astro';
 
 const db = getDb();
-const allRedirects = await db.select().from(redirects).orderBy(desc(redirects.id));
+
+const itemsPerPage = 12;
+const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);
+let page = 1;
+if (pageData.success) {
+    page = pageData.data;
+}
+const offset = (page - 1) * itemsPerPage;
+
+const allRedirects = await db.select().from(redirects).orderBy(desc(redirects.id)).limit(itemsPerPage).offset(offset);
+const totalRedirects = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(redirects)
+    .then(result => result[0]?.count ?? 0);
+const totalPages = Math.ceil(totalRedirects / itemsPerPage);
 ---
 
 <AdminLayout>
@@ -73,5 +89,10 @@ const allRedirects = await db.select().from(redirects).orderBy(desc(redirects.id
             ))}
         </tbody>
     </table>
+    {totalRedirects - allRedirects.length > 0 &&
+        <div class="pt-6 pb-6 flex items-center justify-center">
+            <Pagination currentPage={page} totalPages={totalPages} basePath="/admin/redirects/" />
+        </div>
+    }
     <script>import '../../../scripts/select-all'</script>
 </AdminLayout>
