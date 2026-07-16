@@ -130,9 +130,14 @@ export type ImagePickerProps = {
 
 function ImageDisplay({ image, isEditing }: { image: ImageConfig; isEditing: boolean }) {
   const [loading, setLoading] = useState(true);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
-    setLoading(true);
+    // On a server-rendered page, the browser can finish loading this <img> (from the markup
+    // it already parsed) before React hydrates and attaches the onLoad handler below, so that
+    // real "load" event fires into the void and loading would otherwise never clear. Re-check
+    // completeness directly whenever the image identity changes to catch that race.
+    setLoading(!imgRef.current?.complete);
   }, [image.id]);
 
   const base = `/image/${image.id}`;
@@ -150,6 +155,7 @@ function ImageDisplay({ image, isEditing }: { image: ImageConfig; isEditing: boo
         <source srcSet={webpSrc} type="image/webp" />
         <source srcSet={pngSrc} type="image/png" />
         <img
+          ref={imgRef}
           src={pngSrc}
           style={{
             objectFit: "cover",
