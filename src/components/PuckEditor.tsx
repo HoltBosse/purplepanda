@@ -1,4 +1,4 @@
-import { Button, Puck, usePuck } from "@puckeditor/core";
+import { Button, Puck, createUsePuck } from "@puckeditor/core";
 import "@puckeditor/core/puck.css";
 import "../styles/puck-theme.css";
 import type { Config, Data, Overrides, PuckContext } from "@puckeditor/core";
@@ -8,13 +8,15 @@ import { Save } from "../puck/icons.js";
 
 const ROOT_SLOT_NAME = "default-zone";
 
+const useTypedPuck = createUsePuck();
+
 function createOverrides(onSave?: (data: Data) => void): Partial<Overrides<Config>> {
   return {
     headerActions: ({ children }) => {
-      const { appState } = usePuck();
+      const appStateData = useTypedPuck((state) => state.appState.data);
 
       const saveButton = onSave ? (
-        <Button data-puck-save icon={<Save size="14px" />} onClick={() => onSave(appState.data)}>
+        <Button data-puck-save icon={<Save size="14px" />} onClick={() => onSave(appStateData)}>
           Save
         </Button>
       ) : null;
