@@ -12,6 +12,9 @@
  */
 export { default as ChevronDown } from "lucide-react/dist/esm/icons/chevron-down.mjs";
 export { default as Link } from "lucide-react/dist/esm/icons/link.mjs";
+export { default as Monitor } from "lucide-react/dist/esm/icons/monitor.mjs";
 export { default as Save } from "lucide-react/dist/esm/icons/save.mjs";
+export { default as Smartphone } from "lucide-react/dist/esm/icons/smartphone.mjs";
 export { default as Subscript } from "lucide-react/dist/esm/icons/subscript.mjs";
 export { default as Superscript } from "lucide-react/dist/esm/icons/superscript.mjs";
+export { default as Tablet } from "lucide-react/dist/esm/icons/tablet.mjs";
