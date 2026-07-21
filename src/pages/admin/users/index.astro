@@ -5,10 +5,105 @@ import { getDb } from '../../../db/db.js';
 import { users, roles, userRoles } from '../../../db/schema.js';
 import { CircleCheck, CircleX } from '@lucide/astro';
 import { capitalize } from '../../../string';
-import { desc, eq, gt } from 'drizzle-orm';
+import { and, desc, eq, gt, sql } from 'drizzle-orm';
+import { z } from 'zod';
+import Pagination from '../../../components/Pagination.astro';
+import SearchBar from '../../../search/SearchBar';
+import { parseSearchQuery } from '../../../search/parser.js';
+import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
+import type { SearchFieldSpec } from '../../../search/types.js';
 
 const db = getDb();
-const allUsers = await db.select().from(users).where(gt(users.state, -1)).orderBy(desc(users.id));
+
+// Matches the display name the table renders, so `name:"john reese"` behaves the way it reads.
+const fullNameExpr = sql`${users.fname} || ' ' || ${users.lname}`;
+
+// Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
+// valid/invalid highlighting, and the qualifier/value autocomplete dropdown.
+// "enabled"/"disabled" rather than published/unpublished: for an account this is about whether it
+// can sign in (the middleware gates login on state >= 1). No `deleted` — soft-deleted users are
+// hard-filtered out of this listing, so it could never match.
+const searchFields: SearchFieldSpec[] = [
+    {
+        name: 'state',
+        type: 'enum',
+        enumValues: ['enabled', 'disabled'],
+        label: 'State',
+        description: 'Account state',
+    },
+    { name: 'name', type: 'text', label: 'Name', description: 'First/last name contains' },
+    { name: 'email', type: 'text', label: 'Email', description: 'Email address' },
+    // Nullable so `role:null` finds users with no roles assigned at all.
+    { name: 'role', type: 'text', nullable: true, label: 'Role', description: 'Assigned role contains' },
+];
+
+const searchConfig: DrizzleSearchConfig = {
+    fields: [
+        {
+            name: 'state',
+            type: 'enum',
+            enumValues: ['enabled', 'disabled'],
+            column: users.state,
+            valueMap: { enabled: 1, disabled: 0 },
+        },
+        { name: 'name', type: 'text', column: fullNameExpr, matchMode: 'contains' },
+        { name: 'email', type: 'text', column: users.email, matchMode: 'exact' },
+        { name: 'role', type: 'text', nullable: true, column: roles.title, matchMode: 'contains' },
+    ],
+    // A bare term searches name and email together.
+    fulltext: { columns: [users.fname, users.lname, users.email] },
+    // Left-joined so users without roles are still listed; this is the one genuinely many-to-many
+    // join in the admin (a user can hold several roles), which is why the queries below need
+    // DISTINCT — otherwise a two-role user would be listed, and counted, twice.
+    joins: [
+        { table: userRoles, on: eq(userRoles.userId, users.id), type: 'left' },
+        { table: roles, on: eq(userRoles.roleId, roles.id), type: 'left' },
+    ],
+};
+
+const q = Astro.url.searchParams.get('q') ?? '';
+const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig);
+
+const itemsPerPage = 12;
+const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);
+let page = 1;
+if (pageData.success) {
+    page = pageData.data;
+}
+const offset = (page - 1) * itemsPerPage;
+
+// state > -1 hides soft-deleted users, on top of whatever the search matched.
+const listFilter = and(gt(users.state, -1), searchWhere);
+
+const [allUsers, totalUsers] = await Promise.all([
+    applySearchJoins(
+        // Explicit columns rather than `select()`: the password hash is never needed to render this
+        // listing, and DISTINCT can't be applied to a row containing it meaningfully anyway.
+        db
+            .selectDistinct({
+                id: users.id,
+                state: users.state,
+                fname: users.fname,
+                lname: users.lname,
+                email: users.email,
+            })
+            .from(users)
+            .$dynamic(),
+        searchConfig.joins,
+    )
+        .where(listFilter)
+        .orderBy(desc(users.id))
+        .limit(itemsPerPage)
+        .offset(offset),
+    applySearchJoins(
+        db.select({ count: sql<number>`COUNT(DISTINCT ${users.id})` }).from(users).$dynamic(),
+        searchConfig.joins,
+    )
+        .where(listFilter)
+        .then(result => result[0]?.count ?? 0),
+]);
+
+const totalPages = Math.ceil(totalUsers / itemsPerPage);
 
 const userRoleRows = await db
     .select({ userId: userRoles.userId, title: roles.title })
@@ -26,6 +121,9 @@ for (const row of userRoleRows) {
     <div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
         <h1 class="text-2xl font-semibold">Users</h1>
         <a href="/admin/users/new" class="btn btn-primary">New</a>
+    </div>
+    <div class="pt-4 pb-6">
+        <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
     <form id="bulk-form" method="POST"></form>
     <table class="table p-2 bg-base-100 rounded-lg">
@@ -56,6 +154,13 @@ for (const row of userRoleRows) {
             </tr>
         </thead>
         <tbody>
+            {allUsers.length === 0 && (
+                <tr>
+                    <td colspan="4" class="text-center text-base-content/60 py-8">
+                        {q ? 'No users match your search.' : 'No users yet.'}
+                    </td>
+                </tr>
+            )}
             {allUsers.map(user=>(
                 <tr>
                     <td>
@@ -107,5 +212,10 @@ for (const row of userRoleRows) {
             ))}
         </tbody>
     </table>
+    {totalUsers - allUsers.length > 0 &&
+        <div class="pt-6 pb-6 flex items-center justify-center">
+            <Pagination currentPage={page} totalPages={totalPages} basePath="/admin/users/" params={{ q }} />
+        </div>
+    }
     <script>import '../../../scripts/select-all'</script>
 </AdminLayout>

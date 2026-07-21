@@ -25,7 +25,7 @@ const searchFields: SearchFieldSpec[] = [
     },
     { name: 'from', type: 'text', label: 'From', description: 'Source path (exact)' },
     { name: 'to', type: 'text', label: 'To', description: 'Destination path or URL (exact)' },
-    { name: 'author', type: 'text', label: 'Author', description: 'Creator email' },
+    { name: 'author', type: 'text', nullable: true, label: 'Author', description: 'Creator email (null = unattributed)' },
     { name: 'created', type: 'date', label: 'Created', description: 'Date created (YYYY-MM-DD)' },
 ];
 
@@ -46,7 +46,7 @@ const searchConfig: DrizzleSearchConfig = {
         },
         { name: 'from', type: 'text', column: redirects.from, matchMode: 'exact' },
         { name: 'to', type: 'text', column: redirects.to, matchMode: 'exact' },
-        { name: 'author', type: 'text', column: users.email, matchMode: 'exact' },
+        { name: 'author', type: 'text', nullable: true, column: users.email, matchMode: 'exact' },
         { name: 'created', type: 'date', column: userActions.date },
     ],
     // An unqualified term runs a single tsvector match across both columns at once.

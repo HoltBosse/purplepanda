@@ -24,7 +24,7 @@ const searchFields: SearchFieldSpec[] = [
         label: 'State',
         description: 'Publish state',
     },
-    { name: 'author', type: 'text', label: 'Author', description: 'Creator email' },
+    { name: 'author', type: 'text', nullable: true, label: 'Author', description: 'Creator email (null = unattributed)' },
     { name: 'created', type: 'date', label: 'Created', description: 'Date created (YYYY-MM-DD)' },
 ];
 
@@ -43,7 +43,7 @@ const searchConfig: DrizzleSearchConfig = {
             // 0) — -1 is reserved here so a future soft-delete can slot in without a grammar change.
             valueMap: { enabled: 1, disabled: 0, deleted: -1 },
         },
-        { name: 'author', type: 'text', column: users.email, matchMode: 'exact' },
+        { name: 'author', type: 'text', nullable: true, column: users.email, matchMode: 'exact' },
         { name: 'created', type: 'date', column: userActions.date },
     ],
     fulltext: { columns: [documents.title] },

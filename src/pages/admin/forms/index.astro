@@ -31,7 +31,7 @@ const searchFields: SearchFieldSpec[] = [
         description: 'Publish state',
     },
     { name: 'name', type: 'text', label: 'Name', description: 'Form name contains' },
-    { name: 'author', type: 'text', label: 'Author', description: 'Creator email' },
+    { name: 'author', type: 'text', nullable: true, label: 'Author', description: 'Creator email (null = unattributed)' },
     { name: 'created', type: 'date', label: 'Created', description: 'Date created (YYYY-MM-DD)' },
 ];
 
@@ -48,7 +48,7 @@ const searchConfig: DrizzleSearchConfig = {
             valueMap: { published: 1, unpublished: 0 },
         },
         { name: 'name', type: 'text', column: nameExpr, matchMode: 'contains' },
-        { name: 'author', type: 'text', column: users.email, matchMode: 'exact' },
+        { name: 'author', type: 'text', nullable: true, column: users.email, matchMode: 'exact' },
         { name: 'created', type: 'date', column: userActions.date },
     ],
     // A bare term searches the form name — the one piece of form text this listing shows.

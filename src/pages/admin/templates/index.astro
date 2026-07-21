@@ -30,7 +30,7 @@ const searchFields: SearchFieldSpec[] = [
         description: 'Publish state',
     },
     { name: 'title', type: 'text', label: 'Title', description: 'Title contains' },
-    { name: 'author', type: 'text', label: 'Author', description: 'Creator email' },
+    { name: 'author', type: 'text', nullable: true, label: 'Author', description: 'Creator email (null = unattributed)' },
     { name: 'created', type: 'date', label: 'Created', description: 'Date created (YYYY-MM-DD)' },
 ];
 
@@ -47,7 +47,7 @@ const searchConfig: DrizzleSearchConfig = {
             valueMap: { published: 1, unpublished: 0 },
         },
         { name: 'title', type: 'text', column: titleExpr, matchMode: 'contains' },
-        { name: 'author', type: 'text', column: users.email, matchMode: 'exact' },
+        { name: 'author', type: 'text', nullable: true, column: users.email, matchMode: 'exact' },
         { name: 'created', type: 'date', column: userActions.date },
     ],
     // A bare term searches the title — the one piece of template text this listing shows.
