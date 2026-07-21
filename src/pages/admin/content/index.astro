@@ -1,10 +1,16 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
-import { pages, dagNodes } from '../../../db/schema.js';
+import { pages, dagNodes, userActions, users } from '../../../db/schema.js';
 import { CircleCheck, CircleX, EllipsisVertical, FilePen, Trash2, GitBranch } from '@lucide/astro';
-import { desc, eq, and } from 'drizzle-orm';
+import { desc, eq, and, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import externalPuckConfig from "virtual:purplepanda/puck-config";
+import Pagination from '../../../components/Pagination.astro';
+import SearchBar from '../../../search/SearchBar';
+import { parseSearchQuery } from '../../../search/parser.js';
+import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
+import type { SearchFieldSpec } from '../../../search/types.js';
 
 const { id } = Astro.params;
 const contentTypes = (externalPuckConfig ? externalPuckConfig.contentTypes : []) ?? [];
@@ -16,11 +22,101 @@ if(!id || !contentTypes.find(ct => ct.id === id)) {
 const contentType = contentTypes.find(ct => ct.id === id);
 
 const db = getDb();
+
+// The title isn't a column — Puck stores it inside the content document, which is why the table
+// below reads `content.root.props.title`. The search builder takes an arbitrary SQL expression in
+// place of a column, so the same path can be filtered on directly in Postgres.
+const titleExpr = sql`${pages.content} -> 'root' -> 'props' ->> 'title'`;
+
+// Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
+// valid/invalid highlighting, and the qualifier/value autocomplete dropdown.
+const searchFields: SearchFieldSpec[] = [
+    {
+        name: 'state',
+        type: 'enum',
+        // "Published"/"unpublished" rather than enabled/disabled, matching this page's own
+        // Publish/Unpublish bulk actions.
+        enumValues: ['published', 'unpublished', 'deleted'],
+        label: 'State',
+        description: 'Publish state',
+    },
+    { name: 'title', type: 'text', label: 'Title', description: 'Title contains' },
+    { name: 'author', type: 'text', label: 'Author', description: 'Creator email' },
+    { name: 'created', type: 'date', label: 'Created', description: 'Date created (YYYY-MM-DD)' },
+];
+
+// Server-side counterpart. `pages` has no author or created-at column, so both ride on the
+// `contentcreate` row that `content/update.ts` logs to `userActions`
+// (`{ type: "contentcreate", data: { id: <pageId> } }`) whenever content is created.
+const searchConfig: DrizzleSearchConfig = {
+    fields: [
+        {
+            name: 'state',
+            type: 'enum',
+            enumValues: ['published', 'unpublished', 'deleted'],
+            column: pages.state,
+            // "deleted" has no matching rows today (toggle only flips between 1 and 0) — -1 is
+            // reserved so a future soft-delete can slot in without a grammar change.
+            valueMap: { published: 1, unpublished: 0, deleted: -1 },
+        },
+        { name: 'title', type: 'text', column: titleExpr, matchMode: 'contains' },
+        { name: 'author', type: 'text', column: users.email, matchMode: 'exact' },
+        { name: 'created', type: 'date', column: userActions.date },
+    ],
+    // A bare term searches the title — the one piece of content text this listing actually shows.
+    fulltext: { columns: [titleExpr] },
+    joins: [
+        {
+            table: userActions,
+            on: sql`${userActions.type} = 'contentcreate' and ${userActions.data} ->> 'id' = ${pages.id}::text`,
+            type: 'left',
+        },
+        { table: users, on: eq(userActions.userId, users.id), type: 'left' },
+    ],
+};
+
+const q = Astro.url.searchParams.get('q') ?? '';
+const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig);
+
+// Named `currentPage`/`totalPageCount` rather than the usual `page`/`totalPages` because the rows
+// being listed are themselves `pages`, and the table's map callback already binds `page` per row.
+const itemsPerPage = 12;
+const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);
+let currentPage = 1;
+if (pageData.success) {
+    currentPage = pageData.data;
+}
+const offset = (currentPage - 1) * itemsPerPage;
+
+// Every query below is scoped to this content type, on top of whatever the search matched.
+const listFilter = and(eq(pages.contentType, id), searchWhere);
+
 //order by id desc
-const [allPages, allDrafts] = await Promise.all([
-    db.select().from(pages).where(eq(pages.contentType, id)).orderBy(desc(pages.id)),
+// DISTINCT (here and in the count below) because the userActions/users joins are one-to-many:
+// content with more than one `contentcreate` action would otherwise be listed — and counted —
+// once per matching action row.
+const [allPages, allDrafts, totalContent] = await Promise.all([
+    applySearchJoins(
+        db
+            .selectDistinct({ id: pages.id, state: pages.state, contentType: pages.contentType, content: pages.content })
+            .from(pages)
+            .$dynamic(),
+        searchConfig.joins,
+    )
+        .where(listFilter)
+        .orderBy(desc(pages.id))
+        .limit(itemsPerPage)
+        .offset(offset),
     db.select().from(dagNodes).where(and(eq(dagNodes.entityType, 'content'), eq(dagNodes.nodeType, 'draft'), eq(dagNodes.state, 1))).orderBy(desc(dagNodes.createdAt)),
+    applySearchJoins(
+        db.select({ count: sql<number>`COUNT(DISTINCT ${pages.id})` }).from(pages).$dynamic(),
+        searchConfig.joins,
+    )
+        .where(listFilter)
+        .then(result => result[0]?.count ?? 0),
 ]);
+
+const totalPageCount = Math.ceil(totalContent / itemsPerPage);
 
 const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, draft) => {
     const bucket = acc[draft.entityId];
@@ -37,6 +133,9 @@ const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, 
 	<div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
         <h1 class="text-2xl font-semibold">{contentType?.title || 'Content'}</h1>
         <a href={`/admin/content/${id}/new`} class="btn btn-primary">New</a>
+    </div>
+    <div class="pt-4 pb-6">
+        <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
     <form id="bulk-form" method="POST"></form>
     <table class="table p-2 bg-base-100 rounded-lg">
@@ -67,6 +166,13 @@ const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, 
             </tr>
         </thead>
         <tbody>
+            {allPages.length === 0 && (
+                <tr>
+                    <td colspan="4" class="text-center text-base-content/60 py-8">
+                        {q ? 'No content matches your search.' : 'No content yet.'}
+                    </td>
+                </tr>
+            )}
             {allPages.map(page => {
                 const drafts = draftsByPageId[page.id] ?? [];
                 return (
@@ -147,6 +253,11 @@ const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, 
             })}
         </tbody>
     </table>
+    {totalContent - allPages.length > 0 &&
+        <div class="pt-6 pb-6 flex items-center justify-center">
+            <Pagination currentPage={currentPage} totalPages={totalPageCount} basePath={`/admin/content/${id}`} params={{ q }} />
+        </div>
+    }
 
     <!-- Create Draft Modal -->
     <dialog id="create-draft-modal" class="modal">

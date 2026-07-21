@@ -22,9 +22,16 @@ const DEFAULT_LANGUAGE = "simple";
  */
 export type TextMatchMode = "exact" | "contains" | "fulltext";
 
+/**
+ * A plain column, or any SQL expression yielding a value — e.g. a JSONB path
+ * (sql`${pages.content} -> 'root' -> 'props' ->> 'title'`) for schemas that keep searchable text
+ * inside a document rather than in its own column.
+ */
+export type SearchColumn = AnyPgColumn | SQL;
+
 export interface DrizzleSearchField extends SearchFieldSpec {
-  /** The (possibly joined) column this field reads from. */
-  column: AnyPgColumn;
+  /** The (possibly joined) column, or SQL expression, this field reads from. */
+  column: SearchColumn;
   matchMode?: TextMatchMode;
   /** Maps a grammar token to the value actually stored in the column, e.g. `{ enabled: 1 }`. */
   valueMap?: Record<string, unknown>;
@@ -41,8 +48,8 @@ export interface DrizzleSearchField extends SearchFieldSpec {
 }
 
 export interface FulltextSearchConfig {
-  /** Column(s) matched by an unqualified term, e.g. `foo` or `"foo"`. Combined with `coalesce`. */
-  columns: readonly AnyPgColumn[];
+  /** Column(s)/expression(s) matched by an unqualified term, e.g. `foo` or `"foo"`. Combined with `coalesce`. */
+  columns: readonly SearchColumn[];
   /** `regconfig` used for `to_tsvector`/`websearch_to_tsquery`. Defaults to "simple" (no stemming/stopwords — see DEFAULT_LANGUAGE above). */
   language?: string;
   /** See `normalizeSymbols` on DrizzleSearchField. Defaults to true. */
@@ -136,18 +143,18 @@ function buildFieldCondition(node: FieldTermNode, field: DrizzleSearchField): SQ
 
   switch (field.type) {
     case "boolean":
-      return eq(field.column, node.value === "true");
+      return eqValue(field.column, node.value === "true");
     case "date":
       return dateRangeCondition(field.column, node.value);
     case "datetime":
       return /^\d{4}-\d{2}-\d{2}$/.test(node.value)
         ? dateRangeCondition(field.column, node.value)
-        : eq(field.column, node.value);
+        : eqValue(field.column, node.value);
     case "time":
-      return eq(field.column, node.value);
+      return eqValue(field.column, node.value);
     case "enum": {
       const mapped = field.valueMap ? field.valueMap[node.value] : node.value;
-      return mapped === undefined ? undefined : eq(field.column, mapped);
+      return mapped === undefined ? undefined : eqValue(field.column, mapped);
     }
     case "text":
     default:
@@ -177,7 +184,14 @@ function buildTextFieldCondition(node: FieldTermNode, field: DrizzleSearchField)
     return node.quoted ? like(field.column, pattern) : ilike(field.column, pattern);
   }
 
-  return node.quoted ? eq(field.column, node.value) : ilike(field.column, node.value);
+  return node.quoted ? eqValue(field.column, node.value) : ilike(field.column, node.value);
+}
+
+// `eq` is overloaded per operand type and can't resolve a `Column | SQL` union at compile time,
+// even though it handles both identically at runtime (it inspects the operand dynamically to decide
+// how to bind the parameter). The cast is erased, so the real Column is still what `eq` receives.
+function eqValue(column: SearchColumn, value: unknown): SQL {
+  return eq(column as SQL, value);
 }
 
 const SYMBOL_RUN = /[^a-zA-Z0-9]+/g;
@@ -187,7 +201,7 @@ function normalizeFulltextTerm(value: string): string {
   return value.replace(SYMBOL_RUN, " ").trim();
 }
 
-function toTsVector(columns: readonly AnyPgColumn[], language: string, normalize: boolean): SQL {
+function toTsVector(columns: readonly SearchColumn[], language: string, normalize: boolean): SQL {
   const config = regconfig(language);
   const parts = columns.map((c) => {
     const text = sql`coalesce(${c}, '')`;
@@ -207,7 +221,7 @@ function regconfig(language: string): SQL {
   return sql`${language}::regconfig`;
 }
 
-function dateRangeCondition(column: AnyPgColumn, isoDate: string): SQL {
+function dateRangeCondition(column: SearchColumn, isoDate: string): SQL {
   return sql`${column} >= ${isoDate} and ${column} < ${nextIsoDate(isoDate)}`;
 }
 
