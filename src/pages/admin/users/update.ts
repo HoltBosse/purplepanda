@@ -119,7 +119,12 @@ export async function POST(context: APIContext): Promise<Response> {
         user.password = await hash(password!);
         user.state = 1;
 
-        await db.insert(users).values(user).returning();
+        // `user` is synthesized from the table's column defaults above, so `user.id` is drizzle's
+        // `gen_random_uuid()` SQL expression rather than a real id. Adopt the row Postgres actually
+        // inserted — otherwise the role assignment below re-evaluates that expression into an
+        // unrelated uuid, which the user_roles -> users foreign key rejects outright.
+        const [inserted] = await db.insert(users).values(user).returning();
+        if (inserted) user = inserted;
     } else {
         await db.update(users).set({ fname, lname, email, password: user.password }).where(eq(users.id, user.id));
     }

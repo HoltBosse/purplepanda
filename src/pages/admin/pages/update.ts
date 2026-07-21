@@ -57,7 +57,12 @@ export async function POST(context: APIContext): Promise<Response> {
     if (isNewPage) {
         page.content = parsedContent;
         page.state = 1;
-        await db.insert(pages).values(page).returning();
+        // `page` is synthesized from the table's column defaults above, so `page.id` is drizzle's
+        // `gen_random_uuid()` SQL expression rather than a real id. Adopt the row Postgres actually
+        // inserted — otherwise that expression gets re-evaluated into an unrelated uuid for the
+        // publish node's entityId, and serialized verbatim into the audit action's data.id.
+        const [inserted] = await db.insert(pages).values(page).returning();
+        if (inserted) page = inserted;
     } else {
         await db.update(pages).set({ content: parsedContent }).where(eq(pages.id, page.id));
     }

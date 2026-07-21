@@ -67,7 +67,12 @@ export async function POST(context: APIContext): Promise<Response> {
     if(isNewTemplate) {
         template.content = parsedContent;
         template.state = 1;
-        await db.insert(templates).values(template).returning();
+        // `template` is synthesized from the table's column defaults above, so `template.id` is
+        // drizzle's `gen_random_uuid()` SQL expression rather than a real id. Adopt the row Postgres
+        // actually inserted — otherwise that expression gets re-evaluated into an unrelated uuid for
+        // the publish node's entityId, and serialized verbatim into the audit action's data.id.
+        const [inserted] = await db.insert(templates).values(template).returning();
+        if (inserted) template = inserted;
     } else {
         await db.update(templates).set({ content: parsedContent }).where(eq(templates.id, template.id));
     }
