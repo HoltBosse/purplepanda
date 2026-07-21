@@ -3,38 +3,143 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
 import { tags } from '../../../db/schema.js';
 import { CircleCheck, CircleX, CornerDownRight } from '@lucide/astro';
-import { desc, type InferSelectModel } from 'drizzle-orm';
+import { desc, eq, isNull, or, sql, type InferSelectModel } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import { z } from 'zod';
+import Pagination from '../../../components/Pagination.astro';
+import SearchBar from '../../../search/SearchBar';
+import { parseSearchQuery } from '../../../search/parser.js';
+import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
+import type { SearchFieldSpec } from '../../../search/types.js';
 
 type Tag = InferSelectModel<typeof tags>;
 
 const db = getDb();
-const allTags = await db.select().from(tags).orderBy(desc(tags.id));
 
-// Group tags by parent so children are listed directly under their parent,
-// preserving the existing (desc by id) order within each group.
-const tagIds = new Set(allTags.map(tag => tag.id));
-const childrenByParent = new Map<string, Tag[]>();
-for (const tag of allTags) {
-    const parentKey = tag.parentTag && tagIds.has(tag.parentTag) ? tag.parentTag : 'root';
-    if (!childrenByParent.has(parentKey)) childrenByParent.set(parentKey, []);
-    childrenByParent.get(parentKey)!.push(tag);
+// Self-join so a tag can be filtered by its parent's title, and so `parent:null` finds top-level
+// tags (the join yields NULL both for a tag with no parent and one whose parent row is gone).
+const parentTags = alias(tags, 'parent_tags');
+
+// Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
+// valid/invalid highlighting, and the qualifier/value autocomplete dropdown.
+// "enabled"/"disabled" matches this page's Enable/Disable bulk actions, and `deleted` is offered
+// because — like the roles listing — this page has no base state filter, so soft-deleted tags are
+// genuinely visible here.
+const searchFields: SearchFieldSpec[] = [
+    {
+        name: 'state',
+        type: 'enum',
+        enumValues: ['enabled', 'disabled', 'deleted'],
+        label: 'State',
+        description: 'Tag state',
+    },
+    { name: 'title', type: 'text', label: 'Title', description: 'Tag title contains' },
+    { name: 'parent', type: 'text', nullable: true, label: 'Parent', description: 'Parent tag (null = top level)' },
+];
+
+const searchConfig: DrizzleSearchConfig = {
+    fields: [
+        {
+            name: 'state',
+            type: 'enum',
+            enumValues: ['enabled', 'disabled', 'deleted'],
+            column: tags.state,
+            valueMap: { enabled: 1, disabled: 0, deleted: -1 },
+        },
+        { name: 'title', type: 'text', column: tags.title, matchMode: 'contains' },
+        { name: 'parent', type: 'text', nullable: true, column: parentTags.title, matchMode: 'contains' },
+    ],
+    fulltext: { columns: [tags.title] },
+    joins: [{ table: parentTags, on: eq(tags.parentTag, parentTags.id), type: 'left' }],
+};
+
+const q = Astro.url.searchParams.get('q') ?? '';
+const isSearching = q.trim().length > 0;
+const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig);
+
+const itemsPerPage = 12;
+const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);
+let page = 1;
+if (pageData.success) {
+    page = pageData.data;
 }
+const offset = (page - 1) * itemsPerPage;
 
-const orderedTags: { tag: Tag; depth: number }[] = [];
-function addChildren(parentKey: string, depth: number, visited: Set<string>) {
-    for (const child of childrenByParent.get(parentKey) ?? []) {
-        if (visited.has(child.id)) continue;
-        orderedTags.push({ tag: child, depth });
-        addChildren(child.id, depth + 1, new Set(visited).add(child.id));
+// A tag sits at the root if it has no parent, or if its parent row no longer exists — matching how
+// the tree below treats an unresolvable parent.
+const isRootTag = or(
+    isNull(tags.parentTag),
+    sql`not exists (select 1 from ${tags} ancestor where ancestor.id = ${tags.parentTag})`,
+);
+
+let orderedTags: { tag: Tag; depth: number }[] = [];
+let totalItems = 0;
+
+if (isSearching) {
+    // Filtering inevitably breaks the parent/child chain (a match's parent may not match), so
+    // results are shown as a flat list rather than silently rendering orphans at the wrong depth.
+    const [rows, total] = await Promise.all([
+        applySearchJoins(db.selectDistinct({ ...getTagColumns() }).from(tags).$dynamic(), searchConfig.joins)
+            .where(searchWhere)
+            .orderBy(desc(tags.id))
+            .limit(itemsPerPage)
+            .offset(offset),
+        applySearchJoins(
+            db.select({ count: sql<number>`COUNT(DISTINCT ${tags.id})` }).from(tags).$dynamic(),
+            searchConfig.joins,
+        )
+            .where(searchWhere)
+            .then(result => result[0]?.count ?? 0),
+    ]);
+    orderedTags = rows.map(tag => ({ tag, depth: 1 }));
+    totalItems = total;
+} else {
+    // Paginating raw rows would split a subtree across pages, leaving children stranded and drawn
+    // as if they were top-level. Paginating by ROOT instead keeps every subtree whole, so a page
+    // may render more rows than `itemsPerPage` — the page size counts roots, not tags.
+    const [rootPage, totalRoots, everyTag] = await Promise.all([
+        db.select().from(tags).where(isRootTag).orderBy(desc(tags.id)).limit(itemsPerPage).offset(offset),
+        db.select({ count: sql<number>`COUNT(*)` }).from(tags).where(isRootTag).then(r => r[0]?.count ?? 0),
+        db.select().from(tags).orderBy(desc(tags.id)),
+    ]);
+
+    const childrenByParent = new Map<string, Tag[]>();
+    for (const tag of everyTag) {
+        if (!tag.parentTag) continue;
+        if (!childrenByParent.has(tag.parentTag)) childrenByParent.set(tag.parentTag, []);
+        childrenByParent.get(tag.parentTag)!.push(tag);
     }
+
+    // `visited` guards against a parent cycle, which the self-referencing FK doesn't prevent.
+    function addChildren(parentId: string, depth: number, visited: Set<string>) {
+        for (const child of childrenByParent.get(parentId) ?? []) {
+            if (visited.has(child.id)) continue;
+            orderedTags.push({ tag: child, depth });
+            addChildren(child.id, depth + 1, new Set(visited).add(child.id));
+        }
+    }
+
+    for (const root of rootPage) {
+        orderedTags.push({ tag: root, depth: 1 });
+        addChildren(root.id, 2, new Set([root.id]));
+    }
+    totalItems = totalRoots;
 }
-addChildren('root', 1, new Set());
+
+function getTagColumns() {
+    return { id: tags.id, state: tags.state, title: tags.title, parentTag: tags.parentTag };
+}
+
+const totalPages = Math.ceil(totalItems / itemsPerPage);
 ---
 
 <AdminLayout>
 	<div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
         <h1 class="text-2xl font-semibold">Tags</h1>
         <a href="/admin/tags/new" class="btn btn-primary">New</a>
+    </div>
+    <div class="pt-4 pb-6">
+        <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
     <form id="bulk-form" method="POST"></form>
     <table class="table p-2 bg-base-100 rounded-lg">
@@ -64,6 +169,13 @@ addChildren('root', 1, new Set());
             </tr>
         </thead>
         <tbody>
+            {orderedTags.length === 0 && (
+                <tr>
+                    <td colspan="3" class="text-center text-base-content/60 py-8">
+                        {q ? 'No tags match your search.' : 'No tags yet.'}
+                    </td>
+                </tr>
+            )}
             {orderedTags.map(({ tag, depth }) => (
                 <tr>
                     <td>
@@ -97,5 +209,10 @@ addChildren('root', 1, new Set());
             ))}
         </tbody>
     </table>
+    {totalPages > 1 &&
+        <div class="pt-6 pb-6 flex items-center justify-center">
+            <Pagination currentPage={page} totalPages={totalPages} basePath="/admin/tags/" params={{ q }} />
+        </div>
+    }
     <script>import '../../../scripts/select-all'</script>
 </AdminLayout>
