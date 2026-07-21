@@ -672,6 +672,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/sitemap.xml",
+          entrypoint: "@holtbosse/purplepanda/pages/sitemap.xml.ts",
+        });
+
+        injectRoute({
           pattern: "/[...path]",
           entrypoint: "@holtbosse/purplepanda/pages/page.astro",
         });
