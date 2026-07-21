@@ -1,20 +1,104 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
-import { documents } from '../../../db/schema.js';
+import { documents, userActions, users } from '../../../db/schema.js';
 import { CircleCheck, CircleX, ExternalLink } from '@lucide/astro';
 import Input from '../../../form/fields/Input.astro';
-import { desc } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
+import { z } from 'zod';
+import Pagination from '../../../components/Pagination.astro';
+import SearchBar from '../../../search/SearchBar';
+import { parseSearchQuery } from '../../../search/parser.js';
+import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
+import type { SearchFieldSpec } from '../../../search/types.js';
 
 const db = getDb();
-const allDocuments = await db.select().from(documents).orderBy(desc(documents.id));
 
+// Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
+// valid/invalid highlighting, and the qualifier/value autocomplete dropdown.
+const searchFields: SearchFieldSpec[] = [
+    {
+        name: 'state',
+        type: 'enum',
+        enumValues: ['enabled', 'disabled', 'deleted'],
+        label: 'State',
+        description: 'Publish state',
+    },
+    { name: 'author', type: 'text', label: 'Author', description: 'Creator email' },
+    { name: 'created', type: 'date', label: 'Created', description: 'Date created (YYYY-MM-DD)' },
+];
+
+// Server-side counterpart: resolves each field to a (possibly joined) column. `documents` has no
+// author or created-at column of its own, so both ride on the `documentcreate` row that
+// `upload.ts` already logs to `userActions` (`{ type: "documentcreate", data: { id: <docId> } }`)
+// whenever a document is created.
+const searchConfig: DrizzleSearchConfig = {
+    fields: [
+        {
+            name: 'state',
+            type: 'enum',
+            enumValues: ['enabled', 'disabled', 'deleted'],
+            column: documents.state,
+            // "deleted" has no matching rows today (toggle.ts only ever flips state between 1 and
+            // 0) — -1 is reserved here so a future soft-delete can slot in without a grammar change.
+            valueMap: { enabled: 1, disabled: 0, deleted: -1 },
+        },
+        { name: 'author', type: 'text', column: users.email, matchMode: 'exact' },
+        { name: 'created', type: 'date', column: userActions.date },
+    ],
+    fulltext: { columns: [documents.title] },
+    joins: [
+        {
+            table: userActions,
+            on: sql`${userActions.type} = 'documentcreate' and ${userActions.data} ->> 'id' = ${documents.id}::text`,
+            type: 'left',
+        },
+        { table: users, on: eq(userActions.userId, users.id), type: 'left' },
+    ],
+};
+
+const q = Astro.url.searchParams.get('q') ?? '';
+const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig);
+
+const itemsPerPage = 12;
+const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);
+let page = 1;
+if (pageData.success) {
+    page = pageData.data;
+}
+const offset = (page - 1) * itemsPerPage;
+
+// DISTINCT (here and in the count below) because the userActions/users joins are one-to-many: a
+// document with more than one `documentcreate` action would otherwise be listed — and counted —
+// once per matching action row.
+const allDocuments = await applySearchJoins(
+    db
+        .selectDistinct({ id: documents.id, state: documents.state, title: documents.title, slug: documents.slug })
+        .from(documents)
+        .$dynamic(),
+    searchConfig.joins,
+)
+    .where(searchWhere)
+    .orderBy(desc(documents.id))
+    .limit(itemsPerPage)
+    .offset(offset);
+
+const totalDocuments = await applySearchJoins(
+    db.select({ count: sql<number>`COUNT(DISTINCT ${documents.id})` }).from(documents).$dynamic(),
+    searchConfig.joins,
+)
+    .where(searchWhere)
+    .then(result => result[0]?.count ?? 0);
+const totalPages = Math.ceil(totalDocuments / itemsPerPage);
 ---
 
 <AdminLayout>
     <div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
         <h1 class="text-2xl font-semibold">Documents</h1>
         <button commandfor="new-document-dialog" command="show-modal" class="btn btn-primary">Upload</button>
+    </div>
+    <div class="pt-4 pb-6">
+        <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
     <form id="bulk-form" method="POST"></form>
     <table class="table p-2 bg-base-100 rounded-lg">
@@ -46,6 +130,13 @@ const allDocuments = await db.select().from(documents).orderBy(desc(documents.id
             </tr>
         </thead>
         <tbody>
+            {allDocuments.length === 0 && (
+                <tr>
+                    <td colspan="4" class="text-center text-base-content/60 py-8">
+                        {q ? 'No documents match your search.' : 'No documents yet.'}
+                    </td>
+                </tr>
+            )}
             {allDocuments.map(doc => (
                 <tr>
                     <td>
@@ -88,6 +179,11 @@ const allDocuments = await db.select().from(documents).orderBy(desc(documents.id
             ))}
         </tbody>
     </table>
+    {totalDocuments - allDocuments.length > 0 &&
+        <div class="pt-6 pb-6 flex items-center justify-center">
+            <Pagination currentPage={page} totalPages={totalPages} basePath="/admin/documents/" params={{ q }} />
+        </div>
+    }
 
     <dialog id="new-document-dialog" closedby="any" class="relative m-auto w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] md:max-w-2xl rounded-xl bg-base-100 p-6 md:p-8 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
         <form method="dialog">

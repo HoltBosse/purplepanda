@@ -3,17 +3,31 @@ interface Props {
     currentPage: number;
     totalPages: number;
     basePath: string;
+    /**
+     * Extra query params to carry across page links (e.g. a search term), so paging doesn't drop
+     * the current filters. Entries with empty/undefined values are omitted. Omit this prop entirely
+     * and links stay exactly `${basePath}?page=N` as before.
+     */
+    params?: Record<string, string | number | undefined | null>;
 }
 
-const { currentPage, totalPages, basePath } = Astro.props;
-//console.log("Pagination props: ", { currentPage, totalPages, basePath });
+const { currentPage, totalPages, basePath, params } = Astro.props;
+
+const hrefFor = (page: number) => {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(params ?? {})) {
+        if (value !== undefined && value !== null && String(value) !== "") search.set(key, String(value));
+    }
+    search.set("page", String(page));
+    return `${basePath}?${search.toString()}`;
+};
 ---
 <div class="join">
-    <a href={`${basePath}?page=1`} class="bg-base-100 join-item btn">«</a>
-    {currentPage - 2 > 0 && <a href={`${basePath}?page=${currentPage - 2}`} class="bg-base-100 join-item btn">{currentPage - 2}</a>}
-    {currentPage -1 > 0 && <a href={`${basePath}?page=${currentPage - 1}`} class="bg-base-100 join-item btn">{currentPage - 1}</a>}
+    <a href={hrefFor(1)} class="bg-base-100 join-item btn">«</a>
+    {currentPage - 2 > 0 && <a href={hrefFor(currentPage - 2)} class="bg-base-100 join-item btn">{currentPage - 2}</a>}
+    {currentPage -1 > 0 && <a href={hrefFor(currentPage - 1)} class="bg-base-100 join-item btn">{currentPage - 1}</a>}
     <a class="bg-info text-white join-item btn btn-active">{currentPage}</a>
-    {currentPage + 1 <= totalPages && <a href={`${basePath}?page=${currentPage + 1}`} class="bg-base-100 join-item btn">{currentPage + 1}</a>}
-    {currentPage + 2 <= totalPages && <a href={`${basePath}?page=${currentPage + 2}`} class="bg-base-100 join-item btn">{currentPage + 2}</a>}
-    <a href={`${basePath}?page=${totalPages}`} class="bg-base-100 join-item btn">»</a>
+    {currentPage + 1 <= totalPages && <a href={hrefFor(currentPage + 1)} class="bg-base-100 join-item btn">{currentPage + 1}</a>}
+    {currentPage + 2 <= totalPages && <a href={hrefFor(currentPage + 2)} class="bg-base-100 join-item btn">{currentPage + 2}</a>}
+    <a href={hrefFor(totalPages)} class="bg-base-100 join-item btn">»</a>
 </div>
