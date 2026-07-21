@@ -192,6 +192,27 @@ describe('buildSearchWhere', () => {
         expect(params).not.toContain('%jane@example.com%');
     });
 
+    it('quotes a field value to group spaces, without forcing case-sensitivity', () => {
+        // Quoting is the only way to express a space in a field value, so it must not also mean
+        // "match case exactly" — otherwise a name like "Newsletter Signup" could never be found
+        // without reproducing its casing.
+        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('title:"q1 report"'), baseConfig)!);
+        expect(sql.toLowerCase()).toContain('ilike');
+        expect(sql).not.toMatch(/(?<!i)\blike\b/i);
+        expect(params).toContain('%q1 report%');
+    });
+
+    it('matches a quoted exact-mode field value case-insensitively', () => {
+        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('author:"Jane Doe"'), baseConfig)!);
+        expect(sql.toLowerCase()).toContain('ilike');
+        expect(params).toContain('Jane Doe');
+    });
+
+    it('escapes LIKE metacharacters in an exact-mode value', () => {
+        const { params } = toQuery(buildSearchWhere(parseSearchQuery('author:a%b_c'), baseConfig)!);
+        expect(params).toContain('a\\%b\\_c');
+    });
+
     it('silently skips an unrecognized field rather than throwing', () => {
         expect(buildSearchWhere(parseSearchQuery('bogus:x'), baseConfig)).toBeUndefined();
     });

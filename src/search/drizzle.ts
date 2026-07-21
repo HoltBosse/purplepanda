@@ -19,6 +19,7 @@ const DEFAULT_LANGUAGE = "simple";
  *   - "contains" case-insensitive substring, e.g. `title:report` matches "Q1 report.pdf"
  *   - "fulltext" Postgres `tsvector`/`tsquery` match against this column specifically
  * A wildcard value (`foo*bar`, `foo?bar`) always overrides this with a translated `ILIKE` pattern.
+ * All three are case-insensitive; quoting a field value only groups it (`form:"Newsletter Signup"`).
  */
 export type TextMatchMode = "exact" | "contains" | "fulltext";
 
@@ -196,31 +197,35 @@ function buildFieldCondition(node: FieldTermNode, field: DrizzleSearchField): SQ
   }
 }
 
+// On a FIELD value, quoting means "treat this as one value, spaces included" — it is the only way
+// to write `form:"Newsletter Signup"` — and deliberately does NOT imply case-sensitivity. Otherwise
+// any name containing a space could only ever be matched with exact casing, since quoting would be
+// both the grouping mechanism and a case-sensitivity switch. Quote-means-case-sensitive still
+// applies to bare search terms (`'foo'`), which is where the grammar defines it.
 function buildTextFieldCondition(node: FieldTermNode, field: DrizzleSearchField): SQL {
   if (node.wildcard) {
     return ilike(field.column, wildcardToLikePattern(node.value));
   }
 
   const mode = field.matchMode ?? "exact";
+  const containsPattern = `%${escapeLikePattern(node.value)}%`;
 
   if (mode === "fulltext") {
-    if (node.quoted) return like(field.column, `%${escapeLikePattern(node.value)}%`);
+    if (node.quoted) return ilike(field.column, containsPattern);
     const language = field.language ?? DEFAULT_LANGUAGE;
     const normalize = field.normalizeSymbols ?? true;
     const term = normalize ? normalizeFulltextTerm(node.value) : node.value;
-    const pattern = `%${escapeLikePattern(node.value)}%`;
-    if (term.length === 0) return ilike(field.column, pattern);
+    if (term.length === 0) return ilike(field.column, containsPattern);
     const vector = toTsVector([field.column], language, normalize);
     const fullText = sql`${vector} @@ ${toTsQuery(term, language, field.prefixMatch ?? true)}`;
-    return field.substringMatch === false ? fullText : or(fullText, ilike(field.column, pattern))!;
+    return field.substringMatch === false ? fullText : or(fullText, ilike(field.column, containsPattern))!;
   }
 
-  if (mode === "contains") {
-    const pattern = `%${escapeLikePattern(node.value)}%`;
-    return node.quoted ? like(field.column, pattern) : ilike(field.column, pattern);
-  }
+  if (mode === "contains") return ilike(field.column, containsPattern);
 
-  return node.quoted ? eqValue(field.column, node.value) : ilike(field.column, node.value);
+  // "exact": a case-insensitive whole-value match. The value is escaped so that a literal % or _
+  // inside it isn't silently treated as a LIKE wildcard (`*`/`?` are the grammar's wildcards).
+  return ilike(field.column, escapeLikePattern(node.value));
 }
 
 // `eq` is overloaded per operand type and can't resolve a `Column | SQL` union at compile time,
