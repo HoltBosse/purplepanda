@@ -43,6 +43,32 @@ describe('buildSearchWhere', () => {
         expect(params).toContain('foo');
     });
 
+    it('splits non-alphanumerics on both sides so URLs/paths are searchable by their parts', () => {
+        // Postgres lexes 'https://xkcd.com/1360/' as indivisible url tokens, so without this the
+        // tsquery for "xkcd" could never match a URL column.
+        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('xkcd.com'), baseConfig)!);
+        expect(sql).toContain('regexp_replace');
+        expect(params).toContain('xkcd com');
+    });
+
+    it('leaves the term intact when normalizeSymbols is disabled', () => {
+        const config: DrizzleSearchConfig = {
+            ...baseConfig,
+            fulltext: { columns: [documents.title], normalizeSymbols: false },
+        };
+        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('xkcd.com'), config)!);
+        expect(sql).not.toContain('regexp_replace');
+        expect(params).toContain('xkcd.com');
+    });
+
+    it('falls back to a substring match when a term is entirely symbols', () => {
+        // "/" normalizes to an empty tsquery, which would otherwise match zero rows.
+        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('/'), baseConfig)!);
+        expect(sql.toLowerCase()).toContain('ilike');
+        expect(sql).not.toContain('to_tsvector');
+        expect(params).toContain('%/%');
+    });
+
     it('falls back to a case-sensitive LIKE match for a quoted bare term', () => {
         const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery("'Foo'"), baseConfig)!);
         expect(sql.toLowerCase()).toContain('like');

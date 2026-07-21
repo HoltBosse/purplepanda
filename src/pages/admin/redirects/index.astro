@@ -1,13 +1,68 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
-import { redirects } from '../../../db/schema.js';
+import { redirects, userActions, users } from '../../../db/schema.js';
 import { CircleCheck, CircleX } from '@lucide/astro';
-import { desc, sql } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import Pagination from '../../../components/Pagination.astro';
+import SearchBar from '../../../search/SearchBar';
+import { parseSearchQuery } from '../../../search/parser.js';
+import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
+import type { SearchFieldSpec } from '../../../search/types.js';
 
 const db = getDb();
+
+// Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
+// valid/invalid highlighting, and the qualifier/value autocomplete dropdown.
+const searchFields: SearchFieldSpec[] = [
+    {
+        name: 'state',
+        type: 'enum',
+        enumValues: ['enabled', 'disabled', 'deleted'],
+        label: 'State',
+        description: 'Enabled state',
+    },
+    { name: 'from', type: 'text', label: 'From', description: 'Source path (exact)' },
+    { name: 'to', type: 'text', label: 'To', description: 'Destination path or URL (exact)' },
+    { name: 'author', type: 'text', label: 'Author', description: 'Creator email' },
+    { name: 'created', type: 'date', label: 'Created', description: 'Date created (YYYY-MM-DD)' },
+];
+
+// Server-side counterpart: resolves each field to a (possibly joined) column. `redirects` has no
+// author or created-at column of its own, so both ride on the `redirectcreate` row that
+// `update.ts` logs to `userActions` (`{ type: "redirectcreate", data: { id: <redirectId> } }`)
+// whenever a redirect is created.
+const searchConfig: DrizzleSearchConfig = {
+    fields: [
+        {
+            name: 'state',
+            type: 'enum',
+            enumValues: ['enabled', 'disabled', 'deleted'],
+            column: redirects.state,
+            // "deleted" has no matching rows today (toggle.ts only ever flips state between 1 and
+            // 0) — -1 is reserved here so a future soft-delete can slot in without a grammar change.
+            valueMap: { enabled: 1, disabled: 0, deleted: -1 },
+        },
+        { name: 'from', type: 'text', column: redirects.from, matchMode: 'exact' },
+        { name: 'to', type: 'text', column: redirects.to, matchMode: 'exact' },
+        { name: 'author', type: 'text', column: users.email, matchMode: 'exact' },
+        { name: 'created', type: 'date', column: userActions.date },
+    ],
+    // An unqualified term runs a single tsvector match across both columns at once.
+    fulltext: { columns: [redirects.from, redirects.to] },
+    joins: [
+        {
+            table: userActions,
+            on: sql`${userActions.type} = 'redirectcreate' and ${userActions.data} ->> 'id' = ${redirects.id}::text`,
+            type: 'left',
+        },
+        { table: users, on: eq(userActions.userId, users.id), type: 'left' },
+    ],
+};
+
+const q = Astro.url.searchParams.get('q') ?? '';
+const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig);
 
 const itemsPerPage = 12;
 const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);
@@ -17,10 +72,26 @@ if (pageData.success) {
 }
 const offset = (page - 1) * itemsPerPage;
 
-const allRedirects = await db.select().from(redirects).orderBy(desc(redirects.id)).limit(itemsPerPage).offset(offset);
-const totalRedirects = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(redirects)
+// DISTINCT (here and in the count below) because the userActions/users joins are one-to-many: a
+// redirect with more than one `redirectcreate` action would otherwise be listed — and counted —
+// once per matching action row.
+const allRedirects = await applySearchJoins(
+    db
+        .selectDistinct({ id: redirects.id, state: redirects.state, from: redirects.from, to: redirects.to })
+        .from(redirects)
+        .$dynamic(),
+    searchConfig.joins,
+)
+    .where(searchWhere)
+    .orderBy(desc(redirects.id))
+    .limit(itemsPerPage)
+    .offset(offset);
+
+const totalRedirects = await applySearchJoins(
+    db.select({ count: sql<number>`COUNT(DISTINCT ${redirects.id})` }).from(redirects).$dynamic(),
+    searchConfig.joins,
+)
+    .where(searchWhere)
     .then(result => result[0]?.count ?? 0);
 const totalPages = Math.ceil(totalRedirects / itemsPerPage);
 ---
@@ -29,6 +100,9 @@ const totalPages = Math.ceil(totalRedirects / itemsPerPage);
 	<div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
         <h1 class="text-2xl font-semibold">Redirects</h1>
         <a href="/admin/redirects/new" class="btn btn-primary">New</a>
+    </div>
+    <div class="pt-4 pb-6">
+        <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
     <form id="bulk-form" method="POST"></form>
     <table class="table p-2 bg-base-100 rounded-lg">
@@ -59,6 +133,13 @@ const totalPages = Math.ceil(totalRedirects / itemsPerPage);
             </tr>
         </thead>
         <tbody>
+            {allRedirects.length === 0 && (
+                <tr>
+                    <td colspan="4" class="text-center text-base-content/60 py-8">
+                        {q ? 'No redirects match your search.' : 'No redirects yet.'}
+                    </td>
+                </tr>
+            )}
             {allRedirects.map(redirect => (
                 <tr>
                     <td>
@@ -91,7 +172,7 @@ const totalPages = Math.ceil(totalRedirects / itemsPerPage);
     </table>
     {totalRedirects - allRedirects.length > 0 &&
         <div class="pt-6 pb-6 flex items-center justify-center">
-            <Pagination currentPage={page} totalPages={totalPages} basePath="/admin/redirects/" />
+            <Pagination currentPage={page} totalPages={totalPages} basePath="/admin/redirects/" params={{ q }} />
         </div>
     }
     <script>import '../../../scripts/select-all'</script>

@@ -30,6 +30,14 @@ export interface DrizzleSearchField extends SearchFieldSpec {
   valueMap?: Record<string, unknown>;
   /** `regconfig` used for `matchMode: "fulltext"`. Defaults to "simple" (no stemming/stopwords — see DEFAULT_LANGUAGE above). */
   language?: string;
+  /**
+   * Split runs of non-alphanumeric characters into word boundaries on both sides of a full-text
+   * match. Postgres's text parser keeps URLs and paths as single indivisible tokens — e.g.
+   * `https://xkcd.com/1360/` lexes to `xkcd.com/1360/`, `xkcd.com`, `/1360/`, and `/some-path` to
+   * one `/some-path` token — so searching `xkcd` or `path` would otherwise match nothing at all on
+   * URL/path/identifier columns. Defaults to true.
+   */
+  normalizeSymbols?: boolean;
 }
 
 export interface FulltextSearchConfig {
@@ -37,6 +45,8 @@ export interface FulltextSearchConfig {
   columns: readonly AnyPgColumn[];
   /** `regconfig` used for `to_tsvector`/`websearch_to_tsquery`. Defaults to "simple" (no stemming/stopwords — see DEFAULT_LANGUAGE above). */
   language?: string;
+  /** See `normalizeSymbols` on DrizzleSearchField. Defaults to true. */
+  normalizeSymbols?: boolean;
 }
 
 export interface JoinConfig {
@@ -105,8 +115,18 @@ function buildTextSearchCondition(node: TextTermNode, fulltext?: FulltextSearchC
   }
 
   const language = fulltext.language ?? DEFAULT_LANGUAGE;
-  const vector = toTsVector(fulltext.columns, language);
-  return sql`${vector} @@ websearch_to_tsquery(${regconfig(language)}, ${node.value})`;
+  const normalize = fulltext.normalizeSymbols ?? true;
+  const term = normalize ? normalizeFulltextTerm(node.value) : node.value;
+
+  // An all-symbol term (e.g. "/") normalizes to nothing, and an empty tsquery matches no rows at
+  // all — fall back to a substring match so such a search still behaves sensibly.
+  if (term.length === 0) {
+    const pattern = `%${escapeLikePattern(node.value)}%`;
+    return combine(or, [...fulltext.columns].map((c) => ilike(c, pattern)));
+  }
+
+  const vector = toTsVector(fulltext.columns, language, normalize);
+  return sql`${vector} @@ websearch_to_tsquery(${regconfig(language)}, ${term})`;
 }
 
 function buildFieldCondition(node: FieldTermNode, field: DrizzleSearchField): SQL | undefined {
@@ -145,8 +165,11 @@ function buildTextFieldCondition(node: FieldTermNode, field: DrizzleSearchField)
   if (mode === "fulltext") {
     if (node.quoted) return like(field.column, `%${escapeLikePattern(node.value)}%`);
     const language = field.language ?? DEFAULT_LANGUAGE;
-    const vector = toTsVector([field.column], language);
-    return sql`${vector} @@ websearch_to_tsquery(${regconfig(language)}, ${node.value})`;
+    const normalize = field.normalizeSymbols ?? true;
+    const term = normalize ? normalizeFulltextTerm(node.value) : node.value;
+    if (term.length === 0) return ilike(field.column, `%${escapeLikePattern(node.value)}%`);
+    const vector = toTsVector([field.column], language, normalize);
+    return sql`${vector} @@ websearch_to_tsquery(${regconfig(language)}, ${term})`;
   }
 
   if (mode === "contains") {
@@ -157,13 +180,23 @@ function buildTextFieldCondition(node: FieldTermNode, field: DrizzleSearchField)
   return node.quoted ? eq(field.column, node.value) : ilike(field.column, node.value);
 }
 
-function toTsVector(columns: readonly AnyPgColumn[], language: string): SQL {
+const SYMBOL_RUN = /[^a-zA-Z0-9]+/g;
+
+/** Mirrors the `regexp_replace` applied to the columns in `toTsVector`, so both sides tokenize alike. */
+function normalizeFulltextTerm(value: string): string {
+  return value.replace(SYMBOL_RUN, " ").trim();
+}
+
+function toTsVector(columns: readonly AnyPgColumn[], language: string, normalize: boolean): SQL {
   const config = regconfig(language);
-  const first = columns[0];
-  if (columns.length === 1 && first) {
-    return sql`to_tsvector(${config}, coalesce(${first}, ''))`;
+  const parts = columns.map((c) => {
+    const text = sql`coalesce(${c}, '')`;
+    return normalize ? sql`regexp_replace(${text}, '[^a-zA-Z0-9]+', ' ', 'g')` : text;
+  });
+  const first = parts[0];
+  if (parts.length === 1 && first) {
+    return sql`to_tsvector(${config}, ${first})`;
   }
-  const parts = columns.map((c) => sql`coalesce(${c}, '')`);
   return sql`to_tsvector(${config}, ${sql.join(parts, sql` || ' ' || `)})`;
 }
 
