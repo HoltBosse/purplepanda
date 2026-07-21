@@ -1,17 +1,184 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
-import { pages, dagNodes } from '../../../db/schema.js';
+import { pages, dagNodes, userActions, users } from '../../../db/schema.js';
 import { CircleCheck, CircleX, EllipsisVertical, FilePen, Trash2, GitBranch, CornerDownRight } from '@lucide/astro';
-import { desc, isNull, and, eq, gt, type InferSelectModel } from 'drizzle-orm';
+import { desc, isNull, and, or, eq, gt, sql, type InferSelectModel } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import { z } from 'zod';
+import Pagination from '../../../components/Pagination.astro';
+import SearchBar from '../../../search/SearchBar';
+import { parseSearchQuery } from '../../../search/parser.js';
+import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
+import type { SearchFieldSpec } from '../../../search/types.js';
 
 type Page = InferSelectModel<typeof pages>;
 
 const db = getDb();
-const [allPages, allDrafts] = await Promise.all([
-    db.select().from(pages).where(and(isNull(pages.contentType), gt(pages.state, -1))).orderBy(desc(pages.id)),
-    db.select().from(dagNodes).where(and(eq(dagNodes.entityType, 'page'), eq(dagNodes.nodeType, 'draft'), eq(dagNodes.state, 1))).orderBy(desc(dagNodes.createdAt)),
-]);
+
+// Neither the title nor the parent link is a column — Puck stores both inside the content document,
+// which is why the table below reads `content.root.props.*`. The search builder accepts arbitrary
+// SQL expressions in place of columns, so the same paths can be filtered on directly in Postgres.
+const titleExpr = sql`${pages.content} -> 'root' -> 'props' ->> 'title'`;
+const parentPageExpr = sql`${pages.content} -> 'root' -> 'props' ->> 'parentPage'`;
+
+// This listing is only the plain pages (content-typed rows live under /admin/content) and hides
+// soft-deleted ones.
+const visibleScope = and(isNull(pages.contentType), gt(pages.state, -1));
+
+// Self-join so a page can be filtered by its parent's title, and so `parent:null` finds top-level
+// pages. Scoped to visible parents so a page whose parent was deleted reads as top level — which is
+// exactly how the tree below already treats an unresolvable parent.
+const parentPages = alias(pages, 'parent_pages');
+// The parent's title lives inside its own content document, exactly like this page's does.
+const parentTitleExpr = sql`${parentPages.content} -> 'root' -> 'props' ->> 'title'`;
+
+// Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
+// valid/invalid highlighting, and the qualifier/value autocomplete dropdown.
+const searchFields: SearchFieldSpec[] = [
+    {
+        name: 'state',
+        type: 'enum',
+        enumValues: ['published', 'unpublished'],
+        label: 'State',
+        description: 'Publish state',
+    },
+    { name: 'title', type: 'text', label: 'Title', description: 'Title contains' },
+    { name: 'parent', type: 'text', nullable: true, label: 'Parent', description: 'Parent page (null = top level)' },
+    { name: 'author', type: 'text', nullable: true, label: 'Author', description: 'Creator email (null = unattributed)' },
+    { name: 'created', type: 'date', label: 'Created', description: 'Date created (YYYY-MM-DD)' },
+];
+
+// `pages` has no author or created-at column, so both ride on the `pagecreate` row that
+// `pages/update.ts` logs to `userActions` (`{ type: "pagecreate", data: { id: <pageId> } }`).
+const searchConfig: DrizzleSearchConfig = {
+    fields: [
+        {
+            name: 'state',
+            type: 'enum',
+            enumValues: ['published', 'unpublished'],
+            column: pages.state,
+            valueMap: { published: 1, unpublished: 0 },
+        },
+        { name: 'title', type: 'text', column: titleExpr, matchMode: 'contains' },
+        { name: 'parent', type: 'text', nullable: true, column: parentTitleExpr, matchMode: 'contains' },
+        { name: 'author', type: 'text', nullable: true, column: users.email, matchMode: 'exact' },
+        { name: 'created', type: 'date', column: userActions.date },
+    ],
+    fulltext: { columns: [titleExpr] },
+    joins: [
+        {
+            table: parentPages,
+            on: sql`${parentPages.id}::text = ${parentPageExpr} and ${parentPages.contentType} is null and ${parentPages.state} > -1`,
+            type: 'left',
+        },
+        {
+            table: userActions,
+            on: sql`${userActions.type} = 'pagecreate' and ${userActions.data} ->> 'id' = ${pages.id}::text`,
+            type: 'left',
+        },
+        { table: users, on: eq(userActions.userId, users.id), type: 'left' },
+    ],
+};
+
+const q = Astro.url.searchParams.get('q') ?? '';
+const isSearching = q.trim().length > 0;
+const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig);
+
+const itemsPerPage = 12;
+const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);
+// Named `currentPage`/`totalPageCount` rather than the usual `page`/`totalPages` because the rows
+// being listed are themselves `pages`, and the table's map callback already binds `page` per row.
+let currentPage = 1;
+if (pageData.success) {
+    currentPage = pageData.data;
+}
+const offset = (currentPage - 1) * itemsPerPage;
+
+// A page sits at the root if it names no parent, or if that parent isn't itself visible here —
+// mirroring how the tree treats a parent it can't resolve.
+const isRootPage = or(
+    sql`${parentPageExpr} is null`,
+    sql`not exists (
+        select 1 from ${pages} ancestor
+        where ancestor.id::text = ${parentPageExpr}
+          and ancestor."contentType" is null
+          and ancestor.state > -1
+    )`,
+);
+
+let orderedPages: { page: Page; depth: number }[] = [];
+let totalItems = 0;
+let allDrafts: InferSelectModel<typeof dagNodes>[] = [];
+
+if (isSearching) {
+    // Filtering inevitably breaks the parent/child chain (a match's parent may not match), so
+    // results are shown flat rather than silently rendering orphans at the wrong depth.
+    // DISTINCT because the userActions join is one-to-many.
+    const [rows, total, drafts] = await Promise.all([
+        applySearchJoins(db.selectDistinct({ ...pageColumns() }).from(pages).$dynamic(), searchConfig.joins)
+            .where(and(visibleScope, searchWhere))
+            .orderBy(desc(pages.id))
+            .limit(itemsPerPage)
+            .offset(offset),
+        applySearchJoins(
+            db.select({ count: sql<number>`COUNT(DISTINCT ${pages.id})` }).from(pages).$dynamic(),
+            searchConfig.joins,
+        )
+            .where(and(visibleScope, searchWhere))
+            .then(result => result[0]?.count ?? 0),
+        draftsQuery(),
+    ]);
+    orderedPages = rows.map(row => ({ page: row as Page, depth: 1 }));
+    totalItems = total;
+    allDrafts = drafts;
+} else {
+    // Paginating raw rows would split a subtree across pages, leaving children stranded and drawn
+    // as if they were top level. Paginating by ROOT instead keeps every subtree whole, so a page
+    // may render more rows than `itemsPerPage` — the page size counts roots, not pages.
+    const [rootPage, totalRoots, everyPage, drafts] = await Promise.all([
+        db.select().from(pages).where(and(visibleScope, isRootPage)).orderBy(desc(pages.id)).limit(itemsPerPage).offset(offset),
+        db.select({ count: sql<number>`COUNT(*)` }).from(pages).where(and(visibleScope, isRootPage)).then(r => r[0]?.count ?? 0),
+        db.select().from(pages).where(visibleScope).orderBy(desc(pages.id)),
+        draftsQuery(),
+    ]);
+
+    const childrenByParent = new Map<string, Page[]>();
+    for (const candidate of everyPage) {
+        const parentPage = (candidate.content as any)?.root?.props?.parentPage;
+        if (!parentPage) continue;
+        if (!childrenByParent.has(parentPage)) childrenByParent.set(parentPage, []);
+        childrenByParent.get(parentPage)!.push(candidate);
+    }
+
+    // `visited` guards against a parent cycle, which nothing in the content document prevents.
+    function addChildren(parentId: string, depth: number, visited: Set<string>) {
+        for (const child of childrenByParent.get(parentId) ?? []) {
+            if (visited.has(child.id)) continue;
+            orderedPages.push({ page: child, depth });
+            addChildren(child.id, depth + 1, new Set(visited).add(child.id));
+        }
+    }
+
+    for (const root of rootPage) {
+        orderedPages.push({ page: root, depth: 1 });
+        addChildren(root.id, 2, new Set([root.id]));
+    }
+    totalItems = totalRoots;
+    allDrafts = drafts;
+}
+
+function pageColumns() {
+    return { id: pages.id, state: pages.state, contentType: pages.contentType, content: pages.content };
+}
+
+function draftsQuery() {
+    return db
+        .select()
+        .from(dagNodes)
+        .where(and(eq(dagNodes.entityType, 'page'), eq(dagNodes.nodeType, 'draft'), eq(dagNodes.state, 1)))
+        .orderBy(desc(dagNodes.createdAt));
+}
 
 const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, draft) => {
     const bucket = acc[draft.entityId];
@@ -23,32 +190,16 @@ const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, 
     return acc;
 }, {});
 
-// Group pages by parent so children are listed directly under their parent,
-// preserving the existing (desc by id) order within each group.
-const pageIds = new Set(allPages.map(page => page.id));
-const childrenByParent = new Map<string, Page[]>();
-for (const page of allPages) {
-    const parentPage = (page.content as any)?.root?.props?.parentPage;
-    const parentKey = parentPage && pageIds.has(parentPage) ? parentPage : 'root';
-    if (!childrenByParent.has(parentKey)) childrenByParent.set(parentKey, []);
-    childrenByParent.get(parentKey)!.push(page);
-}
-
-const orderedPages: { page: Page; depth: number }[] = [];
-function addChildren(parentKey: string, depth: number, visited: Set<string>) {
-    for (const child of childrenByParent.get(parentKey) ?? []) {
-        if (visited.has(child.id)) continue;
-        orderedPages.push({ page: child, depth });
-        addChildren(child.id, depth + 1, new Set(visited).add(child.id));
-    }
-}
-addChildren('root', 1, new Set());
+const totalPageCount = Math.ceil(totalItems / itemsPerPage);
 ---
 
 <AdminLayout>
 	<div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
         <h1 class="text-2xl font-semibold">Pages</h1>
         <a href="/admin/pages/new" class="btn btn-primary">New</a>
+    </div>
+    <div class="pt-4 pb-6">
+        <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
     <form id="bulk-form" method="POST"></form>
     <table class="table p-2 bg-base-100 rounded-lg">
@@ -79,6 +230,13 @@ addChildren('root', 1, new Set());
             </tr>
         </thead>
         <tbody>
+            {orderedPages.length === 0 && (
+                <tr>
+                    <td colspan="4" class="text-center text-base-content/60 py-8">
+                        {q ? 'No pages match your search.' : 'No pages yet.'}
+                    </td>
+                </tr>
+            )}
             {orderedPages.map(({ page, depth }) => {
                 const drafts = draftsByPageId[page.id] ?? [];
                 return (
@@ -163,6 +321,11 @@ addChildren('root', 1, new Set());
             })}
         </tbody>
     </table>
+    {totalPageCount > 1 &&
+        <div class="pt-6 pb-6 flex items-center justify-center">
+            <Pagination currentPage={currentPage} totalPages={totalPageCount} basePath="/admin/pages/" params={{ q }} />
+        </div>
+    }
 
     <!-- Create Draft Modal -->
     <dialog id="create-draft-modal" class="modal">
