@@ -79,7 +79,14 @@ const totalPages = Math.ceil(totalRoles / itemsPerPage);
         <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
     <form id="bulk-form" method="POST"></form>
-    <table class="table p-2 bg-base-100 rounded-lg">
+    {allRoles.length === 0 && (
+        <div class="text-center text-base-content/60 py-8 bg-base-100 rounded-lg">
+            {q ? 'No roles match your search.' : 'No roles yet.'}
+        </div>
+    )}
+    {allRoles.length > 0 && (
+        <>
+    <table class="hidden sm:table p-2 bg-base-100 rounded-lg">
         <thead>
             <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
                 <th class="w-px whitespace-nowrap">
@@ -107,13 +114,6 @@ const totalPages = Math.ceil(totalRoles / itemsPerPage);
             </tr>
         </thead>
         <tbody>
-            {allRoles.length === 0 && (
-                <tr>
-                    <td colspan="4" class="text-center text-base-content/60 py-8">
-                        {q ? 'No roles match your search.' : 'No roles yet.'}
-                    </td>
-                </tr>
-            )}
             {allRoles.map(role => (
                 <tr>
                     <td>
@@ -148,6 +148,64 @@ const totalPages = Math.ceil(totalRoles / itemsPerPage);
             ))}
         </tbody>
     </table>
+
+    <div class="sm:hidden admin-cards flex flex-col gap-3">
+        <div class="hidden items-center gap-2 bg-base-100 rounded-lg p-3 [.admin-cards:has(.row-select:checked)_&]:flex">
+            <label>
+                <input type="checkbox" class="checkbox select-all" />
+            </label>
+            <button form="bulk-form" type="submit" formaction="/admin/users/roles/bulk/publish" class="btn btn-xs btn-outline btn-accent">Enable</button>
+            <button form="bulk-form" type="submit" formaction="/admin/users/roles/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Disable</button>
+            <button form="bulk-form" type="submit" formaction="/admin/users/roles/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+        </div>
+        <div class="flex items-center gap-2 bg-base-100 rounded-lg p-3 [.admin-cards:has(.row-select:checked)_&]:hidden">
+            <label class="flex items-center gap-2">
+                <input type="checkbox" class="checkbox select-all" />
+                <span class="text-sm text-base-content/60">Select all</span>
+            </label>
+        </div>
+        {allRoles.map(role => (
+            <div class="card bg-base-100 rounded-lg p-4">
+                <div class="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-base-300">
+                    <label class="flex items-center gap-2">
+                        <input
+                            form="bulk-form"
+                            type="checkbox"
+                            class="checkbox row-select"
+                            name="selected[]"
+                            value={role.id}
+                        />
+                        <span class="text-sm text-base-content/60">Select</span>
+                    </label>
+                    <form action={`/admin/users/roles/toggle/${role.id}`} method="POST">
+                        <button class="btn btn-square btn-sm" type="submit">
+                            {role.state === 1 ? <CircleCheck size={18} class="text-green-500" /> : <CircleX size={18} class="text-red-500" />}
+                        </button>
+                    </form>
+                </div>
+                <dl class="flex flex-col gap-2">
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-sm text-base-content/60">Title</dt>
+                        <dd class="text-right">
+                            <a href={`/admin/users/roles/edit/${role.id}`}>
+                                <span class="font-bold link-info link-hover">{role.title}</span>
+                            </a>
+                        </dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-sm text-base-content/60">Admin Access</dt>
+                        <dd class="text-right">
+                            {role.adminAccess
+                                ? <span class="badge badge-success badge-sm">Yes</span>
+                                : <span class="badge badge-ghost badge-sm">No</span>}
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        ))}
+    </div>
+        </>
+    )}
     {totalRoles - allRoles.length > 0 &&
         <div class="pt-6 pb-6 flex items-center justify-center">
             <Pagination currentPage={page} totalPages={totalPages} basePath="/admin/users/roles/" params={{ q }} />

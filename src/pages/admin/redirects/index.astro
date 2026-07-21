@@ -105,71 +105,125 @@ const totalPages = Math.ceil(totalRedirects / itemsPerPage);
         <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
     <form id="bulk-form" method="POST"></form>
-    <table class="table p-2 bg-base-100 rounded-lg">
-        <thead>
-            <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
-                <th class="w-px whitespace-nowrap">
+    {allRedirects.length === 0 && (
+        <div class="text-center text-base-content/60 py-8 bg-base-100 rounded-lg">
+            {q ? 'No redirects match your search.' : 'No redirects yet.'}
+        </div>
+    )}
+    {allRedirects.length > 0 && (
+        <>
+            <table class="hidden sm:table p-2 bg-base-100 rounded-lg">
+                <thead>
+                    <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
+                        <th class="w-px whitespace-nowrap">
+                            <label>
+                                <input type="checkbox" class="checkbox select-all" />
+                            </label>
+                        </th>
+                        <th colspan="3">
+                            <div class="flex items-center gap-2">
+                                <button form="bulk-form" type="submit" formaction="/admin/redirects/bulk/publish" class="btn btn-xs btn-outline btn-accent">Enable</button>
+                                <button form="bulk-form" type="submit" formaction="/admin/redirects/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Disable</button>
+                                <button form="bulk-form" type="submit" formaction="/admin/redirects/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+                            </div>
+                        </th>
+                    </tr>
+                    <tr class="[table:has(.row-select:checked)_&]:hidden">
+                        <th class="w-px whitespace-nowrap">
+                            <label>
+                                <input type="checkbox" class="checkbox select-all" />
+                            </label>
+                        </th>
+                        <th class="w-px whitespace-nowrap">State</th>
+                        <th>From</th>
+                        <th>To</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {allRedirects.map(redirect => (
+                        <tr>
+                            <td>
+                                <label>
+                                    <input
+                                        form="bulk-form"
+                                        type="checkbox"
+                                        class="checkbox row-select"
+                                        name="selected[]"
+                                        value={redirect.id}
+                                    />
+                                </label>
+                            </td>
+                            <td class="w-px whitespace-nowrap">
+                                <form action={`/admin/redirects/toggle/${redirect.id}`} method="POST">
+                                    <button class="btn btn-square" type="submit">
+                                        {redirect.state === 1 ? <CircleCheck size={20} class="text-green-500" /> : <CircleX size={20} class="text-red-500" />}
+                                    </button>
+                                </form>
+                            </td>
+                            <td>
+                                <a href={`/admin/redirects/edit/${redirect.id}`}>
+                                    <div class="font-bold link-info link-hover">{redirect.from}</div>
+                                </a>
+                            </td>
+                            <td class="text-base-content/70">{redirect.to}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+
+            <div class="sm:hidden admin-cards flex flex-col gap-3">
+                <div class="hidden items-center gap-2 bg-base-100 rounded-lg p-3 [.admin-cards:has(.row-select:checked)_&]:flex">
                     <label>
                         <input type="checkbox" class="checkbox select-all" />
                     </label>
-                </th>
-                <th colspan="3">
-                    <div class="flex items-center gap-2">
-                        <button form="bulk-form" type="submit" formaction="/admin/redirects/bulk/publish" class="btn btn-xs btn-outline btn-accent">Enable</button>
-                        <button form="bulk-form" type="submit" formaction="/admin/redirects/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Disable</button>
-                        <button form="bulk-form" type="submit" formaction="/admin/redirects/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+                    <button form="bulk-form" type="submit" formaction="/admin/redirects/bulk/publish" class="btn btn-xs btn-outline btn-accent">Enable</button>
+                    <button form="bulk-form" type="submit" formaction="/admin/redirects/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Disable</button>
+                    <button form="bulk-form" type="submit" formaction="/admin/redirects/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+                </div>
+                <div class="flex items-center gap-2 bg-base-100 rounded-lg p-3 [.admin-cards:has(.row-select:checked)_&]:hidden">
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" class="checkbox select-all" />
+                        <span class="text-sm text-base-content/60">Select all</span>
+                    </label>
+                </div>
+                {allRedirects.map(redirect => (
+                    <div class="card bg-base-100 rounded-lg p-4">
+                        <div class="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-base-300">
+                            <label class="flex items-center gap-2">
+                                <input
+                                    form="bulk-form"
+                                    type="checkbox"
+                                    class="checkbox row-select"
+                                    name="selected[]"
+                                    value={redirect.id}
+                                />
+                                <span class="text-sm text-base-content/60">Select</span>
+                            </label>
+                            <form action={`/admin/redirects/toggle/${redirect.id}`} method="POST">
+                                <button class="btn btn-square btn-sm" type="submit">
+                                    {redirect.state === 1 ? <CircleCheck size={18} class="text-green-500" /> : <CircleX size={18} class="text-red-500" />}
+                                </button>
+                            </form>
+                        </div>
+                        <dl class="flex flex-col gap-2">
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-sm text-base-content/60">From</dt>
+                                <dd class="text-right">
+                                    <a href={`/admin/redirects/edit/${redirect.id}`}>
+                                        <span class="font-bold link-info link-hover">{redirect.from}</span>
+                                    </a>
+                                </dd>
+                            </div>
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-sm text-base-content/60">To</dt>
+                                <dd class="text-right text-base-content/70 break-all">{redirect.to}</dd>
+                            </div>
+                        </dl>
                     </div>
-                </th>
-            </tr>
-            <tr class="[table:has(.row-select:checked)_&]:hidden">
-                <th class="w-px whitespace-nowrap">
-                    <label>
-                        <input type="checkbox" class="checkbox select-all" />
-                    </label>
-                </th>
-                <th class="w-px whitespace-nowrap">State</th>
-                <th>From</th>
-                <th>To</th>
-            </tr>
-        </thead>
-        <tbody>
-            {allRedirects.length === 0 && (
-                <tr>
-                    <td colspan="4" class="text-center text-base-content/60 py-8">
-                        {q ? 'No redirects match your search.' : 'No redirects yet.'}
-                    </td>
-                </tr>
-            )}
-            {allRedirects.map(redirect => (
-                <tr>
-                    <td>
-                        <label>
-                            <input
-                                form="bulk-form"
-                                type="checkbox"
-                                class="checkbox row-select"
-                                name="selected[]"
-                                value={redirect.id}
-                            />
-                        </label>
-                    </td>
-                    <td class="w-px whitespace-nowrap">
-                        <form action={`/admin/redirects/toggle/${redirect.id}`} method="POST">
-                            <button class="btn btn-square" type="submit">
-                                {redirect.state === 1 ? <CircleCheck size={20} class="text-green-500" /> : <CircleX size={20} class="text-red-500" />}
-                            </button>
-                        </form>
-                    </td>
-                    <td>
-                        <a href={`/admin/redirects/edit/${redirect.id}`}>
-                            <div class="font-bold link-info link-hover">{redirect.from}</div>
-                        </a>
-                    </td>
-                    <td class="text-base-content/70">{redirect.to}</td>
-                </tr>
-            ))}
-        </tbody>
-    </table>
+                ))}
+            </div>
+        </>
+    )}
     {totalRedirects - allRedirects.length > 0 &&
         <div class="pt-6 pb-6 flex items-center justify-center">
             <Pagination currentPage={page} totalPages={totalPages} basePath="/admin/redirects/" params={{ q }} />

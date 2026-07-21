@@ -101,84 +101,147 @@ const totalPages = Math.ceil(totalDocuments / itemsPerPage);
         <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
     <form id="bulk-form" method="POST"></form>
-    <table class="table p-2 bg-base-100 rounded-lg">
-        <thead>
-            <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
-                <th class="w-px whitespace-nowrap">
+    {allDocuments.length === 0 && (
+        <div class="text-center text-base-content/60 py-8 bg-base-100 rounded-lg">
+            {q ? 'No documents match your search.' : 'No documents yet.'}
+        </div>
+    )}
+    {allDocuments.length > 0 && (
+        <>
+            <table class="hidden sm:table p-2 bg-base-100 rounded-lg">
+                <thead>
+                    <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
+                        <th class="w-px whitespace-nowrap">
+                            <label>
+                                <input type="checkbox" class="checkbox select-all" />
+                            </label>
+                        </th>
+                        <th colspan="2">
+                            <div class="flex items-center gap-2">
+                                <button form="bulk-form" type="submit" formaction="/admin/documents/bulk/publish" class="btn btn-xs btn-outline btn-accent">Publish</button>
+                                <button form="bulk-form" type="submit" formaction="/admin/documents/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Unpublish</button>
+                                <button form="bulk-form" type="submit" formaction="/admin/documents/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+                            </div>
+                        </th>
+                        <th></th>
+                    </tr>
+                    <tr class="[table:has(.row-select:checked)_&]:hidden">
+                        <th class="w-px whitespace-nowrap">
+                            <label>
+                                <input type="checkbox" class="checkbox select-all" />
+                            </label>
+                        </th>
+                        <th class="w-px whitespace-nowrap">State</th>
+                        <th>Document</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {allDocuments.map(doc => (
+                        <tr>
+                            <td>
+                                <label>
+                                    <input
+                                        form="bulk-form"
+                                        type="checkbox"
+                                        class="checkbox row-select"
+                                        name="selected[]"
+                                        value={doc.id}
+                                    />
+                                </label>
+                            </td>
+                            <td class="w-px whitespace-nowrap">
+                                <form action={`/admin/documents/toggle/${doc.id}`} method="POST">
+                                    <button class="btn btn-square" type="submit">
+                                        {doc.state === 1 ? <CircleCheck size={20} class="text-green-500" /> : <CircleX size={20} class="text-red-500" />}
+                                    </button>
+                                </form>
+                            </td>
+                            <td>
+                                <button
+                                    class="font-bold link link-info link-hover text-left"
+                                    data-edit-id={doc.id}
+                                    data-edit-title={doc.title}
+                                >{doc.title}</button>
+                            </td>
+                            <td class="w-px whitespace-nowrap">
+                                <a
+                                    href={`/document/${doc.slug}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="btn btn-ghost btn-square btn-sm"
+                                    title={`Open ${doc.title}`}
+                                >
+                                    <ExternalLink size={16} />
+                                </a>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+
+            <div class="sm:hidden admin-cards flex flex-col gap-3">
+                <div class="hidden items-center gap-2 bg-base-100 rounded-lg p-3 [.admin-cards:has(.row-select:checked)_&]:flex">
                     <label>
                         <input type="checkbox" class="checkbox select-all" />
                     </label>
-                </th>
-                <th colspan="2">
-                    <div class="flex items-center gap-2">
-                        <button form="bulk-form" type="submit" formaction="/admin/documents/bulk/publish" class="btn btn-xs btn-outline btn-accent">Publish</button>
-                        <button form="bulk-form" type="submit" formaction="/admin/documents/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Unpublish</button>
-                        <button form="bulk-form" type="submit" formaction="/admin/documents/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+                    <button form="bulk-form" type="submit" formaction="/admin/documents/bulk/publish" class="btn btn-xs btn-outline btn-accent">Publish</button>
+                    <button form="bulk-form" type="submit" formaction="/admin/documents/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Unpublish</button>
+                    <button form="bulk-form" type="submit" formaction="/admin/documents/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+                </div>
+                <div class="flex items-center gap-2 bg-base-100 rounded-lg p-3 [.admin-cards:has(.row-select:checked)_&]:hidden">
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" class="checkbox select-all" />
+                        <span class="text-sm text-base-content/60">Select all</span>
+                    </label>
+                </div>
+                {allDocuments.map(doc => (
+                    <div class="card bg-base-100 rounded-lg p-4">
+                        <div class="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-base-300">
+                            <label class="flex items-center gap-2">
+                                <input
+                                    form="bulk-form"
+                                    type="checkbox"
+                                    class="checkbox row-select"
+                                    name="selected[]"
+                                    value={doc.id}
+                                />
+                                <span class="text-sm text-base-content/60">Select</span>
+                            </label>
+                            <div class="flex items-center gap-1">
+                                <form action={`/admin/documents/toggle/${doc.id}`} method="POST">
+                                    <button class="btn btn-square btn-sm" type="submit">
+                                        {doc.state === 1 ? <CircleCheck size={18} class="text-green-500" /> : <CircleX size={18} class="text-red-500" />}
+                                    </button>
+                                </form>
+                                <a
+                                    href={`/document/${doc.slug}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="btn btn-ghost btn-square btn-sm"
+                                    title={`Open ${doc.title}`}
+                                >
+                                    <ExternalLink size={16} />
+                                </a>
+                            </div>
+                        </div>
+                        <dl class="flex flex-col gap-2">
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-sm text-base-content/60">Document</dt>
+                                <dd class="text-right">
+                                    <button
+                                        class="font-bold link link-info link-hover text-right"
+                                        data-edit-id={doc.id}
+                                        data-edit-title={doc.title}
+                                    >{doc.title}</button>
+                                </dd>
+                            </div>
+                        </dl>
                     </div>
-                </th>
-                <th></th>
-            </tr>
-            <tr class="[table:has(.row-select:checked)_&]:hidden">
-                <th class="w-px whitespace-nowrap">
-                    <label>
-                        <input type="checkbox" class="checkbox select-all" />
-                    </label>
-                </th>
-                <th class="w-px whitespace-nowrap">State</th>
-                <th>Document</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {allDocuments.length === 0 && (
-                <tr>
-                    <td colspan="4" class="text-center text-base-content/60 py-8">
-                        {q ? 'No documents match your search.' : 'No documents yet.'}
-                    </td>
-                </tr>
-            )}
-            {allDocuments.map(doc => (
-                <tr>
-                    <td>
-                        <label>
-                            <input
-                                form="bulk-form"
-                                type="checkbox"
-                                class="checkbox row-select"
-                                name="selected[]"
-                                value={doc.id}
-                            />
-                        </label>
-                    </td>
-                    <td class="w-px whitespace-nowrap">
-                        <form action={`/admin/documents/toggle/${doc.id}`} method="POST">
-                            <button class="btn btn-square" type="submit">
-                                {doc.state === 1 ? <CircleCheck size={20} class="text-green-500" /> : <CircleX size={20} class="text-red-500" />}
-                            </button>
-                        </form>
-                    </td>
-                    <td>
-                        <button
-                            class="font-bold link link-info link-hover text-left"
-                            data-edit-id={doc.id}
-                            data-edit-title={doc.title}
-                        >{doc.title}</button>
-                    </td>
-                    <td class="w-px whitespace-nowrap">
-                        <a
-                            href={`/document/${doc.slug}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="btn btn-ghost btn-square btn-sm"
-                            title={`Open ${doc.title}`}
-                        >
-                            <ExternalLink size={16} />
-                        </a>
-                    </td>
-                </tr>
-            ))}
-        </tbody>
-    </table>
+                ))}
+            </div>
+        </>
+    )}
     {totalDocuments - allDocuments.length > 0 &&
         <div class="pt-6 pb-6 flex items-center justify-center">
             <Pagination currentPage={page} totalPages={totalPages} basePath="/admin/documents/" params={{ q }} />

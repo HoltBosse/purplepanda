@@ -109,7 +109,14 @@ const totalPages = Math.ceil(totalForms / itemsPerPage);
         <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
     <form id="bulk-form" method="POST"></form>
-    <table class="table p-2 bg-base-100 rounded-lg">
+    {allForms.length === 0 && (
+        <div class="text-center text-base-content/60 py-8 bg-base-100 rounded-lg">
+            {q ? 'No forms match your search.' : 'No forms yet.'}
+        </div>
+    )}
+    {allForms.length > 0 && (
+        <>
+    <table class="hidden sm:table p-2 bg-base-100 rounded-lg">
         <thead>
             <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
                 <th class="w-px whitespace-nowrap">
@@ -137,13 +144,6 @@ const totalPages = Math.ceil(totalForms / itemsPerPage);
             </tr>
         </thead>
         <tbody>
-            {allForms.length === 0 && (
-                <tr>
-                    <td colspan="4" class="text-center text-base-content/60 py-8">
-                        {q ? 'No forms match your search.' : 'No forms yet.'}
-                    </td>
-                </tr>
-            )}
             {allForms.map(form => (
                 <tr>
                     <td>
@@ -178,6 +178,61 @@ const totalPages = Math.ceil(totalForms / itemsPerPage);
             ))}
         </tbody>
     </table>
+
+    <div class="sm:hidden admin-cards flex flex-col gap-3">
+        <div class="hidden items-center gap-2 bg-base-100 rounded-lg p-3 [.admin-cards:has(.row-select:checked)_&]:flex">
+            <label>
+                <input type="checkbox" class="checkbox select-all" />
+            </label>
+            <button form="bulk-form" type="submit" formaction="/admin/forms/bulk/publish" class="btn btn-xs btn-outline btn-accent">Publish</button>
+            <button form="bulk-form" type="submit" formaction="/admin/forms/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Unpublish</button>
+            <button form="bulk-form" type="submit" formaction="/admin/forms/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+        </div>
+        <div class="flex items-center gap-2 bg-base-100 rounded-lg p-3 [.admin-cards:has(.row-select:checked)_&]:hidden">
+            <label class="flex items-center gap-2">
+                <input type="checkbox" class="checkbox select-all" />
+                <span class="text-sm text-base-content/60">Select all</span>
+            </label>
+        </div>
+        {allForms.map(form => (
+            <div class="card bg-base-100 rounded-lg p-4">
+                <div class="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-base-300">
+                    <label class="flex items-center gap-2">
+                        <input
+                            form="bulk-form"
+                            type="checkbox"
+                            class="checkbox row-select"
+                            name="selected[]"
+                            value={form.id}
+                        />
+                        <span class="text-sm text-base-content/60">Select</span>
+                    </label>
+                    <div class="flex items-center gap-1">
+                        <form action={`/admin/forms/toggle/${form.id}`} method="POST">
+                            <button class="btn btn-square btn-sm" type="submit">
+                                {form.state === 1 ? <CircleCheck size={18} class="text-green-500" /> : <CircleX size={18} class="text-red-500" />}
+                            </button>
+                        </form>
+                        <a href={`/admin/forms/history/${form.id}`} class="btn btn-ghost btn-sm btn-square" title="History">
+                            <GitBranch size={16} />
+                        </a>
+                    </div>
+                </div>
+                <dl class="flex flex-col gap-2">
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-sm text-base-content/60">Form</dt>
+                        <dd class="text-right">
+                            <a href={`/admin/forms/edit/${form.id}`}>
+                                <span class="font-bold link link-info link-hover">{(form.content as any)?.root?.props?.name || 'Untitled'}</span>
+                            </a>
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        ))}
+    </div>
+        </>
+    )}
     {totalForms - allForms.length > 0 &&
         <div class="pt-6 pb-6 flex items-center justify-center">
             <Pagination currentPage={page} totalPages={totalPages} basePath="/admin/forms/" params={{ q }} />

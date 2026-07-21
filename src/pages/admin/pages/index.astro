@@ -202,125 +202,229 @@ const totalPageCount = Math.ceil(totalItems / itemsPerPage);
         <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
     <form id="bulk-form" method="POST"></form>
-    <table class="table p-2 bg-base-100 rounded-lg">
-        <thead>
-            <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
-                <th class="w-px whitespace-nowrap">
-                    <label>
-                        <input type="checkbox" class="checkbox select-all" />
-                    </label>
-                </th>
-                <th colspan="3">
-                    <div class="flex items-center gap-2">
-                        <button form="bulk-form" type="submit" formaction="/admin/pages/bulk/publish" class="btn btn-xs btn-outline btn-accent">Publish</button>
-                        <button form="bulk-form" type="submit" formaction="/admin/pages/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Unpublish</button>
-                        <button form="bulk-form" type="submit" formaction="/admin/pages/bulk/delete" class="btn btn-xs btn-error">Delete</button>
-                    </div>
-                </th>
-            </tr>
-            <tr class="[table:has(.row-select:checked)_&]:hidden">
-                <th class="w-px whitespace-nowrap">
-                    <label>
-                        <input type="checkbox" class="checkbox select-all" />
-                    </label>
-                </th>
-                <th class="w-px whitespace-nowrap">State</th>
-                <th>Page</th>
-                <th class="w-px whitespace-nowrap"></th>
-            </tr>
-        </thead>
-        <tbody>
-            {orderedPages.length === 0 && (
-                <tr>
-                    <td colspan="4" class="text-center text-base-content/60 py-8">
-                        {q ? 'No pages match your search.' : 'No pages yet.'}
-                    </td>
-                </tr>
-            )}
-            {orderedPages.map(({ page, depth }) => {
-                const drafts = draftsByPageId[page.id] ?? [];
-                return (
-                    <tr>
-                        <td>
+    {orderedPages.length === 0 && (
+        <div class="text-center text-base-content/60 py-8 bg-base-100 rounded-lg">
+            {q ? 'No pages match your search.' : 'No pages yet.'}
+        </div>
+    )}
+    {orderedPages.length > 0 && (
+        <>
+            <table class="hidden sm:table p-2 bg-base-100 rounded-lg">
+                <thead>
+                    <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
+                        <th class="w-px whitespace-nowrap">
                             <label>
-                                <input
-                                    form="bulk-form"
-                                    type="checkbox"
-                                    class="checkbox row-select"
-                                    name="selected[]"
-                                    value={page.id}
-                                />
+                                <input type="checkbox" class="checkbox select-all" />
                             </label>
-                        </td>
-                        <td class="w-px whitespace-nowrap">
-                            <form action={`/admin/pages/toggle/${page.id}`} method="POST">
-                                <button class="btn btn-square" type="submit">
-                                    {page.state === 1 ? <CircleCheck size={20} class="text-green-500" /> : <CircleX size={20} class="text-red-500" />}
-                                </button>
-                            </form>
-                        </td>
-                        <td>
-                            <a href={`/admin/pages/edit/${page.id}`}>
-                                <div class="font-bold flex items-center gap-1">
-                                    {depth > 1 && <span class="whitespace-pre">{' '.repeat((depth - 2) * 2)}</span>}
-                                    {depth > 1 && <CornerDownRight size={14} class="text-base-content/50 shrink-0" />}
-                                    <span class="link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</span>
-                                </div>
-                            </a>
-                        </td>
-                        <td class="w-px whitespace-nowrap">
-                            <div class="dropdown dropdown-end">
-                                <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square">
-                                    <EllipsisVertical size={16} />
-                                </div>
-                                <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow-lg border border-base-300">
-                                    {drafts.length > 0 ? (
-                                        <>
-                                            <li class="menu-title text-xs text-base-content/60 px-2 py-1">Drafts</li>
-                                            {drafts.map(draft => (
-                                                <li>
-                                                    <div class="flex items-center gap-1 pr-1">
-                                                        <a href={`/admin/pages/drafts/edit/${draft.id}`} class="flex items-center gap-2 flex-1 min-w-0" title={draft.name}>
-                                                            <FilePen size={14} class="shrink-0" />
-                                                            <span class="truncate min-w-0">{draft.name}</span>
-                                                        </a>
-                                                        <form method="POST" action={`/admin/drafts/delete/${draft.id}`}>
-                                                            <button type="submit" class="btn btn-ghost btn-xs btn-square text-error shrink-0" title="Delete draft">
-                                                                <Trash2 size={12} />
-                                                            </button>
-                                                        </form>
-                                                    </div>
-                                                </li>
-                                            ))}
-                                            <li><hr class="my-1 border-base-300" /></li>
-                                        </>
-                                    ) : null}
-                                    <li>
-                                        <button
-                                            type="button"
-                                            class="gap-2"
-                                            data-create-draft
-                                            data-entity-id={page.id}
-                                            data-entity-type="page"
-                                        >
-                                            <FilePen size={14} />
-                                            Create new draft
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <a href={`/admin/pages/history/${page.id}`} class="gap-2">
-                                            <GitBranch size={12} />
-                                            History
-                                        </a>
-                                    </li>
-                                </ul>
+                        </th>
+                        <th colspan="3">
+                            <div class="flex items-center gap-2">
+                                <button form="bulk-form" type="submit" formaction="/admin/pages/bulk/publish" class="btn btn-xs btn-outline btn-accent">Publish</button>
+                                <button form="bulk-form" type="submit" formaction="/admin/pages/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Unpublish</button>
+                                <button form="bulk-form" type="submit" formaction="/admin/pages/bulk/delete" class="btn btn-xs btn-error">Delete</button>
                             </div>
-                        </td>
+                        </th>
                     </tr>
-                );
-            })}
-        </tbody>
-    </table>
+                    <tr class="[table:has(.row-select:checked)_&]:hidden">
+                        <th class="w-px whitespace-nowrap">
+                            <label>
+                                <input type="checkbox" class="checkbox select-all" />
+                            </label>
+                        </th>
+                        <th class="w-px whitespace-nowrap">State</th>
+                        <th>Page</th>
+                        <th class="w-px whitespace-nowrap"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {orderedPages.map(({ page, depth }) => {
+                        const drafts = draftsByPageId[page.id] ?? [];
+                        return (
+                            <tr>
+                                <td>
+                                    <label>
+                                        <input
+                                            form="bulk-form"
+                                            type="checkbox"
+                                            class="checkbox row-select"
+                                            name="selected[]"
+                                            value={page.id}
+                                        />
+                                    </label>
+                                </td>
+                                <td class="w-px whitespace-nowrap">
+                                    <form action={`/admin/pages/toggle/${page.id}`} method="POST">
+                                        <button class="btn btn-square" type="submit">
+                                            {page.state === 1 ? <CircleCheck size={20} class="text-green-500" /> : <CircleX size={20} class="text-red-500" />}
+                                        </button>
+                                    </form>
+                                </td>
+                                <td>
+                                    <a href={`/admin/pages/edit/${page.id}`}>
+                                        <div class="font-bold flex items-center gap-1">
+                                            {depth > 1 && <span class="whitespace-pre">{' '.repeat((depth - 2) * 2)}</span>}
+                                            {depth > 1 && <CornerDownRight size={14} class="text-base-content/50 shrink-0" />}
+                                            <span class="link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</span>
+                                        </div>
+                                    </a>
+                                </td>
+                                <td class="w-px whitespace-nowrap">
+                                    <div class="dropdown dropdown-end">
+                                        <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square">
+                                            <EllipsisVertical size={16} />
+                                        </div>
+                                        <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow-lg border border-base-300">
+                                            {drafts.length > 0 ? (
+                                                <>
+                                                    <li class="menu-title text-xs text-base-content/60 px-2 py-1">Drafts</li>
+                                                    {drafts.map(draft => (
+                                                        <li>
+                                                            <div class="flex items-center gap-1 pr-1">
+                                                                <a href={`/admin/pages/drafts/edit/${draft.id}`} class="flex items-center gap-2 flex-1 min-w-0" title={draft.name}>
+                                                                    <FilePen size={14} class="shrink-0" />
+                                                                    <span class="truncate min-w-0">{draft.name}</span>
+                                                                </a>
+                                                                <form method="POST" action={`/admin/drafts/delete/${draft.id}`}>
+                                                                    <button type="submit" class="btn btn-ghost btn-xs btn-square text-error shrink-0" title="Delete draft">
+                                                                        <Trash2 size={12} />
+                                                                    </button>
+                                                                </form>
+                                                            </div>
+                                                        </li>
+                                                    ))}
+                                                    <li><hr class="my-1 border-base-300" /></li>
+                                                </>
+                                            ) : null}
+                                            <li>
+                                                <button
+                                                    type="button"
+                                                    class="gap-2"
+                                                    data-create-draft
+                                                    data-entity-id={page.id}
+                                                    data-entity-type="page"
+                                                >
+                                                    <FilePen size={14} />
+                                                    Create new draft
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <a href={`/admin/pages/history/${page.id}`} class="gap-2">
+                                                    <GitBranch size={12} />
+                                                    History
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+
+            <div class="sm:hidden admin-cards flex flex-col gap-3">
+                <div class="hidden items-center gap-2 bg-base-100 rounded-lg p-3 [.admin-cards:has(.row-select:checked)_&]:flex">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                    <button form="bulk-form" type="submit" formaction="/admin/pages/bulk/publish" class="btn btn-xs btn-outline btn-accent">Publish</button>
+                    <button form="bulk-form" type="submit" formaction="/admin/pages/bulk/unpublish" class="btn btn-xs btn-outline btn-warning">Unpublish</button>
+                    <button form="bulk-form" type="submit" formaction="/admin/pages/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+                </div>
+                <div class="flex items-center gap-2 bg-base-100 rounded-lg p-3 [.admin-cards:has(.row-select:checked)_&]:hidden">
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" class="checkbox select-all" />
+                        <span class="text-sm text-base-content/60">Select all</span>
+                    </label>
+                </div>
+                {orderedPages.map(({ page, depth }) => {
+                    const drafts = draftsByPageId[page.id] ?? [];
+                    return (
+                        <div class="card bg-base-100 rounded-lg p-4">
+                            <div class="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-base-300">
+                                <label class="flex items-center gap-2">
+                                    <input
+                                        form="bulk-form"
+                                        type="checkbox"
+                                        class="checkbox row-select"
+                                        name="selected[]"
+                                        value={page.id}
+                                    />
+                                    <span class="text-sm text-base-content/60">Select</span>
+                                </label>
+                                <div class="flex items-center gap-1">
+                                    <form action={`/admin/pages/toggle/${page.id}`} method="POST">
+                                        <button class="btn btn-square btn-sm" type="submit">
+                                            {page.state === 1 ? <CircleCheck size={18} class="text-green-500" /> : <CircleX size={18} class="text-red-500" />}
+                                        </button>
+                                    </form>
+                                    <div class="dropdown dropdown-end">
+                                        <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square">
+                                            <EllipsisVertical size={16} />
+                                        </div>
+                                        <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow-lg border border-base-300">
+                                            {drafts.length > 0 ? (
+                                                <>
+                                                    <li class="menu-title text-xs text-base-content/60 px-2 py-1">Drafts</li>
+                                                    {drafts.map(draft => (
+                                                        <li>
+                                                            <div class="flex items-center gap-1 pr-1">
+                                                                <a href={`/admin/pages/drafts/edit/${draft.id}`} class="flex items-center gap-2 flex-1 min-w-0" title={draft.name}>
+                                                                    <FilePen size={14} class="shrink-0" />
+                                                                    <span class="truncate min-w-0">{draft.name}</span>
+                                                                </a>
+                                                                <form method="POST" action={`/admin/drafts/delete/${draft.id}`}>
+                                                                    <button type="submit" class="btn btn-ghost btn-xs btn-square text-error shrink-0" title="Delete draft">
+                                                                        <Trash2 size={12} />
+                                                                    </button>
+                                                                </form>
+                                                            </div>
+                                                        </li>
+                                                    ))}
+                                                    <li><hr class="my-1 border-base-300" /></li>
+                                                </>
+                                            ) : null}
+                                            <li>
+                                                <button
+                                                    type="button"
+                                                    class="gap-2"
+                                                    data-create-draft
+                                                    data-entity-id={page.id}
+                                                    data-entity-type="page"
+                                                >
+                                                    <FilePen size={14} />
+                                                    Create new draft
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <a href={`/admin/pages/history/${page.id}`} class="gap-2">
+                                                    <GitBranch size={12} />
+                                                    History
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <dl class="flex flex-col gap-2">
+                                <div class="flex justify-between gap-4">
+                                    <dt class="text-sm text-base-content/60">Page</dt>
+                                    <dd class="text-right">
+                                        <a href={`/admin/pages/edit/${page.id}`}>
+                                            <div class="font-bold flex items-center justify-end gap-1">
+                                                {depth > 1 && <CornerDownRight size={14} class="text-base-content/50 shrink-0" />}
+                                                <span class="link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</span>
+                                            </div>
+                                        </a>
+                                    </dd>
+                                </div>
+                            </dl>
+                        </div>
+                    );
+                })}
+            </div>
+        </>
+    )}
     {totalPageCount > 1 &&
         <div class="pt-6 pb-6 flex items-center justify-center">
             <Pagination currentPage={currentPage} totalPages={totalPageCount} basePath="/admin/pages/" params={{ q }} />
