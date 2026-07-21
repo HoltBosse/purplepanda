@@ -56,7 +56,12 @@ export async function POST(context: APIContext): Promise<Response> {
     if (isNewForm) {
         form.content = parsedContent;
         form.state = 1;
-        await db.insert(forms).values(form).returning();
+        // `form` is synthesized from the table's column defaults above, so `form.id` is drizzle's
+        // `gen_random_uuid()` SQL expression rather than a real id. Adopt the row Postgres actually
+        // inserted — otherwise that expression gets re-evaluated into an unrelated uuid for the
+        // publish node's entityId, and serialized verbatim into the audit action's data.id.
+        const [inserted] = await db.insert(forms).values(form).returning();
+        if (inserted) form = inserted;
     } else {
         await db.update(forms).set({ content: parsedContent }).where(eq(forms.id, form.id));
     }

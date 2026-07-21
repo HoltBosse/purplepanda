@@ -1,18 +1,112 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
-import { forms } from '../../../db/schema.js';
+import { forms, userActions, users } from '../../../db/schema.js';
 import { CircleCheck, CircleX, GitBranch } from '@lucide/astro';
-import { desc, gt } from 'drizzle-orm';
+import { and, desc, eq, gt, sql } from 'drizzle-orm';
+import { z } from 'zod';
+import Pagination from '../../../components/Pagination.astro';
+import SearchBar from '../../../search/SearchBar';
+import { parseSearchQuery } from '../../../search/parser.js';
+import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
+import type { SearchFieldSpec } from '../../../search/types.js';
 
 const db = getDb();
-const allForms = await db.select().from(forms).where(gt(forms.state, -1)).orderBy(desc(forms.id));
+
+// A form's name isn't a column — Puck stores it in the content document, which is why the table
+// below reads `content.root.props.name`. The search builder accepts an arbitrary SQL expression in
+// place of a column, so the same path can be filtered on directly in Postgres.
+const nameExpr = sql`${forms.content} -> 'root' -> 'props' ->> 'name'`;
+
+// Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
+// valid/invalid highlighting, and the qualifier/value autocomplete dropdown.
+// Note there is deliberately no `deleted` state here: this listing hard-filters to state > -1, so
+// a `state:deleted` term could never match anything.
+const searchFields: SearchFieldSpec[] = [
+    {
+        name: 'state',
+        type: 'enum',
+        enumValues: ['published', 'unpublished'],
+        label: 'State',
+        description: 'Publish state',
+    },
+    { name: 'name', type: 'text', label: 'Name', description: 'Form name contains' },
+    { name: 'author', type: 'text', label: 'Author', description: 'Creator email' },
+    { name: 'created', type: 'date', label: 'Created', description: 'Date created (YYYY-MM-DD)' },
+];
+
+// Server-side counterpart. `forms` has no author or created-at column, so both ride on the
+// `formcreate` row that `forms/update.ts` logs to `userActions`
+// (`{ type: "formcreate", data: { id: <formId> } }`) whenever a form is created.
+const searchConfig: DrizzleSearchConfig = {
+    fields: [
+        {
+            name: 'state',
+            type: 'enum',
+            enumValues: ['published', 'unpublished'],
+            column: forms.state,
+            valueMap: { published: 1, unpublished: 0 },
+        },
+        { name: 'name', type: 'text', column: nameExpr, matchMode: 'contains' },
+        { name: 'author', type: 'text', column: users.email, matchMode: 'exact' },
+        { name: 'created', type: 'date', column: userActions.date },
+    ],
+    // A bare term searches the form name — the one piece of form text this listing shows.
+    fulltext: { columns: [nameExpr] },
+    joins: [
+        {
+            table: userActions,
+            on: sql`${userActions.type} = 'formcreate' and ${userActions.data} ->> 'id' = ${forms.id}::text`,
+            type: 'left',
+        },
+        { table: users, on: eq(userActions.userId, users.id), type: 'left' },
+    ],
+};
+
+const q = Astro.url.searchParams.get('q') ?? '';
+const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig);
+
+const itemsPerPage = 12;
+const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);
+let page = 1;
+if (pageData.success) {
+    page = pageData.data;
+}
+const offset = (page - 1) * itemsPerPage;
+
+// state > -1 hides soft-deleted forms, on top of whatever the search matched.
+const listFilter = and(gt(forms.state, -1), searchWhere);
+
+// DISTINCT (here and in the count below) because the userActions/users joins are one-to-many: a
+// form with more than one `formcreate` action would otherwise be listed — and counted — once per
+// matching action row.
+const [allForms, totalForms] = await Promise.all([
+    applySearchJoins(
+        db.selectDistinct({ id: forms.id, state: forms.state, content: forms.content }).from(forms).$dynamic(),
+        searchConfig.joins,
+    )
+        .where(listFilter)
+        .orderBy(desc(forms.id))
+        .limit(itemsPerPage)
+        .offset(offset),
+    applySearchJoins(
+        db.select({ count: sql<number>`COUNT(DISTINCT ${forms.id})` }).from(forms).$dynamic(),
+        searchConfig.joins,
+    )
+        .where(listFilter)
+        .then(result => result[0]?.count ?? 0),
+]);
+
+const totalPages = Math.ceil(totalForms / itemsPerPage);
 ---
 
 <AdminLayout>
     <div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
         <h1 class="text-2xl font-semibold">Forms</h1>
         <a href="/admin/forms/new" class="btn btn-primary">New</a>
+    </div>
+    <div class="pt-4 pb-6">
+        <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
     <form id="bulk-form" method="POST"></form>
     <table class="table p-2 bg-base-100 rounded-lg">
@@ -43,6 +137,13 @@ const allForms = await db.select().from(forms).where(gt(forms.state, -1)).orderB
             </tr>
         </thead>
         <tbody>
+            {allForms.length === 0 && (
+                <tr>
+                    <td colspan="4" class="text-center text-base-content/60 py-8">
+                        {q ? 'No forms match your search.' : 'No forms yet.'}
+                    </td>
+                </tr>
+            )}
             {allForms.map(form => (
                 <tr>
                     <td>
@@ -77,5 +178,10 @@ const allForms = await db.select().from(forms).where(gt(forms.state, -1)).orderB
             ))}
         </tbody>
     </table>
+    {totalForms - allForms.length > 0 &&
+        <div class="pt-6 pb-6 flex items-center justify-center">
+            <Pagination currentPage={page} totalPages={totalPages} basePath="/admin/forms/" params={{ q }} />
+        </div>
+    }
     <script>import '../../../scripts/select-all'</script>
 </AdminLayout>
