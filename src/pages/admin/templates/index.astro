@@ -1,18 +1,111 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
-import { templates } from '../../../db/schema.js';
+import { templates, userActions, users } from '../../../db/schema.js';
 import { CircleCheck, CircleX, GitBranch } from '@lucide/astro';
-import { desc, ne } from 'drizzle-orm';
+import { and, desc, eq, ne, sql } from 'drizzle-orm';
+import { z } from 'zod';
+import Pagination from '../../../components/Pagination.astro';
+import SearchBar from '../../../search/SearchBar';
+import { parseSearchQuery } from '../../../search/parser.js';
+import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
+import type { SearchFieldSpec } from '../../../search/types.js';
 
 const db = getDb();
-const allTemplates = await db.select().from(templates).where(ne(templates.state, -1)).orderBy(desc(templates.id));
+
+// A template's title isn't a column — Puck stores it in the content document, which is why the
+// table below reads `content.root.props.title`. The search builder accepts an arbitrary SQL
+// expression in place of a column, so the same path can be filtered on directly in Postgres.
+const titleExpr = sql`${templates.content} -> 'root' -> 'props' ->> 'title'`;
+
+// Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
+// valid/invalid highlighting, and the qualifier/value autocomplete dropdown.
+// No `deleted` state: this listing hard-filters state != -1, so it could never match anything.
+const searchFields: SearchFieldSpec[] = [
+    {
+        name: 'state',
+        type: 'enum',
+        enumValues: ['published', 'unpublished'],
+        label: 'State',
+        description: 'Publish state',
+    },
+    { name: 'title', type: 'text', label: 'Title', description: 'Title contains' },
+    { name: 'author', type: 'text', label: 'Author', description: 'Creator email' },
+    { name: 'created', type: 'date', label: 'Created', description: 'Date created (YYYY-MM-DD)' },
+];
+
+// Server-side counterpart. `templates` has no author or created-at column, so both ride on the
+// `templatecreate` row that `templates/update.ts` logs to `userActions`
+// (`{ type: "templatecreate", data: { id: <templateId> } }`) whenever a template is created.
+const searchConfig: DrizzleSearchConfig = {
+    fields: [
+        {
+            name: 'state',
+            type: 'enum',
+            enumValues: ['published', 'unpublished'],
+            column: templates.state,
+            valueMap: { published: 1, unpublished: 0 },
+        },
+        { name: 'title', type: 'text', column: titleExpr, matchMode: 'contains' },
+        { name: 'author', type: 'text', column: users.email, matchMode: 'exact' },
+        { name: 'created', type: 'date', column: userActions.date },
+    ],
+    // A bare term searches the title — the one piece of template text this listing shows.
+    fulltext: { columns: [titleExpr] },
+    joins: [
+        {
+            table: userActions,
+            on: sql`${userActions.type} = 'templatecreate' and ${userActions.data} ->> 'id' = ${templates.id}::text`,
+            type: 'left',
+        },
+        { table: users, on: eq(userActions.userId, users.id), type: 'left' },
+    ],
+};
+
+const q = Astro.url.searchParams.get('q') ?? '';
+const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig);
+
+const itemsPerPage = 12;
+const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);
+let page = 1;
+if (pageData.success) {
+    page = pageData.data;
+}
+const offset = (page - 1) * itemsPerPage;
+
+// state != -1 hides soft-deleted templates, on top of whatever the search matched.
+const listFilter = and(ne(templates.state, -1), searchWhere);
+
+// DISTINCT (here and in the count below) because the userActions/users joins are one-to-many: a
+// template with more than one `templatecreate` action would otherwise be listed — and counted —
+// once per matching action row.
+const [allTemplates, totalTemplates] = await Promise.all([
+    applySearchJoins(
+        db.selectDistinct({ id: templates.id, state: templates.state, content: templates.content }).from(templates).$dynamic(),
+        searchConfig.joins,
+    )
+        .where(listFilter)
+        .orderBy(desc(templates.id))
+        .limit(itemsPerPage)
+        .offset(offset),
+    applySearchJoins(
+        db.select({ count: sql<number>`COUNT(DISTINCT ${templates.id})` }).from(templates).$dynamic(),
+        searchConfig.joins,
+    )
+        .where(listFilter)
+        .then(result => result[0]?.count ?? 0),
+]);
+
+const totalPages = Math.ceil(totalTemplates / itemsPerPage);
 ---
 
 <AdminLayout>
 	<div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
         <h1 class="text-2xl font-semibold">Templates</h1>
         <a href="/admin/templates/new" class="btn btn-primary">New</a>
+    </div>
+    <div class="pt-4 pb-6">
+        <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
     <form id="bulk-form" method="POST"></form>
     <table class="table p-2 bg-base-100 rounded-lg">
@@ -43,6 +136,13 @@ const allTemplates = await db.select().from(templates).where(ne(templates.state,
             </tr>
         </thead>
         <tbody>
+            {allTemplates.length === 0 && (
+                <tr>
+                    <td colspan="4" class="text-center text-base-content/60 py-8">
+                        {q ? 'No templates match your search.' : 'No templates yet.'}
+                    </td>
+                </tr>
+            )}
             {allTemplates.map(template => (
                 <tr>
                     <td>
@@ -77,5 +177,10 @@ const allTemplates = await db.select().from(templates).where(ne(templates.state,
             ))}
         </tbody>
     </table>
+    {totalTemplates - allTemplates.length > 0 &&
+        <div class="pt-6 pb-6 flex items-center justify-center">
+            <Pagination currentPage={page} totalPages={totalPages} basePath="/admin/templates/" params={{ q }} />
+        </div>
+    }
     <script>import '../../../scripts/select-all'</script>
 </AdminLayout>
