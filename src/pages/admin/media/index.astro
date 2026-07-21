@@ -14,6 +14,10 @@ import { promises as fs } from 'fs';
 import { join } from 'node:path';
 import { getMediaPath } from '../../../media/media.js';
 import Pagination from '../../../components/Pagination.astro';
+import SearchBar from '../../../search/SearchBar';
+import { parseSearchQuery } from '../../../search/parser.js';
+import { buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
+import type { SearchFieldSpec } from '../../../search/types.js';
 
 const { id } = Astro.params;
 
@@ -34,6 +38,26 @@ if(id) {
     }
 }
 
+// Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
+// valid/invalid highlighting, and the qualifier/value autocomplete dropdown.
+const searchFields: SearchFieldSpec[] = [
+    { name: 'title', type: 'text', label: 'Title', description: 'Asset title contains' },
+    { name: 'alt', type: 'text', label: 'Alt text', description: 'Alt text contains' },
+];
+
+const searchConfig: DrizzleSearchConfig = {
+    fields: [
+        { name: 'title', type: 'text', column: media.title, matchMode: 'contains' },
+        { name: 'alt', type: 'text', column: media.alt, matchMode: 'contains' },
+    ],
+    fulltext: { columns: [media.title, media.alt] },
+    joins: [],
+};
+
+const q = Astro.url.searchParams.get('q') ?? '';
+const isSearching = q.trim().length > 0;
+const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig);
+
 const itemsPerPage = 12;
 const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);
 let page = 1;
@@ -42,16 +66,22 @@ if (pageData.success) {
 }
 const offset = (page - 1) * itemsPerPage;
 
+// A search spans every folder rather than just the current one, so the folder-scoped browsing
+// list (and its breadcrumb) is skipped entirely while searching — see the template below.
 //using drizzle, fetch mediafolders, join media on mediafolders.id = media.folder, join mediafolders on mediafolders.parent=mediafolder.id to return the name of the folder, number of inner folders, number of inner media
-const folders = await db.select({
+const folders = isSearching ? [] : await db.select({
     id: mediafolders.id,
     name: mediafolders.name,
     innerFolders: sql<number>`(SELECT COUNT(*) FROM ${mediafolders} AS mf WHERE mf.parent = "mediafolders"."id" AND mf.state = 1)`,
     innerMedia: sql<number>`(SELECT COUNT(*) FROM ${media} WHERE ${media}.folder = "mediafolders"."id" AND ${media}.state = 1)`,
 }).from(mediafolders).where(and(id ? eq(mediafolders.parent, id) : isNull(mediafolders.parent), eq(mediafolders.state, 1))).orderBy(mediafolders.name);
 
-const mediaItems = await db.select().from(media).where(and(id ? eq(media.folder, id) : isNull(media.folder), eq(media.state, 1))).limit(itemsPerPage).offset(offset);
-const totalMediaItems = await db.select({ count: sql<number>`COUNT(*)` }).from(media).where(and(id ? eq(media.folder, id) : isNull(media.folder), eq(media.state, 1))).then(result => result[0]?.count ?? 0);
+const mediaWhere = isSearching
+    ? and(eq(media.state, 1), searchWhere)
+    : and(id ? eq(media.folder, id) : isNull(media.folder), eq(media.state, 1));
+
+const mediaItems = await db.select().from(media).where(mediaWhere).limit(itemsPerPage).offset(offset);
+const totalMediaItems = await db.select({ count: sql<number>`COUNT(*)` }).from(media).where(mediaWhere).then(result => result[0]?.count ?? 0);
 const totalPages = Math.ceil(totalMediaItems / itemsPerPage);
 
 // Load image metadata in parallel using sharp
@@ -95,7 +125,7 @@ type FolderPathEntry = {
 };
 
 let folderPath: FolderPathEntry[] = [{ id: null, name: "Root" }];
-if(id) {
+if(id && !isSearching) {
     const ancestors: FolderPathEntry[] = [];
     const visitedFolderIds = new Set<string>();
     let currentFolderId: string | null = id;
@@ -139,17 +169,22 @@ if(id) {
             <button commandfor="new-image-dialog" command="show-modal" class="btn btn-primary w-full sm:w-auto">Upload</button>
         </div>
     </div>
-    <div class="flex flex-wrap items-center gap-2 text-sm text-base-content/70 pb-4">
-        {folderPath.map((folder, index) => (
-            <div class="flex items-center gap-2">
-                {index > 0 && <span aria-hidden="true" class="text-base-content/40">&gt;</span>}
-                <a
-                    data-id={folder.id ?? "null"}
-                    href={folder.id ? `/admin/media/${folder.id}` : "/admin/media"}
-                    class={index === 0 ? "text-base-content/70 folder-item" : index === folderPath.length - 1 ? "font-semibold text-base-content folder-item" : ""}
-                >{folder.name}</a>
-            </div>
-        ))}
+    {!isSearching && (
+        <div class="flex flex-wrap items-center gap-2 text-sm text-base-content/70 pb-2">
+            {folderPath.map((folder, index) => (
+                <div class="flex items-center gap-2">
+                    {index > 0 && <span aria-hidden="true" class="text-base-content/40">&gt;</span>}
+                    <a
+                        data-id={folder.id ?? "null"}
+                        href={folder.id ? `/admin/media/${folder.id}` : "/admin/media"}
+                        class={index === 0 ? "text-base-content/70 folder-item" : index === folderPath.length - 1 ? "font-semibold text-base-content folder-item" : ""}
+                    >{folder.name}</a>
+                </div>
+            ))}
+        </div>
+    )}
+    <div class={`pb-4 pt-4`}>
+        <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
 
     <script>
@@ -227,29 +262,35 @@ if(id) {
         </template>
     </dialog>
 
-    {folders.length > 0 && <p class="text-lg font-semibold mt-4 mb-2">Folders</p>}
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {folders.map(folder=>(
-            <a
-                data-id={folder.id}
-                href={`/admin/media/${folder.id}`}
-                class="flex w-full min-w-0 items-center gap-4 rounded-box border border-base-300 bg-base-100 p-4 shadow-sm transition-colors hover:bg-base-300 folder-item"
-            >
-                <input type="checkbox" class="checkbox checkbox-info select-mode-toggable hidden" />
-                <div class="bg-info text-white px-2 py-1 rounded flex items-center justify-center h-full aspect-square">
-                    <Folder size={20} />
-                </div>
-                <div class="min-w-0">
-                    <h3 class="font-semibold text-base-content">{folder.name}</h3>
-                    <p class="text-sm text-base-content/60">{folder.innerFolders} folders, {folder.innerMedia} assets</p>
-                </div>
-            </a>
-        ))}
-    </div>
+    {!isSearching && folders.length > 0 && (
+        <>
+            <p class="text-lg font-semibold mt-4 mb-2">Folders</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {folders.map(folder=>(
+                    <a
+                        data-id={folder.id}
+                        href={`/admin/media/${folder.id}`}
+                        class="flex w-full min-w-0 items-center gap-4 rounded-box border border-base-300 bg-base-100 p-4 shadow-sm transition-colors hover:bg-base-300 folder-item"
+                    >
+                        <input type="checkbox" class="checkbox checkbox-info select-mode-toggable hidden" />
+                        <div class="bg-info text-white px-2 py-1 rounded flex items-center justify-center h-full aspect-square">
+                            <Folder size={20} />
+                        </div>
+                        <div class="min-w-0">
+                            <h3 class="font-semibold text-base-content">{folder.name}</h3>
+                            <p class="text-sm text-base-content/60">{folder.innerFolders} folders, {folder.innerMedia} assets</p>
+                        </div>
+                    </a>
+                ))}
+            </div>
+            <br />
+        </>
+    )}
 
-    {folders.length > 0 && <br />}
-
-    <p class="text-lg font-semibold mt-4 mb-2">Assets</p>
+    {!isSearching && <p class="text-lg font-semibold mt-4 mb-2">Assets</p>}
+    {isSearching && mediaItemsWithMetadata.length === 0 && (
+        <p class="text-center text-base-content/60 py-8">No assets match your search.</p>
+    )}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {mediaItemsWithMetadata.map((media)=>(
             <a
@@ -289,7 +330,12 @@ if(id) {
     </div>
     {totalMediaItems-mediaItemsWithMetadata.length > 0 &&
         <div class="pt-6 pb-6 flex items-center justify-center">
-            <Pagination currentPage={page} totalPages={totalPages} basePath={`/admin/media/${id ? `${id}/` : ""}`} />
+            <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                basePath={isSearching ? "/admin/media/" : `/admin/media/${id ? `${id}/` : ""}`}
+                params={{ q }}
+            />
         </div>
     }
 </AdminLayout>
