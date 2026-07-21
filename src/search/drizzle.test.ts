@@ -38,17 +38,80 @@ describe('buildSearchWhere', () => {
     it('builds a case-insensitive tsvector/tsquery match for a bare unquoted term', () => {
         const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('foo'), baseConfig)!);
         expect(sql).toContain('to_tsvector');
+        expect(sql).toContain('to_tsquery');
+        // Case-insensitive: the tsvector path folds case, and the substring path uses ILIKE rather
+        // than a case-sensitive LIKE (which is reserved for quoted terms).
+        expect(sql).not.toMatch(/(?<!i)\blike\b/i);
+        expect(params).toContain('foo:*');
+    });
+
+    it('matches lexeme prefixes by default, so "bird" also finds "birdo"', () => {
+        // Postgres FTS is lexeme-based: a plain query for "bird" matches 'smol bird' but not
+        // 'birdo', which is a different lexeme entirely.
+        const { params } = toQuery(buildSearchWhere(parseSearchQuery('bird'), baseConfig)!);
+        expect(params).toContain('bird:*');
+    });
+
+    it('ANDs prefix terms together for a multi-word term', () => {
+        const { params } = toQuery(buildSearchWhere(parseSearchQuery('xkcd.com'), baseConfig)!);
+        expect(params).toContain('xkcd:* & com:*');
+    });
+
+    it('ORs a raw substring match alongside the tsquery by default', () => {
+        // Covers what FTS structurally can't: mid-word matches, and literals spanning the symbol
+        // boundaries the tsvector side splits on.
+        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('irdo'), baseConfig)!);
+        expect(sql).toContain('to_tsvector');
+        expect(sql.toLowerCase()).toContain('ilike');
+        expect(sql.toLowerCase()).toContain(' or ');
+        expect(params).toContain('%irdo%');
+    });
+
+    it('matches a symbol-spanning literal verbatim via the substring pass', () => {
+        const { params } = toQuery(buildSearchWhere(parseSearchQuery('xkcd.com/1360'), baseConfig)!);
+        // normalized for the tsquery side...
+        expect(params).toContain('xkcd:* & com:* & 1360:*');
+        // ...and kept raw for the substring side.
+        expect(params).toContain('%xkcd.com/1360%');
+    });
+
+    it('emits only the tsquery when substringMatch is disabled', () => {
+        const config: DrizzleSearchConfig = {
+            ...baseConfig,
+            fulltext: { columns: [documents.title], substringMatch: false },
+        };
+        const { sql } = toQuery(buildSearchWhere(parseSearchQuery('bird'), config)!);
+        expect(sql).toContain('to_tsvector');
+        expect(sql.toLowerCase()).not.toContain('ilike');
+    });
+
+    it('falls back to websearch_to_tsquery when prefixMatch is disabled', () => {
+        const config: DrizzleSearchConfig = {
+            ...baseConfig,
+            fulltext: { columns: [documents.title], prefixMatch: false },
+        };
+        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('foo'), config)!);
         expect(sql).toContain('websearch_to_tsquery');
-        expect(sql).not.toMatch(/\blike\b/i);
         expect(params).toContain('foo');
+    });
+
+    it('never passes non-alphanumeric input to to_tsquery, which parses operators', () => {
+        // With normalizeSymbols off the term can contain `& | ! ( ) :`, which to_tsquery would
+        // either misparse or error on — that combination must use websearch_to_tsquery instead.
+        const config: DrizzleSearchConfig = {
+            ...baseConfig,
+            fulltext: { columns: [documents.title], normalizeSymbols: false },
+        };
+        const { sql } = toQuery(buildSearchWhere(parseSearchQuery('foo&bar!baz'), config)!);
+        expect(sql).toContain('websearch_to_tsquery');
+        expect(sql).not.toMatch(/[^_]to_tsquery/);
     });
 
     it('splits non-alphanumerics on both sides so URLs/paths are searchable by their parts', () => {
         // Postgres lexes 'https://xkcd.com/1360/' as indivisible url tokens, so without this the
         // tsquery for "xkcd" could never match a URL column.
-        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('xkcd.com'), baseConfig)!);
+        const { sql } = toQuery(buildSearchWhere(parseSearchQuery('xkcd.com'), baseConfig)!);
         expect(sql).toContain('regexp_replace');
-        expect(params).toContain('xkcd com');
     });
 
     it('leaves the term intact when normalizeSymbols is disabled', () => {

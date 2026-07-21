@@ -45,6 +45,10 @@ export interface DrizzleSearchField extends SearchFieldSpec {
    * URL/path/identifier columns. Defaults to true.
    */
   normalizeSymbols?: boolean;
+  /** See `prefixMatch` on FulltextSearchConfig. Defaults to true. */
+  prefixMatch?: boolean;
+  /** See `substringMatch` on FulltextSearchConfig. Defaults to true. */
+  substringMatch?: boolean;
 }
 
 export interface FulltextSearchConfig {
@@ -54,6 +58,29 @@ export interface FulltextSearchConfig {
   language?: string;
   /** See `normalizeSymbols` on DrizzleSearchField. Defaults to true. */
   normalizeSymbols?: boolean;
+  /**
+   * Match each term as a lexeme *prefix* (`to_tsquery('bird:*')`) instead of a whole lexeme.
+   * Postgres full-text search is lexeme-based, not substring-based: searching "bird" matches
+   * "smol bird" (lexemes 'smol','bird') but NOT "birdo" (lexeme 'birdo'), which surprises anyone
+   * who expects a search box to match as they type. Prefix matching fixes that while staying real
+   * tsquery (and still index-usable). Note it is a *prefix*: "bird" finds "birdo", but "irdo" does
+   * not — see `substringMatch` to cover that too. Defaults to true.
+   */
+  prefixMatch?: boolean;
+  /**
+   * Additionally OR in a case-insensitive substring match on the raw term, covering the two things
+   * full-text search structurally cannot do: mid-word matches ("irdo" finding "birdo") and literal
+   * matches that span the symbol boundaries `normalizeSymbols` splits on ("xkcd.com/1360" matching
+   * a URL verbatim). The two are complements — tsquery brings word-aware, order-independent,
+   * multi-word AND semantics; the substring pass brings raw literal matching.
+   *
+   * Cost: `ILIKE '%term%'` has a leading wildcard, so it can't use a B-tree index, and OR-ing it
+   * alongside the tsquery keeps a GIN index from being used either. That's free today — none of
+   * these tables has an FTS index, so the tsvector is already recomputed per row on a sequential
+   * scan — but if a GIN index is ever added for scale, prefer the `pg_trgm` extension (a GIN
+   * trigram index makes `ILIKE '%x%'` itself indexable) over this flag. Defaults to true.
+   */
+  substringMatch?: boolean;
 }
 
 export interface JoinConfig {
@@ -133,7 +160,14 @@ function buildTextSearchCondition(node: TextTermNode, fulltext?: FulltextSearchC
   }
 
   const vector = toTsVector(fulltext.columns, language, normalize);
-  return sql`${vector} @@ websearch_to_tsquery(${regconfig(language)}, ${term})`;
+  const fullText = sql`${vector} @@ ${toTsQuery(term, language, fulltext.prefixMatch ?? true)}`;
+
+  if (fulltext.substringMatch === false) return fullText;
+
+  // Matched against the *raw* value, not the normalized one, so a literal like "xkcd.com/1360"
+  // still matches verbatim even though the tsvector side split it into separate words.
+  const pattern = `%${escapeLikePattern(node.value)}%`;
+  return or(fullText, ...[...fulltext.columns].map((c) => ilike(c, pattern)));
 }
 
 function buildFieldCondition(node: FieldTermNode, field: DrizzleSearchField): SQL | undefined {
@@ -174,9 +208,11 @@ function buildTextFieldCondition(node: FieldTermNode, field: DrizzleSearchField)
     const language = field.language ?? DEFAULT_LANGUAGE;
     const normalize = field.normalizeSymbols ?? true;
     const term = normalize ? normalizeFulltextTerm(node.value) : node.value;
-    if (term.length === 0) return ilike(field.column, `%${escapeLikePattern(node.value)}%`);
+    const pattern = `%${escapeLikePattern(node.value)}%`;
+    if (term.length === 0) return ilike(field.column, pattern);
     const vector = toTsVector([field.column], language, normalize);
-    return sql`${vector} @@ websearch_to_tsquery(${regconfig(language)}, ${term})`;
+    const fullText = sql`${vector} @@ ${toTsQuery(term, language, field.prefixMatch ?? true)}`;
+    return field.substringMatch === false ? fullText : or(fullText, ilike(field.column, pattern))!;
   }
 
   if (mode === "contains") {
@@ -192,6 +228,26 @@ function buildTextFieldCondition(node: FieldTermNode, field: DrizzleSearchField)
 // how to bind the parameter). The cast is erased, so the real Column is still what `eq` receives.
 function eqValue(column: SearchColumn, value: unknown): SQL {
   return eq(column as SQL, value);
+}
+
+const SAFE_TSQUERY_TOKEN = /^[a-zA-Z0-9]+$/;
+
+/**
+ * Builds the tsquery side of a full-text match. `websearch_to_tsquery` accepts arbitrary user input
+ * safely but can't express prefix matching, while `to_tsquery` can (`bird:*`) but parses operators
+ * (`& | ! ( ) :`) and errors on malformed input. So prefix mode is only used when every token is
+ * plain alphanumeric — which `normalizeSymbols` (on by default) already guarantees. Anything else
+ * falls back to `websearch_to_tsquery`, so untrusted input can never reach `to_tsquery`.
+ */
+function toTsQuery(term: string, language: string, prefixMatch: boolean): SQL {
+  const config = regconfig(language);
+  if (prefixMatch) {
+    const tokens = term.split(/\s+/).filter((t) => t.length > 0);
+    if (tokens.length > 0 && tokens.every((t) => SAFE_TSQUERY_TOKEN.test(t))) {
+      return sql`to_tsquery(${config}, ${tokens.map((t) => `${t}:*`).join(" & ")})`;
+    }
+  }
+  return sql`websearch_to_tsquery(${config}, ${term})`;
 }
 
 const SYMBOL_RUN = /[^a-zA-Z0-9]+/g;
