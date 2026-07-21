@@ -5,8 +5,52 @@ import { userActions, users } from '../../../db/schema.js';
 import { desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import Pagination from '../../../components/Pagination.astro';
+import SearchBar from '../../../search/SearchBar';
+import { parseSearchQuery } from '../../../search/parser.js';
+import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
+import type { SearchFieldSpec } from '../../../search/types.js';
 
 const db = getDb();
+
+// The set of action types grows as new features log actions, so read it from the data rather than
+// hardcoding it — that keeps the autocomplete dropdown accurate (and self-documenting) for free.
+const actionTypes = await db
+    .selectDistinct({ type: userActions.type })
+    .from(userActions)
+    .orderBy(userActions.type)
+    .then(rows => rows.map(row => row.type));
+
+// On an empty log there are no types to offer; fall back to a plain text field so the grammar
+// degrades to "no matches" rather than reporting "expected one of: <nothing>".
+const typeField: SearchFieldSpec = actionTypes.length > 0
+    ? { name: 'type', type: 'enum', enumValues: actionTypes, label: 'Type', description: 'Action type' }
+    : { name: 'type', type: 'text', label: 'Type', description: 'Action type' };
+
+// Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
+// valid/invalid highlighting, and the qualifier/value autocomplete dropdown.
+const searchFields: SearchFieldSpec[] = [
+    typeField,
+    // Nullable so `user:null` finds the actions attributed to no user (shown as "System").
+    { name: 'user', type: 'text', nullable: true, label: 'User', description: 'Acting user email' },
+    { name: 'date', type: 'date', label: 'Date', description: 'Date the action occurred (YYYY-MM-DD)' },
+];
+
+// Server-side counterpart: resolves each field to a (possibly joined) column. The users join is
+// one-to-one (userId -> users.id, a primary key), so unlike the documents/redirects pages this one
+// can't fan out rows and needs no DISTINCT.
+const searchConfig: DrizzleSearchConfig = {
+    fields: [
+        { ...typeField, column: userActions.type },
+        { name: 'user', type: 'text', nullable: true, column: users.email, matchMode: 'exact' },
+        { name: 'date', type: 'date', column: userActions.date },
+    ],
+    // An unqualified term searches the action type and the acting user's name/email at once.
+    fulltext: { columns: [userActions.type, users.email, users.fname, users.lname] },
+    joins: [{ table: users, on: eq(userActions.userId, users.id), type: 'left' }],
+};
+
+const q = Astro.url.searchParams.get('q') ?? '';
+const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig);
 
 const itemsPerPage = 10;
 const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);
@@ -16,24 +60,30 @@ if (pageData.success) {
 }
 const offset = (page - 1) * itemsPerPage;
 
-const actions = await db
-    .select({
-        id: userActions.id,
-        type: userActions.type,
-        date: userActions.date,
-        userFname: users.fname,
-        userLname: users.lname,
-        userEmail: users.email,
-    })
-    .from(userActions)
-    .leftJoin(users, eq(userActions.userId, users.id))
+const actions = await applySearchJoins(
+    db
+        .select({
+            id: userActions.id,
+            type: userActions.type,
+            date: userActions.date,
+            userFname: users.fname,
+            userLname: users.lname,
+            userEmail: users.email,
+        })
+        .from(userActions)
+        .$dynamic(),
+    searchConfig.joins,
+)
+    .where(searchWhere)
     .orderBy(desc(userActions.date))
     .limit(itemsPerPage)
     .offset(offset);
 
-const totalActions = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(userActions)
+const totalActions = await applySearchJoins(
+    db.select({ count: sql<number>`COUNT(*)` }).from(userActions).$dynamic(),
+    searchConfig.joins,
+)
+    .where(searchWhere)
     .then(result => result[0]?.count ?? 0);
 const totalPages = Math.ceil(totalActions / itemsPerPage);
 ---
@@ -41,6 +91,9 @@ const totalPages = Math.ceil(totalActions / itemsPerPage);
 <AdminLayout>
 	<div class="flex items-center justify-between align-middle border-b border-base-300 pt-2 pb-4">
         <h1 class="text-2xl font-semibold">Audit Log</h1>
+    </div>
+    <div class="pt-4 pb-6">
+        <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
     <table class="table p-2 bg-base-100 rounded-lg">
         <thead>
@@ -51,6 +104,13 @@ const totalPages = Math.ceil(totalActions / itemsPerPage);
             </tr>
         </thead>
         <tbody>
+            {actions.length === 0 && (
+                <tr>
+                    <td colspan="3" class="text-center text-base-content/60 py-8">
+                        {q ? 'No actions match your search.' : 'No actions recorded yet.'}
+                    </td>
+                </tr>
+            )}
             {actions.map((action) => (
                 <tr>
                     <td class="font-bold">{action.type}</td>
@@ -63,7 +123,7 @@ const totalPages = Math.ceil(totalActions / itemsPerPage);
 
     {totalActions - actions.length > 0 &&
         <div class="pt-6 pb-6 flex items-center justify-center">
-            <Pagination currentPage={page} totalPages={totalPages} basePath="/admin/audit/" />
+            <Pagination currentPage={page} totalPages={totalPages} basePath="/admin/audit/" params={{ q }} />
         </div>
     }
 </AdminLayout>
