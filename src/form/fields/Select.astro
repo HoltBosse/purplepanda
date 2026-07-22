@@ -1,6 +1,8 @@
 ---
 import type { ComponentProps } from "astro/types";
 import BaseField from "../BaseField.astro";
+import "slim-select/styles";
+import "./Select.css";
 
 interface Props extends ComponentProps<typeof BaseField> {
   placeholder?: string;
@@ -17,13 +19,15 @@ const selectedValues = multiple ? (Array.isArray(value) ? value : value !== unde
 
 <BaseField {...baseProps}>
     <select
-        class={classList}
+        class={classList ?? "select w-full"}
         name={name}
         id={id}
         required={required}
         multiple={multiple}
+        data-slim-select
+        data-placeholder-text={placeholder}
     >
-        {placeholder && !multiple && <option class={optionsClassList} value="" disabled selected={value === undefined && !options.some(option => option.value === value)}>{placeholder}</option>}
+        {placeholder && !multiple && <option class={optionsClassList} value="" disabled selected={value === undefined && !options.some(option => option.value === value)} data-placeholder="true">{placeholder}</option>}
         {options.map((option) => (
             <option class={optionsClassList} value={option.value} selected={multiple ? selectedValues!.includes(option.value) : option.value === value}>
                 {option.label}
@@ -31,3 +35,24 @@ const selectedValues = multiple ? (Array.isArray(value) ? value : value !== unde
         ))}
     </select>
 </BaseField>
+
+<script>
+  import SlimSelect from "slim-select";
+
+  document.querySelectorAll<HTMLSelectElement>("select[data-slim-select]").forEach((select) => {
+    if (select.dataset.slimSelectInitialized) return;
+    select.dataset.slimSelectInitialized = "true";
+
+    const placeholderText = select.dataset.placeholderText;
+
+    // SlimSelect copies the select's classes onto its own .ss-main box AND the
+    // body-level dropdown. Clear them so the field's fallback utility classes
+    // don't leak onto either — the enhanced look is owned entirely by Select.css.
+    select.className = "";
+
+    new SlimSelect({
+      select,
+      settings: placeholderText ? { placeholderText } : {},
+    });
+  });
+</script>

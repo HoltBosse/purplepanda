@@ -12,6 +12,7 @@ export type SelectProps = {
   placeholder: string;
   options: SelectOption[];
   required: boolean;
+  multiple: boolean;
 };
 
 const Select: ComponentConfig<SelectProps> = {
@@ -42,6 +43,14 @@ const Select: ComponentConfig<SelectProps> = {
         { label: "No", value: false },
       ],
     },
+    multiple: {
+      type: "radio",
+      label: "Allow multiple",
+      options: [
+        { label: "Yes", value: true },
+        { label: "No", value: false },
+      ],
+    },
   },
   defaultProps: {
     label: "Label",
@@ -53,8 +62,9 @@ const Select: ComponentConfig<SelectProps> = {
       { label: "Option 2", value: "option-2" },
     ],
     required: false,
+    multiple: false,
   },
-  render: ({ label, description, name, placeholder, options, required }) => (
+  render: ({ label, description, name, placeholder, options, required, multiple }) => (
     <div className="w-full">
       {label && (
         <label className="block text-sm font-medium mb-1" htmlFor={name}>
@@ -66,10 +76,11 @@ const Select: ComponentConfig<SelectProps> = {
         id={name}
         name={name}
         required={required}
+        multiple={multiple}
         className="select select-bordered w-full"
-        defaultValue=""
+        defaultValue={multiple ? [] : ""}
       >
-        {placeholder && (
+        {placeholder && !multiple && (
           <option value="" disabled>
             {placeholder}
           </option>

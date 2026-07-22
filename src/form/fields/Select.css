@@ -1,0 +1,85 @@
+
+/*
+ * Make SlimSelect read as a sibling of the plain input fields (see the
+ * `inputClassList` used across the admin forms, e.g. the user profile form:
+ * `w-full rounded-md border border-gray-300 px-3 py-2
+ *  focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200`).
+ * We point SlimSelect's own tokens at the same Tailwind vars those utilities
+ * compile to, then align geometry (padding / radius / focus ring) to match.
+ */
+:root {
+  --ss-primary-color: var(--color-blue-500);
+  --ss-bg-color: var(--color-base-100);
+  --ss-font-color: var(--color-base-content);
+  --ss-placeholder-color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+  --ss-disabled-color: var(--color-base-200);
+  --ss-border-color: var(--color-gray-300);
+  --ss-highlight-color: var(--color-blue-200);
+  --ss-focus-color: var(--color-blue-500);
+  --ss-success-color: var(--color-success);
+  --ss-error-color: var(--color-error);
+  --ss-border-radius: var(--radius-md);
+  --ss-main-height: 2.5rem;
+}
+
+/* Closed control — mirror `rounded-md border border-gray-300 px-3 py-2`,
+   transparent background so it sits on the surrounding card like the inputs. */
+.ss-main {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0 0.75rem; /* px-3 gutter; vertical padding lives on .ss-values */
+  background-color: transparent;
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-md);
+  color: var(--color-base-content);
+  font-size: 1rem;
+  line-height: 1.5rem;
+  box-shadow: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ss-main .ss-values {
+  padding: 0.5rem 0; /* py-2 */
+}
+
+/* Text already sits at the .ss-main px-3 gutter — drop SlimSelect's own inset. */
+.ss-main .ss-values .ss-single,
+.ss-main .ss-values .ss-placeholder,
+.ss-main .ss-values .ss-multi-string {
+  padding: 0;
+}
+
+/* focus / open — mirror `focus:border-blue-500 focus:ring focus:ring-blue-200`. */
+.ss-main:focus,
+.ss-main.ss-open {
+  border-color: var(--color-blue-500);
+  box-shadow: 0 0 0 3px var(--color-blue-200);
+  outline: none;
+}
+
+/* Multi-select tags: readable text on the blue chip regardless of theme. */
+.ss-main .ss-values .ss-value .ss-value-text,
+.ss-main .ss-values .ss-max {
+  color: #fff;
+}
+
+.ss-main .ss-values .ss-value .ss-value-delete svg path {
+  stroke: #fff;
+}
+
+/* Dropdown panel — matching border/radius on a solid surface. */
+.ss-content {
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-md);
+  background-color: var(--color-base-100);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  overflow: hidden;
+}
+
+.ss-content .ss-list .ss-option:hover:not(.ss-disabled),
+.ss-content .ss-list .ss-option.ss-highlighted,
+.ss-content .ss-list .ss-option:not(.ss-disabled).ss-selected {
+  color: #fff;
+  background-color: var(--color-blue-500);
+  border-left-color: var(--color-blue-500);
+}
