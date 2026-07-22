@@ -169,164 +169,165 @@ if(id && !isSearching) {
             <button commandfor="new-image-dialog" command="show-modal" class="btn btn-primary w-full sm:w-auto">Upload</button>
         </div>
     </div>
-    {!isSearching && (
-        <div class="flex flex-wrap items-center gap-2 text-sm text-base-content/70 pb-2">
-            {folderPath.map((folder, index) => (
-                <div class="flex items-center gap-2">
-                    {index > 0 && <span aria-hidden="true" class="text-base-content/40">&gt;</span>}
-                    <a
-                        data-id={folder.id ?? "null"}
-                        href={folder.id ? `/admin/media/${folder.id}` : "/admin/media"}
-                        class={index === 0 ? "text-base-content/70 folder-item" : index === folderPath.length - 1 ? "font-semibold text-base-content folder-item" : ""}
-                    >{folder.name}</a>
-                </div>
-            ))}
-        </div>
-    )}
     <div class={`pb-4 pt-4`}>
         <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
     </div>
-
-    <script>
-        import "./media-library";
-    </script>
-
-    <dialog id="delete-confirm-dialog" closedby="any" class="relative m-auto w-96 max-w-[calc(100vw-2rem)] rounded-xl bg-base-100 p-6 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
-        <form method="dialog">
-            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
-        </form>
-        <h3 class="text-lg font-semibold mb-2">Confirm Delete</h3>
-        <p id="delete-confirm-summary" class="text-base-content/70 mb-3"></p>
-        <p id="delete-folder-warning" class="text-sm text-warning mb-4 hidden">Deleting folders will also delete all their contents.</p>
-        <form id="delete-confirm-form" method="post" action="/admin/media/delete">
-            <input type="hidden" name="currentfolderid" value={id ?? ""} />
-            <div class="flex gap-3">
-                <button type="button" id="delete-cancel-btn" class="btn btn-outline flex-1">Cancel</button>
-                <button type="submit" class="btn btn-error flex-1">Delete</button>
-            </div>
-        </form>
-    </dialog>
-
-    <dialog id="new-folder-dialog" closedby="any" class="relative m-auto w-96 max-w-[calc(100vw-2rem)] rounded-xl bg-base-100 p-6 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
-        <form method="dialog">
-            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
-        </form>
-        <form action="/admin/media/newfolder" method="post">
-            <Input name="name" id="name" type="text" label="Folder Name" placeholder="e.g. Art" classList="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200" required />
-            {id ? <input type="hidden" name="parent" value={id} /> : null}
-            <br>
-            <button type="submit" class="btn btn-primary w-full">Create Folder</button>
-        </form>
-    </dialog>
-
-    <dialog id="new-image-dialog" closedby="any" class="relative m-auto w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] md:max-w-2xl rounded-xl bg-base-100 p-6 md:p-8 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
-        <form method="dialog">
-            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
-        </form>
-        <form class="space-y-4">
-            <label id="asset-dropzone" for="asset-upload" class="flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-base-300 bg-base-200/40 p-8 text-center transition-colors hover:border-primary hover:bg-base-200 md:min-h-72 md:p-14">
-                <p class="text-base font-medium text-base-content">Drag &amp; drop here or</p>
-                <span class="mt-2 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-content">Browse files</span>
-                <input id="asset-upload" name="asset" type="file" class="sr-only" multiple />
-            </label>
-        </form>
-    </dialog>
-
-    <dialog id="new-images-configuration" closedby="any" class="relative m-auto w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] md:max-w-4xl rounded-xl bg-base-200 p-6 md:p-8 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
-        <form method="dialog">
-            <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
-        </form>
-        <form id="new-images-form" class="space-y-5" method="post" enctype="multipart/form-data" action="/admin/media/upload">
-            <div id="new-images-list" class="space-y-4"></div>
-            <div class="border-t border-base-300 pt-4">
-                <button id="new-images-submit" type="submit" class="btn btn-primary w-full md:w-auto">Upload</button>
-            </div>
-        </form>
-
-        <template id="new-image-item-template">
-            <section data-image-config class="rounded-xl border border-base-300 bg-base-100 p-4 md:p-5">
-                <div class="flex flex-col gap-4 md:flex-row md:items-center">
-                    <div class="space-y-4 md:w-1/2">
-                        <Input id="image-title-template" name="title[]" type="text" label="Title" placeholder="Image title" classList="input input-bordered w-full" required />
-                        <Input id="image-alt-template" name="alt[]" type="text" label="Alt" placeholder="Alternative text" classList="input input-bordered w-full" required />
-                        <input data-image-id type="hidden" name="id[]" />
-                        <input data-image-file type="file" name="file[]" class="hidden" required />
-                        {id ? <input type="hidden" name="folder[]" value={id} /> : null}
+    <div class="p-4 bg-base-100 rounded-lg">
+        {!isSearching && (
+            <div class="flex flex-wrap items-center gap-2 text-sm text-base-content/70 pb-2">
+                {folderPath.map((folder, index) => (
+                    <div class="flex items-center gap-2">
+                        {index > 0 && <span aria-hidden="true" class="text-base-content/40">&gt;</span>}
+                        <a
+                            data-id={folder.id ?? "null"}
+                            href={folder.id ? `/admin/media/${folder.id}` : "/admin/media"}
+                            class={index === 0 ? (folderPath.length===1 ? "text-base-content/70 folder-item text-base font-bold" : "text-base-content/70 folder-item text-base") : (index === folderPath.length - 1 ? "text-base font-semibold text-base-content folder-item" : "")}
+                        >{folder.name}</a>
                     </div>
-                    <div class="md:w-1/2">
-                        <img data-image-preview alt="Selected image preview" class="h-48 w-full rounded-lg border border-base-300 object-cover md:h-56" />
-                        <p data-image-name class="mt-2 truncate text-sm text-base-content/70"></p>
-                    </div>
-                </div>
-            </section>
-        </template>
-    </dialog>
-
-    {!isSearching && folders.length > 0 && (
-        <>
-            <p class="text-lg font-semibold mt-4 mb-2">Folders</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {folders.map(folder=>(
-                    <a
-                        data-id={folder.id}
-                        href={`/admin/media/${folder.id}`}
-                        class="flex w-full min-w-0 items-center gap-4 rounded-box border border-base-300 bg-base-100 p-4 shadow-sm transition-colors hover:bg-base-300 folder-item"
-                    >
-                        <input type="checkbox" class="checkbox checkbox-info select-mode-toggable hidden" />
-                        <div class="bg-info text-white px-2 py-1 rounded flex items-center justify-center h-full aspect-square">
-                            <Folder size={20} />
-                        </div>
-                        <div class="min-w-0">
-                            <h3 class="font-semibold text-base-content">{folder.name}</h3>
-                            <p class="text-sm text-base-content/60">{folder.innerFolders} folders, {folder.innerMedia} assets</p>
-                        </div>
-                    </a>
                 ))}
             </div>
-            <br />
-        </>
-    )}
+        )}
+        <script>
+            import "./media-library";
+        </script>
 
-    {!isSearching && <p class="text-lg font-semibold mt-4 mb-2">Assets</p>}
-    {isSearching && mediaItemsWithMetadata.length === 0 && (
-        <p class="text-center text-base-content/60 py-8">No assets match your search.</p>
-    )}
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {mediaItemsWithMetadata.map((media)=>(
-            <a
-                class="card w-full min-w-0 bg-base-100 shadow-sm hover:bg-base-300 media-item"
-                data-title={media.title}
-                data-alt={media.alt}
-                data-id={media.id}
-            >
-                {/* w-full bg-base-200 bg-[image:repeating-linear-gradient(45deg,#d4d4d8_0,#d4d4d8_8px,transparent_0,transparent_16px),repeating-linear-gradient(-45deg,#d4d4d8_0,#d4d4d8_8px,transparent_0,transparent_16px)] */}
-                <figure class="pointer-events-none aspect-video w-full overflow-hidden">
-                    <img
-                        src={`/image/${media.id}?fmt=webp&w=1000&q=80`}
-                        title={media.title}
-                        alt={media.title}
-                        class="h-full w-full object-contain pointer-events-none"
-                    />
-                </figure>
-                <input type="checkbox" class="checkbox checkbox-neutral absolute left-2 top-2 z-10 select-mode-toggable hidden pointer-events-none" />
-                <div class="card-body border-t border-base-300 bg-base-200/40">
-                    <div class="flex flex-wrap items-start justify-between gap-3 pointer-events-none">
-                        <div class="min-w-0 pointer-events-none">
-                            <h5 class="font-semibold text-base-content pointer-events-none">{media.title}</h5>
-                            <p class="text-sm text-base-content/60 pointer-events-none">
-                                {media.dimensions ? `${media.dimensions.width} x ${media.dimensions.height}` : '#### x ###'}
-                            </p>
+        <dialog id="delete-confirm-dialog" closedby="any" class="relative m-auto w-96 max-w-[calc(100vw-2rem)] rounded-xl bg-base-100 p-6 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+            </form>
+            <h3 class="text-lg font-semibold mb-2">Confirm Delete</h3>
+            <p id="delete-confirm-summary" class="text-base-content/70 mb-3"></p>
+            <p id="delete-folder-warning" class="text-sm text-warning mb-4 hidden">Deleting folders will also delete all their contents.</p>
+            <form id="delete-confirm-form" method="post" action="/admin/media/delete">
+                <input type="hidden" name="currentfolderid" value={id ?? ""} />
+                <div class="flex gap-3">
+                    <button type="button" id="delete-cancel-btn" class="btn btn-outline flex-1">Cancel</button>
+                    <button type="submit" class="btn btn-error flex-1">Delete</button>
+                </div>
+            </form>
+        </dialog>
+
+        <dialog id="new-folder-dialog" closedby="any" class="relative m-auto w-96 max-w-[calc(100vw-2rem)] rounded-xl bg-base-100 p-6 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+            </form>
+            <form action="/admin/media/newfolder" method="post">
+                <Input name="name" id="name" type="text" label="Folder Name" placeholder="e.g. Art" classList="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200" required />
+                {id ? <input type="hidden" name="parent" value={id} /> : null}
+                <br>
+                <button type="submit" class="btn btn-primary w-full">Create Folder</button>
+            </form>
+        </dialog>
+
+        <dialog id="new-image-dialog" closedby="any" class="relative m-auto w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] md:max-w-2xl rounded-xl bg-base-100 p-6 md:p-8 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+            </form>
+            <form class="space-y-4">
+                <label id="asset-dropzone" for="asset-upload" class="flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-base-300 bg-base-200/40 p-8 text-center transition-colors hover:border-primary hover:bg-base-200 md:min-h-72 md:p-14">
+                    <p class="text-base font-medium text-base-content">Drag &amp; drop here or</p>
+                    <span class="mt-2 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-content">Browse files</span>
+                    <input id="asset-upload" name="asset" type="file" class="sr-only" multiple />
+                </label>
+            </form>
+        </dialog>
+
+        <dialog id="new-images-configuration" closedby="any" class="relative m-auto w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] md:max-w-4xl rounded-xl bg-base-200 p-6 md:p-8 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+            </form>
+            <form id="new-images-form" class="space-y-5" method="post" enctype="multipart/form-data" action="/admin/media/upload">
+                <div id="new-images-list" class="space-y-4"></div>
+                <div class="border-t border-base-300 pt-4">
+                    <button id="new-images-submit" type="submit" class="btn btn-primary w-full md:w-auto">Upload</button>
+                </div>
+            </form>
+
+            <template id="new-image-item-template">
+                <section data-image-config class="rounded-xl border border-base-300 bg-base-100 p-4 md:p-5">
+                    <div class="flex flex-col gap-4 md:flex-row md:items-center">
+                        <div class="space-y-4 md:w-1/2">
+                            <Input id="image-title-template" name="title[]" type="text" label="Title" placeholder="Image title" classList="input input-bordered w-full" required />
+                            <Input id="image-alt-template" name="alt[]" type="text" label="Alt" placeholder="Alternative text" classList="input input-bordered w-full" required />
+                            <input data-image-id type="hidden" name="id[]" />
+                            <input data-image-file type="file" name="file[]" class="hidden" required />
+                            {id ? <input type="hidden" name="folder[]" value={id} /> : null}
                         </div>
-                        <div>
-                            <span class="bg-info text-white px-2 py-1 rounded pointer-events-none">
-                                {/* lazyily splitting on / and showing second half, consider using https://www.npmjs.com/package/mime-db */}
-                                {media.mimetype ? media.mimetype.split('/')[1]?.toUpperCase() ?? 'TYPE' : 'TYPE'}
-                            </span>
+                        <div class="md:w-1/2">
+                            <img data-image-preview alt="Selected image preview" class="h-48 w-full rounded-lg border border-base-300 object-cover md:h-56" />
+                            <p data-image-name class="mt-2 truncate text-sm text-base-content/70"></p>
                         </div>
                     </div>
+                </section>
+            </template>
+        </dialog>
+
+        {!isSearching && folders.length > 0 && (
+            <>
+                <p class="text-lg font-semibold mt-4 mb-2">Folders</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {folders.map(folder=>(
+                        <a
+                            data-id={folder.id}
+                            href={`/admin/media/${folder.id}`}
+                            class="flex w-full min-w-0 items-center gap-4 rounded-box border border-base-300 bg-base-200 p-4 shadow-sm transition-colors hover:bg-base-300 folder-item"
+                        >
+                            <input type="checkbox" class="checkbox checkbox-info select-mode-toggable hidden" />
+                            <div class="bg-info text-white px-2 py-1 rounded flex items-center justify-center h-full aspect-square">
+                                <Folder size={20} />
+                            </div>
+                            <div class="min-w-0">
+                                <h3 class="font-semibold text-base-content">{folder.name}</h3>
+                                <p class="text-sm text-base-content/60">{folder.innerFolders} folders, {folder.innerMedia} assets</p>
+                            </div>
+                        </a>
+                    ))}
                 </div>
-            </a>
-        ))}
+                <br />
+            </>
+        )}
+
+        {!isSearching && <p class="text-lg font-semibold mt-4 mb-2">Assets</p>}
+        {isSearching && mediaItemsWithMetadata.length === 0 && (
+            <p class="text-center text-base-content/60 py-8">No assets match your search.</p>
+        )}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {mediaItemsWithMetadata.map((media)=>(
+                <a
+                    class="card w-full min-w-0 bg-base-200 shadow-sm hover:bg-base-300 media-item"
+                    data-title={media.title}
+                    data-alt={media.alt}
+                    data-id={media.id}
+                >
+                    {/* w-full bg-base-200 bg-[image:repeating-linear-gradient(45deg,#d4d4d8_0,#d4d4d8_8px,transparent_0,transparent_16px),repeating-linear-gradient(-45deg,#d4d4d8_0,#d4d4d8_8px,transparent_0,transparent_16px)] */}
+                    <figure class="pointer-events-none aspect-video w-full overflow-hidden">
+                        <img
+                            src={`/image/${media.id}?fmt=webp&w=1000&q=80`}
+                            title={media.title}
+                            alt={media.title}
+                            class="h-full w-full object-contain pointer-events-none"
+                        />
+                    </figure>
+                    <input type="checkbox" class="checkbox checkbox-neutral absolute left-2 top-2 z-10 select-mode-toggable hidden pointer-events-none" />
+                    <div class="card-body border-t border-base-300 bg-base-300/60">
+                        <div class="flex flex-wrap items-start justify-between gap-3 pointer-events-none">
+                            <div class="min-w-0 pointer-events-none">
+                                <h5 class="font-semibold text-base-content pointer-events-none">{media.title}</h5>
+                                <p class="text-sm text-base-content/60 pointer-events-none">
+                                    {media.dimensions ? `${media.dimensions.width} x ${media.dimensions.height}` : '#### x ###'}
+                                </p>
+                            </div>
+                            <div>
+                                <span class="bg-info text-white px-2 py-1 rounded pointer-events-none">
+                                    {/* lazyily splitting on / and showing second half, consider using https://www.npmjs.com/package/mime-db */}
+                                    {media.mimetype ? media.mimetype.split('/')[1]?.toUpperCase() ?? 'TYPE' : 'TYPE'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            ))}
+        </div>
     </div>
     {totalMediaItems-mediaItemsWithMetadata.length > 0 &&
         <div class="pt-6 pb-6 flex items-center justify-center">
