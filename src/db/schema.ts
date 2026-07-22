@@ -7,6 +7,7 @@ export const users = pgTable("users", {
   lname: varchar("lname", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   password: text("password").notNull(),
+  theme: varchar("theme", { length: 255 }).notNull().default("system"),
 });
 
 export const mediafolders = pgTable("mediafolders", {

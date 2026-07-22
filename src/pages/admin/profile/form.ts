@@ -1,11 +1,27 @@
 import { FormMethod, FormEncType, type FormSection } from '../../../form/types.js';
 import { type InferSelectModel } from 'drizzle-orm';
 import { users } from '../../../db/schema.js';
+import { capitalize } from '../../../string/index.js';
 import * as z from 'zod';
 
 type User = InferSelectModel<typeof users>;
 
 const inputClassList = "w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200";
+
+const DAISYUI_THEMES = [
+	'light', 'dark', 'cupcake', 'bumblebee', 'emerald', 'corporate', 'synthwave', 'retro',
+	'cyberpunk', 'valentine', 'halloween', 'garden', 'forest', 'aqua', 'lofi', 'pastel',
+	'fantasy', 'wireframe', 'black', 'luxury', 'dracula', 'cmyk', 'autumn', 'business',
+	'acid', 'lemonade', 'night', 'coffee', 'winter', 'dim', 'nord', 'sunset',
+	'caramellatte', 'abyss', 'silk',
+];
+
+const THEME_OPTIONS = [
+	{ value: 'system', label: 'System' },
+	...DAISYUI_THEMES.map((theme) => ({ value: theme, label: capitalize(theme) })),
+];
+
+const THEME_VALUES = THEME_OPTIONS.map((option) => option.value) as [string, ...string[]];
 
 export function getProfileForm(user: User, fields: Record<string, any>, redirectUrl: string, flash: Record<string, string> = {}, showCurrentPassword: boolean = false, roleOptions: { value: string; label: string }[] = [], selectedRoleIds: string[] = []): FormSection {
 	return {
@@ -62,6 +78,18 @@ export function getProfileForm(user: User, fields: Record<string, any>, redirect
 								value: flash['email'] ?? user.email,
 								required: true,
 								validator: z.string().email("Invalid email address"),
+							},
+							{
+								id: 'theme',
+								name: 'theme',
+								label: 'Theme',
+								type: 'Select',
+								classList: inputClassList,
+								optionsClassList: "bg-base-100 text-base-content",
+								options: THEME_OPTIONS,
+								value: flash['theme'] ?? user.theme,
+								required: true,
+								validator: z.enum(THEME_VALUES, { message: "Invalid theme" }),
 							}
 						],
 					}

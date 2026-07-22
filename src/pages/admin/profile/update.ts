@@ -36,6 +36,7 @@ export async function POST(context: APIContext): Promise<Response> {
     const fname = getFieldByName(form, 'fname')?.value ?? user.fname;
     const lname = getFieldByName(form, 'lname')?.value ?? user.lname;
     const email = getFieldByName(form, 'email')?.value ?? user.email;
+    const theme = getFieldByName(form, 'theme')?.value ?? user.theme;
 
     //check that email isnt used already by another user
     const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
@@ -46,8 +47,8 @@ export async function POST(context: APIContext): Promise<Response> {
         return context.redirect("/admin/profile");
     }
 
-    //update fname/lname/email in db if it has changed
-    await db.update(users).set({ fname, lname, email }).where(eq(users.id, user.id));
+    //update fname/lname/email/theme in db if it has changed
+    await db.update(users).set({ fname, lname, email, theme }).where(eq(users.id, user.id));
 
     await formFlash.delete('profile');
     const alert = createAlert(alertType.info, "Profile updated only changes name + email. Password change is not implemented yet.");

@@ -67,6 +67,7 @@ export async function POST(context: APIContext): Promise<Response> {
     const fname = getFieldByName(form, 'fname')?.value ?? user.fname;
     const lname = getFieldByName(form, 'lname')?.value ?? user.lname;
     const email = getFieldByName(form, 'email')?.value ?? user.email;
+    const theme = getFieldByName(form, 'theme')?.value ?? user.theme;
     const password = getFieldByName(form, 'new-password')?.value;
     const confirmPassword = getFieldByName(form, 'confirm-new-password')?.value;
 
@@ -116,6 +117,7 @@ export async function POST(context: APIContext): Promise<Response> {
         user.email = email;
         user.fname = fname;
         user.lname = lname;
+        user.theme = theme;
         user.password = await hash(password!);
         user.state = 1;
 
@@ -126,7 +128,7 @@ export async function POST(context: APIContext): Promise<Response> {
         const [inserted] = await db.insert(users).values(user).returning();
         if (inserted) user = inserted;
     } else {
-        await db.update(users).set({ fname, lname, email, password: user.password }).where(eq(users.id, user.id));
+        await db.update(users).set({ fname, lname, email, theme, password: user.password }).where(eq(users.id, user.id));
     }
 
     const roleIdsResult = roleIdsSchema.safeParse(formData.getAll('roles[]').map(String));

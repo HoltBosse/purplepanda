@@ -22,9 +22,11 @@ if(!user) {
 const alerts = Astro.locals.alerts ?? [];
 
 const contentTypes = (externalPuckConfig ? externalPuckConfig.contentTypes : []) ?? [];
+
+const theme = user.theme !== 'system' ? user.theme : undefined;
 ---
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme={theme}>
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
