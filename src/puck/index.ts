@@ -2,6 +2,7 @@ import type { Config, Field, Fields } from "@puckeditor/core";
 export { ClientComponentDataWrapper, wrapConfigWithClientDataResolvers } from "./client-data-wrapper.js";
 export { wrapConfigWithDataBinding, ItemContext, useBoundItem } from "./data-binding.js";
 export type { BoundItem } from "./data-binding.js";
+export { wrapConfigWithIslands, ISLAND_NAME_ATTR, ISLAND_PROPS_ATTR } from "./islands.js";
 
 export type { ComponentConfig, Slot } from "@puckeditor/core";
 
@@ -66,6 +67,11 @@ declare module "@puckeditor/core" {
     data?: (fields: any) => Awaitable<Record<string, unknown>>;
     locations?: Location | Location[];
     bindableFields?: Record<string, BindableFieldMeta>;
+    // When true, this component is hydrated as a standalone React island on the published front
+    // end: its whole render output becomes interactive (hooks, effects, event handlers) while the
+    // rest of the page stays static HTML. Its props must be JSON-serializable — no `slot` fields
+    // or `ReactNode` props (those can't cross the server→client boundary). See ./islands.tsx.
+    island?: boolean;
   }
 }
 

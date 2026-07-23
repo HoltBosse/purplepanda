@@ -5,3 +5,5 @@ export { default as Space } from "./Space.js";
 export { default as Rich } from "./Rich.js";
 export { default as CardCollection } from "./CardCollection.js";
 export type { CardCollectionItem, CardCollectionProps, OrderBy, OrderDirection } from "./CardCollection.js";
+export { default as Counter } from "./Counter.js";
+export type { CounterProps } from "./Counter.js";

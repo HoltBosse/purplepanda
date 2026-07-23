@@ -1,9 +1,14 @@
 import type { Config, Data } from "@puckeditor/core";
 import { Render } from "@puckeditor/core";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
-import { wrapConfigWithDataBinding } from "../puck/index.js";
+import { wrapConfigWithDataBinding, wrapConfigWithIslands } from "../puck/index.js";
 
-const hostConfig: Partial<Config> = wrapConfigWithDataBinding((externalPuckConfig ?? {}) as Config);
+// Island wrapping is applied first (innermost) so the props captured in each island marker are the
+// values a component actually renders with — including per-item values resolved by data binding
+// when the island sits inside a CardCollection card.
+const hostConfig: Partial<Config> = wrapConfigWithDataBinding(
+  wrapConfigWithIslands((externalPuckConfig ?? {}) as Config),
+);
 
 const renderConfig: Config = {
   ...hostConfig,

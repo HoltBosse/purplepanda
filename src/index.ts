@@ -93,8 +93,55 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
 
         logger.info("Setting up purple-panda");
 
-        // Example: inject a script into every page (runs in the browser)
-        injectScript("page", `console.log("[purple-panda] loaded");`);
+        // Front-end island hydration. Components flagged `island: true` render a
+        // `[data-puck-island]` marker around their output (see src/puck/islands.tsx); this runtime
+        // finds those markers and hydrates each one into an interactive React root using the same
+        // component's `render`. The Puck config (and React) are dynamically imported only when a
+        // marker is actually present, so pages without islands ship effectively no JS for this.
+        injectScript(
+          "page",
+          `
+          // Only hydrate on pages that render PageRenderer as static HTML (the published page and
+          // the draft preview routes), which opt in by marking their <body>. Pages that embed
+          // PageRenderer inside a live React tree (e.g. HistoryView, client:load) deliberately omit
+          // the attribute, so their markers are never independently hydrated (that would double-mount).
+          const markers = document.body.hasAttribute("data-purplepanda-islands")
+            ? document.querySelectorAll("[data-puck-island]")
+            : [];
+          if (markers.length > 0) {
+            // In dev, @astrojs/react instruments component modules with React Fast Refresh globals
+            // ($RefreshReg$/$RefreshSig$). Astro only defines those on pages that host a client:*
+            // React island; this page has none, so importing the config below would throw
+            // "$RefreshSig$ is not defined". Provide no-op stubs so the instrumented modules
+            // evaluate (islands here don't need HMR). In production these globals aren't emitted, so
+            // this is a harmless no-op.
+            window.$RefreshReg$ = window.$RefreshReg$ || function () {};
+            window.$RefreshSig$ = window.$RefreshSig$ || function () { return function (type) { return type; }; };
+            window.__vite_plugin_react_preamble_installed__ = true;
+            Promise.all([
+              import("virtual:purplepanda/puck-config"),
+              import("react"),
+              import("react-dom/client"),
+            ]).then(([configModule, React, ReactDOMClient]) => {
+              const config = configModule.default || {};
+              const components = config.components || {};
+              for (const el of markers) {
+                const name = el.getAttribute("data-puck-island");
+                const component = components[name];
+                if (!component || typeof component.render !== "function") continue;
+                let props = {};
+                try {
+                  props = JSON.parse(el.getAttribute("data-puck-props") || "{}");
+                } catch {
+                  // Malformed payload: leave the server-rendered HTML in place.
+                  continue;
+                }
+                ReactDOMClient.hydrateRoot(el, React.createElement(component.render, props));
+              }
+            });
+          }
+        `,
+        );
 
         // Example: tweak Vite config
         updateConfig({
