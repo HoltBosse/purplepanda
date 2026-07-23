@@ -7,12 +7,18 @@ import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 import { extname, resolve, join } from "node:path";
 import { existsSync, createReadStream, readdirSync, statSync, copyFileSync, mkdirSync } from "node:fs";
+import { generateIslandsManifest } from "./islands-manifest.js";
 
 const VIRTUAL_PUCK_CONFIG_ID = "virtual:purplepanda/puck-config";
 const RESOLVED_VIRTUAL_PUCK_CONFIG_ID = `\0${VIRTUAL_PUCK_CONFIG_ID}`;
 
 const VIRTUAL_HAS_404_ID = "virtual:purplepanda/has-404";
 const RESOLVED_VIRTUAL_HAS_404_ID = `\0${VIRTUAL_HAS_404_ID}`;
+
+// Per-component lazy loaders for front-end islands, auto-derived from the Puck config so only the
+// island(s) present on a page load — not the whole config. See ./islands-manifest.ts.
+const VIRTUAL_ISLANDS_ID = "virtual:purplepanda/islands";
+const RESOLVED_VIRTUAL_ISLANDS_ID = `\0${VIRTUAL_ISLANDS_ID}`;
 
 export interface PurplePandaIntegrationOptions {
   enabled?: boolean;
@@ -119,15 +125,28 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
             window.$RefreshSig$ = window.$RefreshSig$ || function () { return function (type) { return type; }; };
             window.__vite_plugin_react_preamble_installed__ = true;
             Promise.all([
-              import("virtual:purplepanda/puck-config"),
+              import("virtual:purplepanda/islands"),
               import("react"),
               import("react-dom/client"),
-            ]).then(([configModule, React, ReactDOMClient]) => {
-              const config = configModule.default || {};
-              const components = config.components || {};
+            ]).then(async ([islandsModule, React, ReactDOMClient]) => {
+              const loaders = islandsModule.default || {};
+              // Fallback for any island the build-time analyzer couldn't map to its own module
+              // (e.g. a component defined inline in the config): import the whole config lazily and
+              // only when such an island is actually present.
+              let fullConfig = null;
+              const resolveComponent = async (name) => {
+                const loader = loaders[name];
+                if (loader) {
+                  try { return await loader(); } catch { return null; }
+                }
+                if (!fullConfig) {
+                  fullConfig = (await import("virtual:purplepanda/puck-config")).default || {};
+                }
+                return (fullConfig.components || {})[name];
+              };
               for (const el of markers) {
                 const name = el.getAttribute("data-puck-island");
-                const component = components[name];
+                const component = await resolveComponent(name);
                 if (!component || typeof component.render !== "function") continue;
                 let props = {};
                 try {
@@ -153,25 +172,44 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
                 resolveId(id) {
                   if (id === VIRTUAL_PUCK_CONFIG_ID) return RESOLVED_VIRTUAL_PUCK_CONFIG_ID;
                   if (id === VIRTUAL_HAS_404_ID) return RESOLVED_VIRTUAL_HAS_404_ID;
+                  if (id === VIRTUAL_ISLANDS_ID) return RESOLVED_VIRTUAL_ISLANDS_ID;
                   return null;
                 },
-                load(id) {
+                async load(id) {
                   if (id === RESOLVED_VIRTUAL_HAS_404_ID) {
                     return `export const has404Page = ${has404Page};`;
+                  }
+
+                  const puckConfigModulePath = () => {
+                    if (!options.puckConfigModule) return null;
+                    const rootDir = fileURLToPath(config.root);
+                    return options.puckConfigModule.startsWith(".")
+                      ? resolve(rootDir, options.puckConfigModule)
+                      : options.puckConfigModule;
+                  };
+
+                  if (id === RESOLVED_VIRTUAL_ISLANDS_ID) {
+                    const modulePath = puckConfigModulePath();
+                    if (!modulePath) return "export default {};";
+                    const pluginContext = this as unknown as {
+                      resolve: (source: string, importer: string) => Promise<{ id: string } | null | undefined>;
+                      parse: (code: string) => unknown;
+                    };
+                    return generateIslandsManifest(
+                      modulePath,
+                      (source, importer) => pluginContext.resolve(source, importer),
+                      (code) => pluginContext.parse(code),
+                    );
                   }
 
                   if (id !== RESOLVED_VIRTUAL_PUCK_CONFIG_ID) {
                     return null;
                   }
 
-                  if (!options.puckConfigModule) {
+                  const modulePath = puckConfigModulePath();
+                  if (!modulePath) {
                     return "export default {};";
                   }
-
-                  const rootDir = fileURLToPath(config.root);
-                  const modulePath = options.puckConfigModule.startsWith(".")
-                    ? resolve(rootDir, options.puckConfigModule)
-                    : options.puckConfigModule;
 
                   return `export { default } from ${JSON.stringify(modulePath)};`;
                 },
