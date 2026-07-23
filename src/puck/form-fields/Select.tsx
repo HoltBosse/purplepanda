@@ -1,4 +1,5 @@
 import type { ComponentConfig } from "@puckeditor/core";
+import { useEffect, useRef } from "react";
 
 type SelectOption = {
   label: string;
@@ -15,8 +16,96 @@ export type SelectProps = {
   multiple: boolean;
 };
 
+type SelectFieldProps = SelectProps & { editing: boolean };
+
+function SelectField({
+  label,
+  description,
+  name,
+  placeholder,
+  options,
+  required,
+  multiple,
+  editing,
+}: SelectFieldProps) {
+  const selectRef = useRef<HTMLSelectElement>(null);
+
+  // SlimSelect enhances the native <select> once the island is hydrated on the front end. It's
+  // skipped while editing (the base render still runs inside the form editor, where we want a plain
+  // native select). SlimSelect and its styles are imported dynamically so nothing browser-only is
+  // evaluated during server rendering (getFormHtml renders this component with renderToStaticMarkup).
+  useEffect(() => {
+    if (editing) return;
+    const select = selectRef.current;
+    if (!select) return;
+
+    let instance: { destroy: () => void } | undefined;
+    let cancelled = false;
+
+    (async () => {
+      const [{ default: SlimSelect }] = await Promise.all([
+        import("slim-select"),
+        import("slim-select/styles"),
+      ]);
+      if (cancelled || !selectRef.current) return;
+
+      // SlimSelect copies the select's classes onto its own box and dropdown; clear them so the
+      // enhanced widget uses SlimSelect's own styling rather than leaking the daisyUI select look
+      // (which is only meant for the native fallback shown before hydration).
+      selectRef.current.className = "";
+
+      instance = new SlimSelect({
+        select: selectRef.current,
+        settings: placeholder ? { placeholderText: placeholder } : {},
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      instance?.destroy();
+    };
+  }, [editing, placeholder, multiple, options]);
+
+  return (
+    <div className="w-full">
+      {label && (
+        <label className="block text-sm font-medium mb-1" htmlFor={name}>
+          {label}
+          {required && <span className="text-error ml-0.5">*</span>}
+        </label>
+      )}
+      <select
+        ref={selectRef}
+        id={name}
+        name={name}
+        required={required}
+        multiple={multiple}
+        className="select select-bordered w-full"
+        defaultValue={multiple ? [] : ""}
+      >
+        {placeholder && !multiple && (
+          <option value="" disabled>
+            {placeholder}
+          </option>
+        )}
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+      {description && (
+        <p className="text-sm text-base-content/60 mt-1">{description}</p>
+      )}
+    </div>
+  );
+}
+
 const Select: ComponentConfig<SelectProps> = {
   label: "Select",
+  // Hydrated as a front-end island so SlimSelect can enhance the native <select>. Props are all
+  // JSON-serializable, which is required for whole-component islands (see src/puck/islands.tsx).
+  island: true,
   locations: "form",
   fields: {
     label: { type: "text", label: "Label" },
@@ -64,37 +153,8 @@ const Select: ComponentConfig<SelectProps> = {
     required: false,
     multiple: false,
   },
-  render: ({ label, description, name, placeholder, options, required, multiple }) => (
-    <div className="w-full">
-      {label && (
-        <label className="block text-sm font-medium mb-1" htmlFor={name}>
-          {label}
-          {required && <span className="text-error ml-0.5">*</span>}
-        </label>
-      )}
-      <select
-        id={name}
-        name={name}
-        required={required}
-        multiple={multiple}
-        className="select select-bordered w-full"
-        defaultValue={multiple ? [] : ""}
-      >
-        {placeholder && !multiple && (
-          <option value="" disabled>
-            {placeholder}
-          </option>
-        )}
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      {description && (
-        <p className="text-sm text-base-content/60 mt-1">{description}</p>
-      )}
-    </div>
+  render: ({ puck, ...props }: SelectProps & { puck?: { isEditing?: boolean } }) => (
+    <SelectField {...props} editing={Boolean(puck?.isEditing)} />
   ),
 };
 

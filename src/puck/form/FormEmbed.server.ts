@@ -6,10 +6,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Render } from "@puckeditor/core";
 import type { Config, Data } from "@puckeditor/core";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
-import { filterConfigByLocation } from "../index.js";
+import { filterConfigByLocation, wrapConfigWithIslands } from "../index.js";
 
 const hostConfig = (externalPuckConfig as Config) ?? ({} as Config);
-const filteredFormConfig = filterConfigByLocation(hostConfig, "form");
+// Island wrapping so any form field flagged `island: true` (e.g. Select) emits its hydration
+// marker into the static form HTML. The marker is injected into a PageRenderer page by FormEmbed,
+// where the front-end runtime finds and hydrates it.
+const filteredFormConfig = wrapConfigWithIslands(filterConfigByLocation(hostConfig, "form"));
 
 export async function getFormHtml(id: string): Promise<string | null> {
   const db = getDb();
