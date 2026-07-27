@@ -3,7 +3,7 @@ import type { ComponentConfig } from "@puckeditor/core";
 export type TextInputProps = {
   label: string;
   description: string;
-  inputType: "text" | "email" | "number" | "tel" | "url" | "password";
+  inputType: "text" | "email" | "number" | "tel" | "url" | "password" | "date";
   placeholder: string;
   required: boolean;
 };
@@ -24,6 +24,7 @@ const TextInput: ComponentConfig<TextInputProps> = {
         { label: "Phone", value: "tel" },
         { label: "URL", value: "url" },
         { label: "Password", value: "password" },
+        { label: "Date", value: "date" },
       ],
     },
     placeholder: { type: "text", label: "Placeholder" },
