@@ -5,6 +5,7 @@ import { userActions, users } from '../../../db/schema.js';
 import { desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import Pagination from '../../../components/Pagination.astro';
+import LocalDateTime from '../../../components/LocalDateTime.astro';
 import SearchBar from '../../../search/SearchBar';
 import { parseSearchQuery } from '../../../search/parser.js';
 import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
@@ -115,7 +116,7 @@ const totalPages = Math.ceil(totalActions / itemsPerPage);
                 <tr>
                     <td class="font-bold">{action.type}</td>
                     <td>{action.userEmail ? `${action.userFname} ${action.userLname}` : 'System'}</td>
-                    <td class="w-px whitespace-nowrap">{action.date.toLocaleString()}</td>
+                    <td class="w-px whitespace-nowrap"><LocalDateTime date={action.date} /></td>
                 </tr>
             ))}
         </tbody>

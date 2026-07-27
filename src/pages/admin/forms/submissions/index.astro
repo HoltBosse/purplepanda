@@ -5,6 +5,7 @@ import { formSubmissions, forms } from '../../../../db/schema.js';
 import { and, eq, desc, gt, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import Pagination from '../../../../components/Pagination.astro';
+import LocalDateTime from '../../../../components/LocalDateTime.astro';
 import SearchBar from '../../../../search/SearchBar';
 import { parseSearchQuery } from '../../../../search/parser.js';
 import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../../search/drizzle.js';
@@ -111,16 +112,6 @@ const [submissions, totalSubmissions] = await Promise.all([
 ]);
 
 const totalPages = Math.ceil(totalSubmissions / itemsPerPage);
-
-function formatDate(date: Date): string {
-    return date.toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-}
 ---
 
 <AdminLayout>
@@ -152,7 +143,7 @@ function formatDate(date: Date): string {
                             {(submission.formContent as any)?.root?.props?.name || 'Untitled'}
                         </a>
                     </td>
-                    <td class="w-px whitespace-nowrap">{formatDate(submission.createdAt)}</td>
+                    <td class="w-px whitespace-nowrap"><LocalDateTime date={submission.createdAt} /></td>
                 </tr>
             ))}
         </tbody>
