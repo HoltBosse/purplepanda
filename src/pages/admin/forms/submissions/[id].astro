@@ -45,10 +45,12 @@ function isFileValue(value: unknown): value is { name: string; size: number; typ
     return !!value && typeof value === 'object' && 'name' in value && 'size' in value && 'type' in value;
 }
 
-// Walk the form's Puck content tree to find each field's choice options (Select,
-// RadioGroup) or checkbox label, so submitted codes (e.g. "option-1") can be
-// resolved back to the human-readable label the visitor actually saw.
+// Walk the form's Puck content tree to find each field's display label and its choice options
+// (Select, RadioGroup) or checkbox label, so the submissions table can show the label the form
+// editor set rather than the raw `field-<id>` key, and so submitted codes (e.g. "option-1") can
+// be resolved back to the human-readable label the visitor actually saw.
 type FieldOption = { label: string; value: string };
+const labelByFieldName: Record<string, string> = {};
 const optionsByFieldName: Record<string, FieldOption[]> = {};
 const checkboxLabelByFieldName: Record<string, string> = {};
 
@@ -60,11 +62,15 @@ function collectFieldMeta(node: unknown): void {
     if (!node || typeof node !== 'object') return;
 
     const props = (node as any).props;
-    if (props && typeof props.name === 'string') {
+    if (props && typeof props.id === 'string') {
+        const fieldName = `field-${props.id}`;
+        if (typeof props.label === 'string' && props.label) {
+            labelByFieldName[fieldName] = props.label;
+        }
         if (Array.isArray(props.options)) {
-            optionsByFieldName[props.name] = props.options;
+            optionsByFieldName[fieldName] = props.options;
         } else if (typeof props.checkboxLabel === 'string') {
-            checkboxLabelByFieldName[props.name] = props.checkboxLabel;
+            checkboxLabelByFieldName[fieldName] = props.checkboxLabel;
         }
     }
 
@@ -72,6 +78,10 @@ function collectFieldMeta(node: unknown): void {
 }
 
 collectFieldMeta(submission.formContent);
+
+function resolveFieldLabel(key: string): string {
+    return labelByFieldName[key] ?? key;
+}
 
 function resolveDisplayValue(key: string, raw: unknown): string {
     if (checkboxLabelByFieldName[key] !== undefined) return checkboxLabelByFieldName[key];
@@ -111,7 +121,7 @@ const fields = Object.entries(submission.data as Record<string, unknown>);
         <tbody>
             {fields.map(([key, value]) => (
                 <tr>
-                    <td class="w-px whitespace-nowrap font-medium">{key}</td>
+                    <td class="w-px whitespace-nowrap font-medium">{resolveFieldLabel(key)}</td>
                     <td class="whitespace-pre-wrap break-words">{formatValue(key, value)}</td>
                 </tr>
             ))}

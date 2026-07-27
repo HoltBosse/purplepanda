@@ -9,25 +9,25 @@ type SelectOption = {
 export type SelectProps = {
   label: string;
   description: string;
-  name: string;
   placeholder: string;
   options: SelectOption[];
   required: boolean;
   multiple: boolean;
 };
 
-type SelectFieldProps = SelectProps & { editing: boolean };
+type SelectFieldProps = SelectProps & { id: string; editing: boolean };
 
 function SelectField({
+  id,
   label,
   description,
-  name,
   placeholder,
   options,
   required,
   multiple,
   editing,
 }: SelectFieldProps) {
+  const name = `field-${id}`;
   const selectRef = useRef<HTMLSelectElement>(null);
 
   // SlimSelect enhances the native <select> once the island is hydrated on the front end. It's
@@ -110,7 +110,6 @@ const Select: ComponentConfig<SelectProps> = {
   fields: {
     label: { type: "text", label: "Label" },
     description: { type: "text", label: "Description (optional)" },
-    name: { type: "text", label: "Field name" },
     placeholder: { type: "text", label: "Placeholder option" },
     options: {
       type: "array",
@@ -144,7 +143,6 @@ const Select: ComponentConfig<SelectProps> = {
   defaultProps: {
     label: "Label",
     description: "",
-    name: "select",
     placeholder: "Select an option",
     options: [
       { label: "Option 1", value: "option-1" },
@@ -153,8 +151,8 @@ const Select: ComponentConfig<SelectProps> = {
     required: false,
     multiple: false,
   },
-  render: ({ puck, ...props }: SelectProps & { puck?: { isEditing?: boolean } }) => (
-    <SelectField {...props} editing={Boolean(puck?.isEditing)} />
+  render: ({ id, puck, ...props }: SelectProps & { id: string; puck?: { isEditing?: boolean } }) => (
+    <SelectField {...props} id={id} editing={Boolean(puck?.isEditing)} />
   ),
 };
 
