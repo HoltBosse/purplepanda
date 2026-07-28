@@ -41,7 +41,9 @@ export function buildFormSubmissionSchema(config: Config, data: Data): z.ZodObje
     shape[`field-${id}`] = toSubmissionSchema.toSubmissionSchema(node.props);
   }
 
-  // passthrough: fields without a validator (custom components, future honeypot/CSRF fields)
-  // pass through unchecked rather than being stripped from the stored submission.
+  // passthrough: fields without a validator (custom components, future field types) pass
+  // through unchecked rather than being stripped from the stored submission. Honeypot/CSRF
+  // fields are handled separately and stripped before this schema ever sees them (see
+  // ./spam-guard.js).
   return z.object(shape).passthrough();
 }

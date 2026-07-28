@@ -8,12 +8,7 @@ import { forms, formSubmissions } from "../../../../db/schema.js";
 import { has404Page } from "virtual:purplepanda/has-404";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { buildFormSubmissionSchema } from "../../../../puck/form/schema.js";
-
-/*
-  TODO:
-  csrf token hidden field as well + ttl
-  honeypot added in to every form
-*/
+import { isHoneypotTripped, stripSpamGuardFields, verifyCsrfToken, CSRF_FIELD_NAME } from "../../../../puck/form/spam-guard.js";
 
 const uuidSchema = z.string().uuid();
 
@@ -47,6 +42,20 @@ function isTrustedDomain(request: Request, requestHost: string): boolean {
 function isAllowedUserAgent(request: Request): boolean {
   const userAgent = request.headers.get("user-agent");
   return !!userAgent && userAgent.startsWith("Mozilla/5.0");
+}
+
+// Redirects back to the referring page when possible so the visible result matches a normal
+// form post; also used to give bots caught by the honeypot an indistinguishable "success" so
+// they don't learn to iterate around it.
+function successResponse(request: Request): Response {
+  const referer = request.headers.get("referer");
+  if (referer) {
+    return new Response(null, { status: 303, headers: { Location: referer } });
+  }
+  return new Response("Thanks for your submission!", {
+    status: 200,
+    headers: { "Content-Type": "text/plain" },
+  });
 }
 
 async function formDataToJson(formData: FormData): Promise<Record<string, unknown>> {
@@ -96,6 +105,18 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress }
   const formData = await request.formData();
   const data = await formDataToJson(formData);
 
+  // Bots that blanket-fill every field trip the trap; respond as if it succeeded so they don't
+  // learn to leave these fields alone.
+  if (isHoneypotTripped(data)) {
+    return successResponse(request);
+  }
+
+  if (!(await verifyCsrfToken(parsedId.data, data[CSRF_FIELD_NAME]))) {
+    return new Response("Forbidden", { status: 403 });
+  }
+
+  stripSpamGuardFields(data);
+
   // Validated against a schema derived from the form's own stored fields, not trusted client
   // input, since the `required`/`inputType` constraints rendered into the HTML are trivially
   // bypassed by posting to this endpoint directly.
@@ -110,13 +131,5 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress }
 
   await db.insert(formSubmissions).values({ formId: form.id, data: parsed.data });
 
-  const referer = request.headers.get("referer");
-  if (referer) {
-    return new Response(null, { status: 303, headers: { Location: referer } });
-  }
-
-  return new Response("Thanks for your submission!", {
-    status: 200,
-    headers: { "Content-Type": "text/plain" },
-  });
+  return successResponse(request);
 };

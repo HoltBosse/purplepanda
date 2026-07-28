@@ -7,6 +7,7 @@ import { Render } from "@puckeditor/core";
 import type { Config, Data } from "@puckeditor/core";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { filterConfigByLocation, wrapConfigWithIslands } from "../index.js";
+import { createCsrfToken, renderSpamGuardFieldsHtml } from "./spam-guard.js";
 
 const hostConfig = (externalPuckConfig as Config) ?? ({} as Config);
 // Island wrapping so any form field flagged `island: true` (e.g. Select) emits its hydration
@@ -36,5 +37,8 @@ export async function getFormHtml(id: string): Promise<string | null> {
   );
 
   const hasFileInput = /type=(["'])file\1/i.test(html);
-  return hasFileInput ? html.replace("<form ", '<form enctype="multipart/form-data" ') : html;
+  const withEnctype = hasFileInput ? html.replace("<form ", '<form enctype="multipart/form-data" ') : html;
+
+  const csrfToken = await createCsrfToken(id);
+  return withEnctype.replace(/(<form[^>]*>)/, `$1${renderSpamGuardFieldsHtml(csrfToken)}`);
 }
