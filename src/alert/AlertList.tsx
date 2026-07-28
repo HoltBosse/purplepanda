@@ -21,7 +21,7 @@ export function AlertItem({ alert }: { alert: Alert }) {
 export function AlertList({ alerts }: { alerts: Alert[] }) {
   if (alerts.length === 0) return null;
   return (
-    <div className="flex flex-col gap-4 mb-4">
+    <div className={`flex flex-col gap-4${alerts.length > 1 ? " mb-4" : ""}`}>
       {alerts.map((alert) => (
         <AlertItem key={alert.id} alert={alert} />
       ))}
