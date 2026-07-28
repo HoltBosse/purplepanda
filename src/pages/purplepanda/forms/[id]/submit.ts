@@ -1,8 +1,9 @@
-import type { APIRoute } from "astro";
+import type { APIContext, APIRoute } from "astro";
 import * as z from "zod";
 import { and, eq } from "drizzle-orm";
 import type { Config, Data } from "@puckeditor/core";
 import { RateLimiterMemory } from "rate-limiter-flexible";
+import { alertType, addAlertToSession, createAlert } from "../../../../alert/index.js";
 import { getDb } from "../../../../db/db.js";
 import { forms, formSubmissions } from "../../../../db/schema.js";
 import { has404Page } from "virtual:purplepanda/has-404";
@@ -45,17 +46,43 @@ function isAllowedUserAgent(request: Request): boolean {
 }
 
 // Redirects back to the referring page when possible so the visible result matches a normal
-// form post; also used to give bots caught by the honeypot an indistinguishable "success" so
-// they don't learn to iterate around it.
-function successResponse(request: Request): Response {
+// form post and the flash alert set just before calling this renders on that page; falls back
+// to a plain-text response when there's no referer to return to.
+function redirectBack(request: Request, fallbackMessage: string): Response {
   const referer = request.headers.get("referer");
   if (referer) {
     return new Response(null, { status: 303, headers: { Location: referer } });
   }
-  return new Response("Thanks for your submission!", {
+  return new Response(fallbackMessage, {
     status: 200,
     headers: { "Content-Type": "text/plain" },
   });
+}
+
+// Also used to give bots caught by the honeypot an indistinguishable "success" so they don't
+// learn to iterate around it.
+async function successResponse(session: APIContext["session"], request: Request): Promise<Response> {
+  await addAlertToSession(session, createAlert(alertType.success, "Thanks for your submission!"));
+  return redirectBack(request, "Thanks for your submission!");
+}
+
+function describeValidationErrors(fieldErrors: Record<string, string[] | undefined>): string {
+  const parts = Object.entries(fieldErrors)
+    .filter((entry): entry is [string, string[]] => Array.isArray(entry[1]) && entry[1].length > 0)
+    .map(([field, messages]) => `${field}: ${messages.join(", ")}`);
+
+  return parts.length > 0
+    ? `Please fix the following and resubmit: ${parts.join("; ")}`
+    : "Please check the form and try again.";
+}
+
+async function validationFailureResponse(
+  session: APIContext["session"],
+  request: Request,
+  fieldErrors: Record<string, string[] | undefined>,
+): Promise<Response> {
+  await addAlertToSession(session, createAlert(alertType.error, describeValidationErrors(fieldErrors)));
+  return redirectBack(request, "There was a problem with your submission.");
 }
 
 async function formDataToJson(formData: FormData): Promise<Record<string, unknown>> {
@@ -69,7 +96,7 @@ async function formDataToJson(formData: FormData): Promise<Record<string, unknow
   return result;
 }
 
-export const POST: APIRoute = async ({ params, request, rewrite, clientAddress }) => {
+export const POST: APIRoute = async ({ params, request, rewrite, clientAddress, session }) => {
   const parsedId = uuidSchema.safeParse(params.id);
   if (!parsedId.success) {
     if (has404Page) return rewrite("/404");
@@ -108,7 +135,7 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress }
   // Bots that blanket-fill every field trip the trap; respond as if it succeeded so they don't
   // learn to leave these fields alone.
   if (isHoneypotTripped(data)) {
-    return successResponse(request);
+    return successResponse(session, request);
   }
 
   if (!(await verifyCsrfToken(parsedId.data, data[CSRF_FIELD_NAME]))) {
@@ -123,13 +150,10 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress }
   const schema = buildFormSubmissionSchema(externalPuckConfig as Config, form.content as Data);
   const parsed = await schema.safeParseAsync(data);
   if (!parsed.success) {
-    return new Response(JSON.stringify({ errors: z.flattenError(parsed.error).fieldErrors }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return validationFailureResponse(session, request, z.flattenError(parsed.error).fieldErrors);
   }
 
   await db.insert(formSubmissions).values({ formId: form.id, data: parsed.data });
 
-  return successResponse(request);
+  return successResponse(session, request);
 };
