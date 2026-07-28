@@ -2,19 +2,27 @@ import type { APIRoute } from "astro";
 import * as z from "zod";
 import { and, eq } from "drizzle-orm";
 import type { Config, Data } from "@puckeditor/core";
+import { RateLimiterMemory } from "rate-limiter-flexible";
 import { getDb } from "../../../../db/db.js";
 import { forms, formSubmissions } from "../../../../db/schema.js";
 import { has404Page } from "virtual:purplepanda/has-404";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { buildFormSubmissionSchema } from "../../../../puck/form/schema.js";
 
-/* 
+/*
   TODO:
   csrf token hidden field as well + ttl
-  honeypot added in to every form 
+  honeypot added in to every form
 */
 
 const uuidSchema = z.string().uuid();
+
+// Per IP + form: 5 submissions per minute, then blocked for 5 minutes.
+const rateLimiter = new RateLimiterMemory({
+  points: 5,
+  duration: 60,
+  blockDuration: 300,
+});
 
 function hostOf(headerValue: string | null): string | null {
   if (!headerValue) return null;
@@ -52,7 +60,7 @@ async function formDataToJson(formData: FormData): Promise<Record<string, unknow
   return result;
 }
 
-export const POST: APIRoute = async ({ params, request, rewrite }) => {
+export const POST: APIRoute = async ({ params, request, rewrite, clientAddress }) => {
   const parsedId = uuidSchema.safeParse(params.id);
   if (!parsedId.success) {
     if (has404Page) return rewrite("/404");
@@ -65,6 +73,12 @@ export const POST: APIRoute = async ({ params, request, rewrite }) => {
 
   if (!isTrustedDomain(request, new URL(request.url).host)) {
     return new Response("Forbidden", { status: 403 });
+  }
+
+  try {
+    await rateLimiter.consume(`${clientAddress}:${parsedId.data}`);
+  } catch {
+    return new Response("Too Many Requests", { status: 429, headers: { "Retry-After": "60" } });
   }
 
   const db = getDb();
