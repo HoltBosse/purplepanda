@@ -1,4 +1,5 @@
 import type { ComponentConfig } from "@puckeditor/core";
+import * as z from "zod";
 
 export type TextareaProps = {
   label: string;
@@ -8,9 +9,15 @@ export type TextareaProps = {
   required: boolean;
 };
 
+function toSubmissionSchema({ required }: TextareaProps) {
+  if (required) return z.string().min(1, "Required");
+  return z.preprocess((value) => (value === "" ? undefined : value), z.string().optional());
+}
+
 const Textarea: ComponentConfig<TextareaProps> = {
   label: "Textarea",
   locations: "form",
+  toSubmissionSchema,
   fields: {
     label: { type: "text", label: "Label" },
     description: { type: "text", label: "Description (optional)" },

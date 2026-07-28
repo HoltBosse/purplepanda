@@ -1,5 +1,6 @@
 import type { ComponentConfig } from "@puckeditor/core";
 import { useEffect, useRef } from "react";
+import * as z from "zod";
 
 type SelectOption = {
   label: string;
@@ -101,12 +102,31 @@ function SelectField({
   );
 }
 
+// A multi-select with nothing chosen (or single-select unselected, if not required) omits the
+// key entirely, same as checkboxes/radios; formDataToJson only yields an array once 2+ values
+// are posted, so a lone selection still needs normalizing into an array for the `multiple` case.
+function toSubmissionSchema({ options, required, multiple }: SelectProps) {
+  const values = options.map((option) => option.value);
+  const optionSchema = values.length > 0 ? z.enum(values) : z.string();
+
+  if (multiple) {
+    const arraySchema = z.preprocess(
+      (value) => (value === undefined ? [] : Array.isArray(value) ? value : [value]),
+      z.array(optionSchema),
+    );
+    return required ? arraySchema.refine((selected) => selected.length > 0, "Required") : arraySchema;
+  }
+
+  return required ? optionSchema : optionSchema.optional();
+}
+
 const Select: ComponentConfig<SelectProps> = {
   label: "Select",
   // Hydrated as a front-end island so SlimSelect can enhance the native <select>. Props are all
   // JSON-serializable, which is required for whole-component islands (see src/puck/islands.tsx).
   island: true,
   locations: "form",
+  toSubmissionSchema,
   fields: {
     label: { type: "text", label: "Label" },
     description: { type: "text", label: "Description (optional)" },

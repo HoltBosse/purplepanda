@@ -1,4 +1,5 @@
 import type { ComponentConfig } from "@puckeditor/core";
+import * as z from "zod";
 
 export type CheckboxProps = {
   label: string;
@@ -7,9 +8,16 @@ export type CheckboxProps = {
   required: boolean;
 };
 
+// An unchecked box isn't included in the submitted form data at all (the key is absent, not
+// empty), and a checked box's value defaults to "on" since no explicit `value` is rendered.
+function toSubmissionSchema({ required }: CheckboxProps) {
+  return required ? z.literal("on", "Required") : z.literal("on").optional();
+}
+
 const Checkbox: ComponentConfig<CheckboxProps> = {
   label: "Checkbox",
   locations: "form",
+  toSubmissionSchema,
   fields: {
     label: { type: "text", label: "Label" },
     description: { type: "text", label: "Description (optional)" },

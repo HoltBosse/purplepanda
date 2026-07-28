@@ -1,4 +1,5 @@
 import type { ComponentConfig } from "@puckeditor/core";
+import * as z from "zod";
 
 type RadioOption = {
   label: string;
@@ -12,9 +13,18 @@ export type RadioGroupProps = {
   required: boolean;
 };
 
+// No option picked means the key is absent entirely (radios don't submit an empty value like
+// text inputs do), so `.optional()` alone covers the not-required case.
+function toSubmissionSchema({ options, required }: RadioGroupProps) {
+  const values = options.map((option) => option.value);
+  const optionSchema = values.length > 0 ? z.enum(values) : z.string();
+  return required ? optionSchema : optionSchema.optional();
+}
+
 const RadioGroup: ComponentConfig<RadioGroupProps> = {
   label: "Radio Group",
   locations: "form",
+  toSubmissionSchema,
   fields: {
     label: { type: "text", label: "Label" },
     description: { type: "text", label: "Description (optional)" },

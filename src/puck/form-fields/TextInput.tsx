@@ -1,4 +1,5 @@
 import type { ComponentConfig } from "@puckeditor/core";
+import * as z from "zod";
 
 export type TextInputProps = {
   label: string;
@@ -8,9 +9,38 @@ export type TextInputProps = {
   required: boolean;
 };
 
+// Empty string means "not filled in" for an optional field (the browser still submits the
+// key for a blank text input), so it's normalized to undefined before the optional check.
+const emptyToUndefined = (value: unknown) => (value === "" ? undefined : value);
+
+// email/url reject "" as an invalid format on their own, so required is enforced without a
+// separate min(1) check; only the plain string-based branches need one.
+function withRequired(schema: z.ZodString, required: boolean) {
+  if (required) return schema.min(1, "Required");
+  return z.preprocess(emptyToUndefined, schema.optional());
+}
+
+function toSubmissionSchema({ inputType, required }: TextInputProps) {
+  switch (inputType) {
+    case "email":
+      return required ? z.email("Invalid email") : z.preprocess(emptyToUndefined, z.email("Invalid email").optional());
+    case "url":
+      return required ? z.url("Invalid URL") : z.preprocess(emptyToUndefined, z.url("Invalid URL").optional());
+    case "number":
+      // Kept as a regex-checked string (like date, below) rather than z.coerce.number(), since
+      // Number("") coerces to 0 instead of failing, which would let a blank required field pass.
+      return withRequired(z.string().regex(/^-?\d+(\.\d+)?$/, "Must be a number"), required);
+    case "date":
+      return withRequired(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date"), required);
+    default:
+      return withRequired(z.string(), required);
+  }
+}
+
 const TextInput: ComponentConfig<TextInputProps> = {
   label: "Text Input",
   locations: "form",
+  toSubmissionSchema,
   fields: {
     label: { type: "text", label: "Label" },
     description: { type: "text", label: "Description (optional)" },

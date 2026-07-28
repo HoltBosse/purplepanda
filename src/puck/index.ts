@@ -1,4 +1,5 @@
 import type { Config, Field, Fields } from "@puckeditor/core";
+import type * as z from "zod";
 export { ClientComponentDataWrapper, wrapConfigWithClientDataResolvers } from "./client-data-wrapper.js";
 export { wrapConfigWithDataBinding, ItemContext, useBoundItem } from "./data-binding.js";
 export type { BoundItem } from "./data-binding.js";
@@ -72,6 +73,11 @@ declare module "@puckeditor/core" {
     // rest of the page stays static HTML. Its props must be JSON-serializable — no `slot` fields
     // or `ReactNode` props (those can't cross the server→client boundary). See ./islands.tsx.
     island?: boolean;
+    // Server-side submission validation for form fields. Given this component's stored props,
+    // returns the Zod schema its posted value must satisfy — keyed by `field-${id}` and combined
+    // across a form's components by buildFormSubmissionSchema (./form-fields/schema.js). Only
+    // components used as form fields need to implement this; others are left unvalidated.
+    toSubmissionSchema?: (props: any) => z.ZodTypeAny;
   }
 }
 

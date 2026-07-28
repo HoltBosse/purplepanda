@@ -1,9 +1,12 @@
 import type { APIRoute } from "astro";
 import * as z from "zod";
 import { and, eq } from "drizzle-orm";
+import type { Config, Data } from "@puckeditor/core";
 import { getDb } from "../../../../db/db.js";
 import { forms, formSubmissions } from "../../../../db/schema.js";
 import { has404Page } from "virtual:purplepanda/has-404";
+import externalPuckConfig from "virtual:purplepanda/puck-config";
+import { buildFormSubmissionSchema } from "../../../../puck/form/schema.js";
 
 /* 
   TODO:
@@ -66,7 +69,7 @@ export const POST: APIRoute = async ({ params, request, rewrite }) => {
 
   const db = getDb();
   const [form] = await db
-    .select({ id: forms.id })
+    .select({ id: forms.id, content: forms.content })
     .from(forms)
     .where(and(eq(forms.id, parsedId.data), eq(forms.state, 1)))
     .limit(1);
@@ -79,7 +82,19 @@ export const POST: APIRoute = async ({ params, request, rewrite }) => {
   const formData = await request.formData();
   const data = await formDataToJson(formData);
 
-  await db.insert(formSubmissions).values({ formId: form.id, data });
+  // Validated against a schema derived from the form's own stored fields, not trusted client
+  // input, since the `required`/`inputType` constraints rendered into the HTML are trivially
+  // bypassed by posting to this endpoint directly.
+  const schema = buildFormSubmissionSchema(externalPuckConfig as Config, form.content as Data);
+  const parsed = schema.safeParse(data);
+  if (!parsed.success) {
+    return new Response(JSON.stringify({ errors: z.flattenError(parsed.error).fieldErrors }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  await db.insert(formSubmissions).values({ formId: form.id, data: parsed.data });
 
   const referer = request.headers.get("referer");
   if (referer) {
