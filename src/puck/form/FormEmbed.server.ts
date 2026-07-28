@@ -8,6 +8,7 @@ import type { Config, Data } from "@puckeditor/core";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { filterConfigByLocation, wrapConfigWithIslands } from "../index.js";
 import { createCsrfToken, renderSpamGuardFieldsHtml } from "./spam-guard.js";
+import { resolveDataForSSR } from "../server-data-wrapper.js";
 
 const hostConfig = (externalPuckConfig as Config) ?? ({} as Config);
 // Island wrapping so any form field flagged `island: true` (e.g. Select) emits its hydration
@@ -19,6 +20,10 @@ export async function getFormHtml(id: string): Promise<string | null> {
   const db = getDb();
   const result = await db.select({ content: forms.content }).from(forms).where(eq(forms.id, id)).limit(1);
   if (!result[0]) return null;
+
+  // Runs each field's `data` resolver (e.g. Turnstile's site key lookup) server-side before the
+  // synchronous render pass below, since components can't await inside render themselves.
+  const resolvedData = await resolveDataForSSR(filteredFormConfig, result[0].content as Data);
 
   const formRenderConfig: Config = {
     ...filteredFormConfig,
@@ -33,7 +38,7 @@ export async function getFormHtml(id: string): Promise<string | null> {
   };
 
   const html = renderToStaticMarkup(
-    createElement(Render, { config: formRenderConfig, data: result[0].content as Data }),
+    createElement(Render, { config: formRenderConfig, data: resolvedData }),
   );
 
   const hasFileInput = /type=(["'])file\1/i.test(html);

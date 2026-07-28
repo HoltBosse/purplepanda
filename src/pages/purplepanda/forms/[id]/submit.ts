@@ -121,7 +121,7 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress }
   // input, since the `required`/`inputType` constraints rendered into the HTML are trivially
   // bypassed by posting to this endpoint directly.
   const schema = buildFormSubmissionSchema(externalPuckConfig as Config, form.content as Data);
-  const parsed = schema.safeParse(data);
+  const parsed = await schema.safeParseAsync(data);
   if (!parsed.success) {
     return new Response(JSON.stringify({ errors: z.flattenError(parsed.error).fieldErrors }), {
       status: 400,
