@@ -1,4 +1,6 @@
 export { default as Accordion } from "./Accordion.js";
+export { default as Alerts } from "./Alerts.js";
+export type { AlertsProps } from "./Alerts.js";
 export { default as Flex } from "./Flex.js";
 export { default as Grid } from "./Grid.js";
 export { default as Margin } from "./Margin.js";

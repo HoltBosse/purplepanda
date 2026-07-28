@@ -22,7 +22,9 @@ type RenderArgsForComponent<TComponent> = TComponent extends { render: (props: i
   : never;
 
 type ComponentWithDataResolver<TComponent> = Omit<TComponent, "data" | "locations"> & {
-  data?: (fields: DataFieldsForComponent<TComponent>) => Awaitable<RenderArgsForComponent<TComponent>>;
+  // context is the requesting page's Astro.locals, threaded through from page.astro via
+  // resolveDataForSSR — lets a resolver read request-scoped state like session flash alerts.
+  data?: (fields: DataFieldsForComponent<TComponent>, context?: App.Locals) => Awaitable<RenderArgsForComponent<TComponent>>;
   locations?: Location | Location[];
 };
 
@@ -65,7 +67,7 @@ type ConfigWithDataResolvers<TConfig extends Config> = Omit<TConfig, "components
 
 declare module "@puckeditor/core" {
   interface ComponentConfigExtensions {
-    data?: (fields: any) => Awaitable<Record<string, unknown>>;
+    data?: (fields: any, context?: App.Locals) => Awaitable<Record<string, unknown>>;
     locations?: Location | Location[];
     bindableFields?: Record<string, BindableFieldMeta>;
     // When true, this component is hydrated as a standalone React island on the published front

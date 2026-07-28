@@ -93,9 +93,9 @@ if (!matchedPage) {
 }
 
 const [pageData, templateData] = await Promise.all([
-    resolveDataForSSR(config, matchedPage.content as Data),
+    resolveDataForSSR(config, matchedPage.content as Data, Astro.locals),
     templateSetting?.templates?.content
-        ? resolveDataForSSR(config, templateSetting.templates.content as Data)
+        ? resolveDataForSSR(config, templateSetting.templates.content as Data, Astro.locals)
         : Promise.resolve(undefined),
 ]);
 

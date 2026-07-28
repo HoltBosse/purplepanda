@@ -1,6 +1,3 @@
-import { Info, TriangleAlert, CircleX, CircleCheckBig } from '@lucide/astro';
-import type { AstroComponent } from '@lucide/astro';
-
 export enum alertType {
     info = 'info',
     success = 'success',
@@ -20,21 +17,6 @@ export function getAlertClass(type: alertType): string {
             return 'alert-error';
         default:
             return '';
-    }
-}
-
-export function getIconForAlert(type: alertType): AstroComponent {
-    switch (type) {
-        case alertType.info:
-            return Info;
-        case alertType.success:
-            return CircleCheckBig;
-        case alertType.warning:
-            return TriangleAlert;
-        case alertType.error:
-            return CircleX;
-        default:
-            return Info;
     }
 }
 

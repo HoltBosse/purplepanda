@@ -4,9 +4,7 @@ import { House, Users, LayoutTemplate, FileText, PenLine, ClipboardList, Images,
 import { getDb } from '../db/db.js';
 import { users } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
-import Alert from '../alert/Alert.astro';
-import SessionAlerts from '../alert/SessionAlerts.astro';
-import { alertType } from '../alert/index.js';
+import { AlertList } from '../alert/AlertList.js';
 import Container from '../components/Container.astro';
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 
@@ -109,7 +107,7 @@ const theme = user.theme !== 'system' ? user.theme : undefined;
 			<div class="drawer-content h-full overflow-auto bg-base-200">
 				<main class="p-6 h-full bg-base-200">
 					<Container>
-						<SessionAlerts alerts={alerts} />
+						<AlertList alerts={alerts} />
 						<slot />
 					</Container>
 				</main>

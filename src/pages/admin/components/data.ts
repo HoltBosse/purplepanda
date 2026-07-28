@@ -22,7 +22,7 @@ function isObject(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function hasDataResolver(value: unknown): value is { data: (fields: JsonObject) => unknown } {
+function hasDataResolver(value: unknown): value is { data: (fields: JsonObject, context?: unknown) => unknown } {
   return isObject(value) && typeof value.data === "function";
 }
 
@@ -53,7 +53,7 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   try {
-    const result = await component.data(fields);
+    const result = await component.data(fields, context.locals);
     if (!isObject(result)) {
       return json({ error: `Component '${componentName}' data resolver must return an object` }, 500);
     }
