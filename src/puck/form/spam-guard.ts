@@ -44,33 +44,88 @@ async function getCsrfSecret(): Promise<string> {
 export async function createCsrfToken(formId: string): Promise<string> {
   const secret = await getCsrfSecret();
   const expires = Date.now() + CSRF_TTL_MS;
-  const payload = `${formId}:${expires}`;
+  // Random component guarantees two tokens issued for the same form in the same millisecond
+  // (e.g. two tabs opened at once) still produce distinct tokens, which the reuse cache below
+  // relies on to key each issuance uniquely.
+  const nonce = randomBytes(9).toString("base64url");
+  const payload = `${formId}:${expires}:${nonce}`;
   const signature = createHmac("sha256", secret).update(payload).digest("base64url");
   return `${Buffer.from(payload, "utf-8").toString("base64url")}.${signature}`;
 }
 
-export async function verifyCsrfToken(formId: string, token: unknown): Promise<boolean> {
-  if (typeof token !== "string") return false;
+interface DecodedCsrfToken {
+  formId: string;
+  issuedAt: number;
+  expires: number;
+  payload: string;
+  signature: string;
+}
+
+// Splits and base64-decodes a token without checking its signature. Safe to use for the timing
+// heuristic below because a tampered `expires`/issuedAt will simply fail the real signature
+// check afterward — it can't be used to bypass anything, only to skip the fast-path trap.
+function decodeCsrfToken(token: unknown): DecodedCsrfToken | null {
+  if (typeof token !== "string") return null;
 
   const [encodedPayload, signature] = token.split(".");
-  if (!encodedPayload || !signature) return false;
+  if (!encodedPayload || !signature) return null;
 
   let payload: string;
   try {
     payload = Buffer.from(encodedPayload, "base64url").toString("utf-8");
   } catch {
-    return false;
+    return null;
   }
 
-  const [tokenFormId, expiresRaw] = payload.split(":");
+  const [formId, expiresRaw] = payload.split(":");
   const expires = Number(expiresRaw);
-  if (tokenFormId !== formId || !Number.isFinite(expires) || Date.now() > expires) return false;
+  if (!formId || !Number.isFinite(expires)) return null;
+
+  return { formId, expires, issuedAt: expires - CSRF_TTL_MS, payload, signature };
+}
+
+// Tokens that have already been used to complete a submission, so a captured/replayed token
+// can't be used to flood the same form again within its validity window. Keyed by the full
+// token (payload + signature), which `createCsrfToken`'s nonce guarantees is unique per
+// issuance; values are the token's own expiry so the sweep below can drop entries once they'd
+// fail expiry regardless. In-memory like the rate limiter in submit.ts, so it resets per process
+// rather than being shared across a fleet — acceptable for the same reason the rate limiter is.
+const usedCsrfTokens = new Map<string, number>();
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, expiresAt] of usedCsrfTokens) {
+    if (expiresAt <= now) usedCsrfTokens.delete(token);
+  }
+}, 5 * 60 * 1000).unref();
+
+// Real humans need at least this long to load the page and fill in a field; bots that submit
+// faster are routed to the same fake-success path as the honeypot so they don't learn to add a
+// delay. Based on the token's own issuance time rather than a server-side session, so it works
+// without needing sticky sessions.
+const MIN_FILL_TIME_MS = 1500;
+
+export function isSubmittedTooFast(formId: string, token: unknown): boolean {
+  const decoded = decodeCsrfToken(token);
+  if (!decoded || decoded.formId !== formId) return false;
+  return Date.now() - decoded.issuedAt < MIN_FILL_TIME_MS;
+}
+
+export async function verifyCsrfToken(formId: string, token: unknown): Promise<boolean> {
+  const decoded = decodeCsrfToken(token);
+  if (!decoded || decoded.formId !== formId || Date.now() > decoded.expires) return false;
 
   const secret = await getCsrfSecret();
-  const expectedSignature = createHmac("sha256", secret).update(payload).digest("base64url");
+  const expectedSignature = createHmac("sha256", secret).update(decoded.payload).digest("base64url");
   const expectedBuf = Buffer.from(expectedSignature);
-  const actualBuf = Buffer.from(signature);
-  return expectedBuf.length === actualBuf.length && timingSafeEqual(expectedBuf, actualBuf);
+  const actualBuf = Buffer.from(decoded.signature);
+  if (expectedBuf.length !== actualBuf.length || !timingSafeEqual(expectedBuf, actualBuf)) return false;
+
+  const tokenKey = `${decoded.payload}.${decoded.signature}`;
+  if (usedCsrfTokens.has(tokenKey)) return false;
+  usedCsrfTokens.set(tokenKey, decoded.expires);
+
+  return true;
 }
 
 export function isHoneypotTripped(data: Record<string, unknown>): boolean {

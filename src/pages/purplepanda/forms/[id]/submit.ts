@@ -9,7 +9,13 @@ import { forms, formSubmissions } from "../../../../db/schema.js";
 import { has404Page } from "virtual:purplepanda/has-404";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { buildFormSubmissionSchema } from "../../../../puck/form/schema.js";
-import { isHoneypotTripped, stripSpamGuardFields, verifyCsrfToken, CSRF_FIELD_NAME } from "../../../../puck/form/spam-guard.js";
+import {
+  isHoneypotTripped,
+  isSubmittedTooFast,
+  stripSpamGuardFields,
+  verifyCsrfToken,
+  CSRF_FIELD_NAME,
+} from "../../../../puck/form/spam-guard.js";
 
 const uuidSchema = z.string().uuid();
 
@@ -135,6 +141,12 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress, 
   // Bots that blanket-fill every field trip the trap; respond as if it succeeded so they don't
   // learn to leave these fields alone.
   if (isHoneypotTripped(data)) {
+    return successResponse(session, request);
+  }
+
+  // Same fake-success treatment for submissions that arrive faster than a human could plausibly
+  // fill the form out.
+  if (isSubmittedTooFast(parsedId.data, data[CSRF_FIELD_NAME])) {
     return successResponse(session, request);
   }
 
