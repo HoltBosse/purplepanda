@@ -46,3 +46,5 @@ export declare const FilePen: AstroComponent;
 export declare const Trash2: AstroComponent;
 export declare const GitBranch: AstroComponent;
 export declare const CornerDownRight: AstroComponent;
+export declare const Eye: AstroComponent;
+export declare const EyeOff: AstroComponent;

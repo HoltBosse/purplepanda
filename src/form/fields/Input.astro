@@ -1,6 +1,7 @@
 ---
 import type { BaseFieldProps } from "../types";
 import BaseField from "../BaseField.astro";
+import { Eye, EyeOff } from "@lucide/astro";
 
 interface Props extends BaseFieldProps {
   placeholder?: string;
@@ -11,16 +12,61 @@ interface Props extends BaseFieldProps {
 const { placeholder, classList, inputType, ...baseProps } = Astro.props as Props;
 const { id, name, value, required, type } = baseProps;
 const resolvedInputType = (inputType ?? type ?? "text") as astroHTML.JSX.HTMLInputTypeAttribute;
+const isPassword = resolvedInputType === "password";
 ---
 
 <BaseField {...baseProps}>
-  <input
-    class={classList}
-    type={resolvedInputType}
-    name={name}
-    id={id}
-    placeholder={placeholder}
-    value={value}
-    required={required}
-  />
+  {isPassword ? (
+    <div class="relative">
+      <input
+        class={`${classList ?? ""} pr-10`}
+        type="password"
+        name={name}
+        id={id}
+        placeholder={placeholder}
+        value={value}
+        required={required}
+        data-password-input
+      />
+      <button
+        type="button"
+        class="absolute right-2 top-1/2 -translate-y-1/2 text-base-content/60 hover:text-base-content"
+        data-password-toggle
+        aria-label="Show password"
+      >
+        <Eye size={18} data-icon-show />
+        <EyeOff size={18} class="hidden" data-icon-hide />
+      </button>
+    </div>
+  ) : (
+    <input
+      class={classList}
+      type={resolvedInputType}
+      name={name}
+      id={id}
+      placeholder={placeholder}
+      value={value}
+      required={required}
+    />
+  )}
 </BaseField>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>("[data-password-toggle]").forEach((button) => {
+    if (button.dataset.passwordToggleInitialized) return;
+    button.dataset.passwordToggleInitialized = "true";
+
+    const input = button.previousElementSibling as HTMLInputElement | null;
+    const showIcon = button.querySelector<SVGElement>("[data-icon-show]");
+    const hideIcon = button.querySelector<SVGElement>("[data-icon-hide]");
+    if (!input) return;
+
+    button.addEventListener("click", () => {
+      const revealing = input.type === "password";
+      input.type = revealing ? "text" : "password";
+      button.setAttribute("aria-label", revealing ? "Hide password" : "Show password");
+      showIcon?.classList.toggle("hidden", revealing);
+      hideIcon?.classList.toggle("hidden", !revealing);
+    });
+  });
+</script>
