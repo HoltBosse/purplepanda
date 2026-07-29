@@ -3,15 +3,25 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import Form from '../../../form/Form.astro';
 import { getAllFields } from '../../../form/index.js';
 import { getDb } from '../../../db/db.js';
-import { users } from '../../../db/schema.js';
-import { eq } from 'drizzle-orm';
-import { capitalize } from '../../../string';
+import { settings } from '../../../db/schema.js';
+import { eq, inArray } from 'drizzle-orm';
 import { getSettingsForm } from './form.js';
 import { createFormFlashSession } from '../../../form/session.js';
 
 const db = getDb();
+
+const [defaultTemplateSetting] = await db.select().from(settings).where(eq(settings.key, 'default_template')).limit(1);
+const defaultTemplateId = defaultTemplateSetting?.value as string | undefined;
+
+const turnstileSettings = await db.select().from(settings).where(inArray(settings.key, ['turnstile_site_key', 'turnstile_secret_key']));
+const turnstileSiteKey = turnstileSettings.find(s => s.key === 'turnstile_site_key')?.value as string | undefined;
+const turnstileSecretKey = turnstileSettings.find(s => s.key === 'turnstile_secret_key')?.value as string | undefined;
+
 const fields = getAllFields();
-const form = getSettingsForm();
+const formFlash = createFormFlashSession(Astro.session);
+const flash = await formFlash.get('settings') ?? {};
+await formFlash.delete('settings');
+const form = getSettingsForm(defaultTemplateId, turnstileSiteKey, turnstileSecretKey, flash);
 ---
 
 <AdminLayout>
