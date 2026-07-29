@@ -5,10 +5,12 @@ import { createFormFlashSession } from "../../../form/session.js";
 import { getSettingsForm } from "./form.js";
 import { getDb } from "../../../db/db.js";
 import { settings } from "../../../db/schema.js";
+import externalPuckConfig from "virtual:purplepanda/puck-config";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
-    const form = getSettingsForm();
+    const contentTypes = externalPuckConfig?.contentTypes ?? [];
+    const form = getSettingsForm(undefined, undefined, undefined, {}, contentTypes);
     const formData = await context.request.formData();
     const formFlash = createFormFlashSession(context.session);
     const result = validateForm(form, formData);
@@ -39,6 +41,17 @@ export async function POST(context: APIContext): Promise<Response> {
         .insert(settings)
         .values({ key: 'turnstile_secret_key', value: turnstileSecretKey })
         .onConflictDoUpdate({ target: settings.key, set: { value: turnstileSecretKey } });
+
+    for (const contentType of contentTypes) {
+        const templateFormKey = `content-default-template-${contentType.id}`;
+        const templateSettingKey = `content_default_template_${contentType.id}`;
+        const templateValue = getFieldByName(form, templateFormKey)?.value ?? '';
+
+        await db
+            .insert(settings)
+            .values({ key: templateSettingKey, value: templateValue })
+            .onConflictDoUpdate({ target: settings.key, set: { value: templateValue } });
+    }
 
     await formFlash.delete('settings');
     const alert = createAlert(alertType.success, "Settings updated successfully.");

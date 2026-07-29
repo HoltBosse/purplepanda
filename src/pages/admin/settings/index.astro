@@ -7,6 +7,7 @@ import { settings } from '../../../db/schema.js';
 import { eq, inArray } from 'drizzle-orm';
 import { getSettingsForm } from './form.js';
 import { createFormFlashSession } from '../../../form/session.js';
+import externalPuckConfig from 'virtual:purplepanda/puck-config';
 
 const db = getDb();
 
@@ -16,12 +17,30 @@ const defaultTemplateId = defaultTemplateSetting?.value as string | undefined;
 const turnstileSettings = await db.select().from(settings).where(inArray(settings.key, ['turnstile_site_key', 'turnstile_secret_key']));
 const turnstileSiteKey = turnstileSettings.find(s => s.key === 'turnstile_site_key')?.value as string | undefined;
 const turnstileSecretKey = turnstileSettings.find(s => s.key === 'turnstile_secret_key')?.value as string | undefined;
+const contentTypes = (externalPuckConfig?.contentTypes ?? []);
+const contentSettingsKeys = contentTypes.map((ct) => `content_default_template_${ct.id}`);
+const contentSettings = contentSettingsKeys.length > 0
+	? await db.select().from(settings).where(inArray(settings.key, contentSettingsKeys))
+	: [];
+const contentTemplateDefaults = Object.fromEntries(
+	contentTypes.map((ct) => [
+		ct.id,
+		(contentSettings.find((s) => s.key === `content_default_template_${ct.id}`)?.value as string | undefined) ?? '',
+	]),
+);
 
 const fields = getAllFields();
 const formFlash = createFormFlashSession(Astro.session);
 const flash = await formFlash.get('settings') ?? {};
 await formFlash.delete('settings');
-const form = getSettingsForm(defaultTemplateId, turnstileSiteKey, turnstileSecretKey, flash);
+const form = getSettingsForm(
+	defaultTemplateId,
+	turnstileSiteKey,
+	turnstileSecretKey,
+	flash,
+	contentTypes,
+	contentTemplateDefaults,
+);
 ---
 
 <AdminLayout>
