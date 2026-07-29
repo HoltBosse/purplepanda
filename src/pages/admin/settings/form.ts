@@ -64,7 +64,33 @@ export function getSettingsForm(defaultTemplateId?: string, turnstileSiteKey?: s
                                 validator: z.string().min(1, "Last name is required"),
                             },
                         ],
-                    }
+                    },
+                    {
+                        id: 'dp-group',
+                        name: 'dp-group',
+                        type: "Group",
+                        fields: fields,
+                        classList: "grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6 mt-6",
+                        groupFields: [
+                            {
+                                id: 'dp-group-header',
+                                name: 'dp-group-header',
+                                type: 'Html',
+                                markup: '<h2 class="text-md font-medium flex items-center">Default Prefab</h2>',
+                            },
+                            {
+                                id: 'dp-option',
+                                name: 'dp-option',
+                                type: 'Html',
+                                markup: `<div class="flex items-center justify-end gap-2">
+                                    <a href="#" class="btn btn-ghost btn-sm btn-square" title="Source Control">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-git-branch"><path d="M15 6a9 9 0 0 0-9 9V3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/></svg>
+                                    </a>
+                                    <a href="#" class="btn btn-ghost btn-sm">Edit</a>
+                                </div>`,
+                            },
+                        ],
+                    },
                 ]
             },
             {
