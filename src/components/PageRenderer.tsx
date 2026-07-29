@@ -1,5 +1,5 @@
 import type { Config, Data } from "@puckeditor/core";
-import { Render } from "@puckeditor/core";
+import { Render, walkTree } from "@puckeditor/core";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { wrapConfigWithDataBinding, wrapConfigWithIslands } from "../puck/index.js";
 
@@ -32,36 +32,26 @@ export default function PageRenderer({ pageData, templateData }: PageRendererPro
     return <Render config={renderConfig} data={pageData} />;
   }
 
-  const templateContent = templateData.content ?? [];
-  const segments: Array<Data["content"] | "__SLOT__"> = [];
-  let current: Data["content"] = [];
+  // TemplateSlot marks where page content is injected. It can be nested inside another
+  // component's slot (e.g. wrapped by Margin/Flex), so we splice it in wherever it appears
+  // in the tree rather than only scanning the top-level content array.
+  let injected = false;
+  const mergedData = walkTree(templateData, renderConfig, (content) => {
+    if (!content.some((item) => (item as any)?.type === "TemplateSlot")) return;
+    injected = true;
+    return content.flatMap((item) =>
+      (item as any)?.type === "TemplateSlot" ? (pageData.content ?? []) : [item],
+    );
+  });
 
-  for (const item of templateContent) {
-    if ((item as any)?.type === "TemplateSlot") {
-      if (current.length > 0) segments.push([...current]);
-      segments.push("__SLOT__");
-      current = [];
-    } else {
-      current.push(item as any);
-    }
+  if (!injected) {
+    return (
+      <>
+        <Render config={renderConfig} data={templateData} />
+        <Render config={renderConfig} data={pageData} />
+      </>
+    );
   }
-  if (current.length > 0) segments.push([...current]);
-  if (!segments.includes("__SLOT__")) segments.push("__SLOT__");
 
-  return (
-    <>
-      {segments.map((segment, index) => {
-        if (segment === "__SLOT__") {
-          return <Render key={`slot-${index}`} config={renderConfig} data={pageData} />;
-        }
-        return (
-          <Render
-            key={`segment-${index}`}
-            config={renderConfig}
-            data={{ ...templateData, content: segment as Data["content"] }}
-          />
-        );
-      })}
-    </>
-  );
+  return <Render config={renderConfig} data={mergedData} />;
 }
