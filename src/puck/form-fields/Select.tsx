@@ -34,6 +34,10 @@ function SelectField({
 }: SelectFieldProps) {
   const name = `field-${id}`;
   const selectRef = useRef<HTMLSelectElement>(null);
+  // While editing, the select is always rendered as single-select (see comment below), so its
+  // defaultValue must match: an array default here would trigger React's
+  // "defaultValue must be a scalar value if multiple is false" warning.
+  const isMultiple = editing ? false : multiple;
 
   // SlimSelect enhances the native <select> once the island is hydrated on the front end. It's
   // skipped while editing (the base render still runs inside the form editor, where we want a plain
@@ -84,11 +88,12 @@ function SelectField({
         id={name}
         name={name}
         required={required}
-        multiple={multiple}
+        /* since we don't render slimselect in editing mode, show it as a native single which is close enough */
+        multiple={isMultiple}
         className="select select-bordered w-full"
-        defaultValue={multiple ? [] : ""}
+        defaultValue={isMultiple ? [] : ""}
       >
-        {placeholder && !multiple && (
+        {placeholder && !isMultiple && (
           <option value="" disabled>
             {placeholder}
           </option>

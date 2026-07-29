@@ -1,8 +1,12 @@
 ---
+import type { Config, Data } from '@puckeditor/core';
+import externalPuckConfig from 'virtual:purplepanda/puck-config';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../../db/db.js';
 import { formSubmissions, forms } from '../../../../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { filterConfigByLocation } from '../../../../puck/index.js';
+import { resolveDataForSSR } from '../../../../puck/server-data-wrapper.js';
 import LocalDateTime from '../../../../components/LocalDateTime.astro';
 
 const db = getDb();
@@ -36,6 +40,14 @@ function isFileValue(value: unknown): value is { name: string; size: number; typ
     return !!value && typeof value === 'object' && 'name' in value && 'size' in value && 'type' in value;
 }
 
+// Run each field's own `data` resolver (e.g. Select's content/users option lookup) before reading
+// props, the same way FormEmbed.server.ts does for rendering a live form — so a field whose
+// `options` prop is just a stale manual-mode leftover (see Select.tsx's `data` resolver comment)
+// gets its real choices merged in first. This keeps the walk below generic: it never needs to know
+// which field types have dynamic sources.
+const formConfig = filterConfigByLocation((externalPuckConfig as Config) ?? ({} as Config), 'form');
+const resolvedFormContent = await resolveDataForSSR(formConfig, submission.formContent as Data);
+
 // Walk the form's Puck content tree to find each field's display label and its choice options
 // (Select, RadioGroup) or checkbox label, so the submissions table can show the label the form
 // editor set rather than the raw `field-<id>` key, and so submitted codes (e.g. "option-1") can
@@ -68,7 +80,7 @@ function collectFieldMeta(node: unknown): void {
     Object.values(node).forEach(collectFieldMeta);
 }
 
-collectFieldMeta(submission.formContent);
+collectFieldMeta(resolvedFormContent);
 
 function resolveFieldLabel(key: string): string {
     return labelByFieldName[key] ?? key;
