@@ -6,6 +6,8 @@
    rather than the legacy numbered grey/azure/... scales. The values below reproduce
    the previous mapping: each token is set to the DaisyUI color the corresponding
    legacy scale step used to resolve to. */
+@reference "./global.css";
+
 .Puck {
   /* Surfaces */
   --puck-color-surface: var(--color-base-100);
@@ -87,9 +89,13 @@
 }
 
 /* Rich prefab (puck/prefab/Rich.tsx): the canvas's copy of .rich-text is wrapped
-   in our "prose" class (see Rich.tsx render()), which styles links, but the
-   sidebar's live tiptap editing surface is Puck's generic field UI and never
-   gets that wrapper, so links there would otherwise render unstyled. */
+   in our "prose" class (see Rich.tsx render()), but the sidebar's live tiptap
+   editing surface is Puck's generic field UI and never gets that wrapper, so
+   give it the "prose" styling directly to match. */
+.Puck .rich-text {
+  @apply prose max-w-none;
+}
+
 .Puck .rich-text a {
   color: var(--puck-color-interactive);
   text-decoration: underline;
