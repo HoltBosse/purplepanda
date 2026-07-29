@@ -25,6 +25,7 @@ function toSubmissionSchema() {
 const Turnstile: ComponentConfig<TurnstileProps> = {
   label: "Turnstile",
   locations: "form",
+  submissionDisplay: false,
   toSubmissionSchema,
   data: async () => {
     if (!import.meta.env.SSR) return {};

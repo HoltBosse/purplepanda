@@ -80,6 +80,10 @@ declare module "@puckeditor/core" {
     // across a form's components by buildFormSubmissionSchema (./form-fields/schema.js). Only
     // components used as form fields need to implement this; others are left unvalidated.
     toSubmissionSchema?: (props: any) => z.ZodTypeAny;
+    // Set to false to hide this field from the admin submissions viewer (packages/purplepanda/
+    // src/pages/admin/forms/submissions/[id].astro) — for fields whose stored value isn't a
+    // meaningful answer to show an admin, e.g. Turnstile's verification token. Defaults to shown.
+    submissionDisplay?: boolean;
   }
 }
 

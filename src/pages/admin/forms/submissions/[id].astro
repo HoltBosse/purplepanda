@@ -51,11 +51,14 @@ const resolvedFormContent = await resolveDataForSSR(formConfig, submission.formC
 // Walk the form's Puck content tree to find each field's display label and its choice options
 // (Select, RadioGroup) or checkbox label, so the submissions table can show the label the form
 // editor set rather than the raw `field-<id>` key, and so submitted codes (e.g. "option-1") can
-// be resolved back to the human-readable label the visitor actually saw.
+// be resolved back to the human-readable label the visitor actually saw. Also collects which
+// field keys opt out of display entirely via `submissionDisplay: false` on their component config
+// (e.g. Turnstile, whose stored value is a verification token rather than a meaningful answer).
 type FieldOption = { label: string; value: string };
 const labelByFieldName: Record<string, string> = {};
 const optionsByFieldName: Record<string, FieldOption[]> = {};
 const checkboxLabelByFieldName: Record<string, string> = {};
+const hiddenFieldNames = new Set<string>();
 
 function collectFieldMeta(node: unknown): void {
     if (Array.isArray(node)) {
@@ -64,6 +67,7 @@ function collectFieldMeta(node: unknown): void {
     }
     if (!node || typeof node !== 'object') return;
 
+    const type = (node as any).type;
     const props = (node as any).props;
     if (props && typeof props.id === 'string') {
         const fieldName = `field-${props.id}`;
@@ -74,6 +78,9 @@ function collectFieldMeta(node: unknown): void {
             optionsByFieldName[fieldName] = props.options;
         } else if (typeof props.checkboxLabel === 'string') {
             checkboxLabelByFieldName[fieldName] = props.checkboxLabel;
+        }
+        if (typeof type === 'string' && formConfig.components?.[type]?.submissionDisplay === false) {
+            hiddenFieldNames.add(fieldName);
         }
     }
 
@@ -99,7 +106,7 @@ function formatValue(key: string, value: unknown): string {
     return resolveDisplayValue(key, value);
 }
 
-const fields = Object.entries(submission.data as Record<string, unknown>);
+const fields = Object.entries(submission.data as Record<string, unknown>).filter(([key]) => !hiddenFieldNames.has(key));
 ---
 
 <AdminLayout>
