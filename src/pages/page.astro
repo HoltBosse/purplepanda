@@ -1,8 +1,9 @@
 ---
 import '../styles/global.css';
 import { getDb } from '../db/db.js';
-import { pages, settings, templates, redirects } from '../db/schema.js';
+import { pages, redirects } from '../db/schema.js';
 import { and, eq, isNull, sql } from 'drizzle-orm';
+import { resolveTemplateSetting } from '../db/templates.js';
 import type { Data } from '@puckeditor/core';
 import externalPuckConfig from 'virtual:purplepanda/puck-config';
 import { has404Page } from 'virtual:purplepanda/has-404';
@@ -65,13 +66,7 @@ const [matchedPage, templateSetting] = await Promise.all([
             .limit(1)
             .then(rows => rows[0])
         : resolvePlainPage(requestPath),
-    db
-        .select()
-        .from(settings)
-        .leftJoin(templates, sql`(${templates.id})::text = (${settings.value} #>> '{}')`)
-        .where(eq(settings.key, 'default_template'))
-        .limit(1)
-        .then(rows => rows[0]),
+    resolveTemplateSetting(db, contentTypeRoute?.contentType.id),
 ]);
 
 if (!matchedPage) {

@@ -2,8 +2,9 @@
 import AdminBareLayout from '../../../../../layouts/AdminBareLayout.astro';
 import ContentPuckEditor from '../../../../../components/ContentPuckEditor';
 import { getDb } from '../../../../../db/db.js';
-import { settings, templates, pages, dagNodes } from '../../../../../db/schema.js';
-import { eq, sql } from 'drizzle-orm';
+import { pages, dagNodes } from '../../../../../db/schema.js';
+import { eq } from 'drizzle-orm';
+import { resolveTemplateSetting } from '../../../../../db/templates.js';
 import type { Data } from '@puckeditor/core';
 
 const db = getDb();
@@ -22,14 +23,9 @@ if (!entity || !entity.contentType) {
 const saveUrl = `/admin/content/drafts/update/${draftId}`;
 const draftPublishUrl = `/admin/content/drafts/publish/${draftId}`;
 
-const [defaultTemplate] = await db
-    .select()
-    .from(settings)
-    .leftJoin(templates, sql`(${templates.id})::text = (${settings.value} #>> '{}')`)
-    .where(eq(settings.key, 'default_template'))
-    .limit(1);
+const templateSetting = await resolveTemplateSetting(db, entity.contentType);
 
-const templateData = defaultTemplate?.templates?.content as Data | undefined;
+const templateData = templateSetting?.templates?.content as Data | undefined;
 ---
 <AdminBareLayout>
     <ContentPuckEditor

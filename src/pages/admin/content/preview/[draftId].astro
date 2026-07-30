@@ -1,11 +1,12 @@
 ---
 import '../../../../styles/global.css';
 import { getDb } from '../../../../db/db.js';
-import { settings, templates, dagNodes } from '../../../../db/schema.js';
-import { eq, sql } from 'drizzle-orm';
+import { pages, dagNodes } from '../../../../db/schema.js';
+import { eq } from 'drizzle-orm';
 import type { Data } from '@puckeditor/core';
 import externalPuckConfig from 'virtual:purplepanda/puck-config';
 import { resolveDataForSSR } from '../../../../puck/server-data-wrapper.js';
+import { resolveTemplateSetting } from '../../../../db/templates.js';
 import PageRenderer from '../../../../components/PageRenderer.js';
 
 const db = getDb();
@@ -18,13 +19,9 @@ if (!draft || draft.nodeType !== 'draft' || draft.entityType !== 'content' || dr
     return Astro.redirect('/admin/content');
 }
 
-const templateSetting = await db
-    .select()
-    .from(settings)
-    .leftJoin(templates, sql`(${templates.id})::text = (${settings.value} #>> '{}')`)
-    .where(eq(settings.key, 'default_template'))
-    .limit(1)
-    .then(rows => rows[0]);
+const [entity] = await db.select().from(pages).where(eq(pages.id, draft.entityId)).limit(1);
+
+const templateSetting = await resolveTemplateSetting(db, entity?.contentType ?? undefined);
 
 const config = externalPuckConfig ?? {};
 

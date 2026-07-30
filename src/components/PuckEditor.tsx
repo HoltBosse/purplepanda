@@ -3,10 +3,47 @@ import "@puckeditor/core/puck.css";
 import "../styles/puck-theme.css";
 import type { Config, Data, Overrides, PuckContext } from "@puckeditor/core";
 import { Render } from "@puckeditor/core";
-import React, { cloneElement, isValidElement, useEffect, useMemo } from "react";
+import React, { cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { Save } from "../puck/icons.js";
 
 const ROOT_SLOT_NAME = "default-zone";
+
+const SLOT_ZONE_STYLE: React.CSSProperties = {
+  flexGrow: 1,
+  minWidth: 0,
+  width: "100%",
+  maxWidth: "100%",
+};
+
+// The template is drawn with Puck's read-only <Render>, but the editable zone can't simply be
+// rendered inside it: DropZone resolves its zone as `${areaId}:${zone}` from React context at its
+// render position, so nested under a template component it would look for `Margin-xyz:default-zone`
+// instead of the page's `root:default-zone` and come up empty. Instead the root portals the real
+// drop zone into a standalone container element, and TemplateSlot adopts that container into the
+// template tree. The portal keeps the drop zone in the root's context (so the zone resolves) while
+// its DOM sits inside the template at any depth.
+//
+// The container is a plain detached DOM node rather than React state on purpose: Puck rebuilds slot
+// components on every render (getSlotTransform returns a fresh component identity), so anything
+// inside a template slot remounts constantly. A ref that set state here would loop
+// detach -> setState -> rerender -> remount -> detach until React bailed out with "Maximum update
+// depth exceeded". Appending a stable container involves no React state, so remounts are harmless.
+const TemplateSlotContainerContext = createContext<HTMLElement | null>(null);
+
+function TemplateSlotRenderer() {
+  const container = useContext(TemplateSlotContainerContext);
+
+  const adoptContainer = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node || !container || node.contains(container)) return;
+      node.appendChild(container);
+    },
+    [container],
+  );
+
+  return <div ref={adoptContainer} style={{ display: "contents" }} />;
+}
 
 const useTypedPuck = createUsePuck();
 
@@ -89,38 +126,47 @@ function ensureTemplateSlot(data: Data): Data {
 
 export default function PuckEditor({ config, data, templateData, onPublish, onSave }: PuckEditorProps) {
   const overrides = useMemo(() => createOverrides(onSave), [onSave]);
-  const normalizedTemplateData = templateData ? ensureTemplateSlot(templateData) : undefined;
-  const segments: Array<Data["content"] | "__SLOT__"> = [];
 
-  if (normalizedTemplateData) {
-    console.log("Using template data:", templateData);
+  // Memoized because it feeds the root render below: a fresh object each render would rebuild the
+  // root component's identity and remount the whole canvas on every keystroke.
+  const normalizedTemplateData = useMemo(
+    () => (templateData ? ensureTemplateSlot(templateData) : undefined),
+    [templateData],
+  );
 
-    /* const rootRef = useRef<HTMLDivElement | null>(null); */
-    const templateContent = normalizedTemplateData.content ?? [];
-    let currentSegment: Data["content"] = [];
+  // Config used to draw the template itself: same host config, plus the TemplateSlot placeholder
+  // that marks where the page's editable zone gets portalled in.
+  const templateRenderConfig = useMemo(
+    () => ({
+      ...config,
+      components: {
+        ...(config.components ?? {}),
+        TemplateSlot: { render: TemplateSlotRenderer },
+      },
+    }),
+    [config],
+  );
 
-    for (const item of templateContent) {
-      if ((item as Record<string, unknown>)?.type === "TemplateSlot") {
-        if (currentSegment.length > 0) {
-          segments.push(currentSegment);
-        }
-        segments.push("__SLOT__");
-        currentSegment = [];
-        continue;
-      }
+  // Detached container that the live drop zone is portalled into; TemplateSlot appends it into the
+  // template. Created once so the portal target — and therefore the drop zone subtree — is stable.
+  const slotContainer = useMemo(() => {
+    if (typeof document === "undefined") return null;
+    const el = document.createElement("div");
+    el.style.display = "contents";
+    return el;
+  }, []);
 
-      currentSegment.push(item as any);
-    }
-
-    if (currentSegment.length > 0) {
-      segments.push(currentSegment);
-    }
-
-    console.log("Segments:", segments);
-  } else {
-    //make sure we always have one slot if no template data is provided
-    segments.push("__SLOT__");
-  }
+  // Held as a memoized element, not re-created inside the root's render: passing React the very same
+  // element reference lets it bail out of re-rendering the template on every root render, which
+  // otherwise remounts the whole template subtree (and moves the drop zone's DOM) constantly.
+  const templateElement = useMemo(() => {
+    if (!normalizedTemplateData || !slotContainer) return null;
+    return (
+      <TemplateSlotContainerContext.Provider value={slotContainer}>
+        <Render config={templateRenderConfig} data={normalizedTemplateData} />
+      </TemplateSlotContainerContext.Provider>
+    );
+  }, [normalizedTemplateData, slotContainer, templateRenderConfig]);
 
   let configCopy = useMemo(() => {
     const nextConfig = {
@@ -137,6 +183,8 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
       }: {
         puck: Pick<PuckContext, "renderDropZone">;
       }) => {
+        const liveZone = renderDropZone({ zone: ROOT_SLOT_NAME, style: SLOT_ZONE_STYLE });
+
         return (
           <div
             style={{
@@ -145,50 +193,23 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
               minHeight: "100%",
               width: "100%",
               maxWidth: "100%",
-              /* boxSizing: "border-box", */
-              /* overflowX: "clip", */
             }}
           >
-            {segments.map((segment, index) => {
-              if (segment === "__SLOT__") {
-                return (
-                  <React.Fragment key={index}>
-                    {renderDropZone({
-                      zone: ROOT_SLOT_NAME,
-                      style: {
-                        flexGrow: 1,
-                        minWidth: 0,
-                        width: "100%",
-                        maxWidth: "100%",
-                        /* boxSizing: "border-box", */
-                      },
-                    })}
-                  </React.Fragment>
-                );
-              } else {
-                if (!normalizedTemplateData) {
-                  return null;
-                }
-
-                return (
-                  <Render
-                    key={`segment-${index}`}
-                    config={config}
-                    data={{
-                      ...normalizedTemplateData,
-                      content: segment,
-                    }}
-                  />
-                );
-              }
-            })}
+            {templateElement && slotContainer ? (
+              <>
+                {templateElement}
+                {createPortal(liveZone, slotContainer)}
+              </>
+            ) : (
+              liveZone
+            )}
           </div>
         );
       },
     };
 
     return nextConfig;
-  }, [config]);
+  }, [config, templateElement, slotContainer]);
 
   return (
     <div style={{ position: "relative", width: "100%", maxWidth: "100%", overflowX: "clip" }}>
