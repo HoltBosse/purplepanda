@@ -1,0 +1,72 @@
+import type { APIContext } from "astro";
+import { createAlert, alertType, addAlertToSession } from "../../../../alert/index.js";
+import { getDb } from "../../../../db/db.js";
+import { settings, dagNodes } from "../../../../db/schema.js";
+import { prefabSettingKey } from "../../../../db/prefabs.js";
+import { eq, and, desc } from 'drizzle-orm';
+import * as z from "zod";
+import { addAction } from "../../../../actions/index.js";
+
+export async function POST(context: APIContext): Promise<Response> {
+    const db = getDb();
+    const { uuid } = context.params;
+    const settingsKey = prefabSettingKey(uuid);
+    const redirectPath = uuid ? `/admin/settings/prefab/${uuid}` : '/admin/settings/prefab/default';
+
+    const formData = await context.request.formData();
+    const contentField = formData.get("content");
+    const contentSchema = z.string().refine((val) => {
+        try {
+            JSON.parse(val);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }, "Content must be a valid JSON string");
+    const contentResult = contentSchema.safeParse(contentField);
+
+    if (!contentResult.success) {
+        const alert = createAlert(alertType.error, "Invalid content Submitted");
+        await addAlertToSession(context.session, alert);
+        return context.redirect(redirectPath);
+    }
+
+    const parsedContent = JSON.parse(contentResult.data);
+
+    const [existing] = await db.select().from(settings).where(eq(settings.key, settingsKey)).limit(1);
+    const isNewPrefab = !existing;
+
+    const [settingRow] = await db
+        .insert(settings)
+        .values({ key: settingsKey, value: parsedContent })
+        .onConflictDoUpdate({ target: settings.key, set: { value: parsedContent } })
+        .returning();
+
+    if (!settingRow) {
+        return new Response("Failed to save prefab", { status: 500 });
+    }
+
+    const [latestPublishNode] = await db
+        .select()
+        .from(dagNodes)
+        .where(and(eq(dagNodes.entityType, 'prefab'), eq(dagNodes.entityId, settingRow.id), eq(dagNodes.nodeType, 'publish')))
+        .orderBy(desc(dagNodes.createdAt))
+        .limit(1);
+
+    const [publishNode] = await db.insert(dagNodes).values({
+        entityType: 'prefab',
+        entityId: settingRow.id,
+        parentId: latestPublishNode?.id ?? null,
+        content: parsedContent,
+        nodeType: 'publish',
+    }).returning();
+
+    const userId = await context.session?.get("userId");
+    await addAction(isNewPrefab ? "prefabcreate" : "prefabupdate", { id: settingRow.id, version: publishNode?.id ?? null }, userId);
+
+    const message = isNewPrefab ? "Prefab created successfully." : "Prefab updated successfully.";
+    const alert = createAlert(alertType.success, message);
+    await addAlertToSession(context.session, alert);
+
+    return context.redirect("/admin/settings");
+}

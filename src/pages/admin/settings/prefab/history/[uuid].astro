@@ -1,0 +1,67 @@
+---
+import AdminLayout from '../../../../../layouts/AdminLayout.astro';
+import HistoryView from '../../../../../components/HistoryView';
+import type { DagNodeData } from '../../../../../components/HistoryView';
+import { getDb } from '../../../../../db/db.js';
+import { dagNodes } from '../../../../../db/schema.js';
+import { resolvePrefabSetting } from '../../../../../db/prefabs.js';
+import externalPuckConfig from 'virtual:purplepanda/puck-config';
+import { eq, and, or, gt } from 'drizzle-orm';
+
+const { uuid } = Astro.params;
+const contentTypes = externalPuckConfig?.contentTypes ?? [];
+const contentType = contentTypes.find(ct => ct.id === uuid);
+
+if (!uuid || !contentType) {
+	return Astro.rewrite('/admin/__not-found');
+}
+
+const db = getDb();
+
+const prefabSetting = await resolvePrefabSetting(db, uuid);
+if (!prefabSetting) return Astro.redirect(`/admin/settings/prefab/${uuid}`);
+
+const allNodes = await db
+    .select()
+    .from(dagNodes)
+    .where(
+        and(
+            eq(dagNodes.entityId, prefabSetting.id),
+            eq(dagNodes.entityType, 'prefab'),
+            or(
+                eq(dagNodes.nodeType, 'publish'),
+                and(eq(dagNodes.nodeType, 'draft'), gt(dagNodes.state, -1)),
+            ),
+        )
+    );
+
+const serializedNodes: DagNodeData[] = allNodes.map(n => ({
+    id: n.id,
+    nodeType: n.nodeType as 'publish' | 'draft',
+    name: n.name,
+    createdAt: n.createdAt.toISOString(),
+    parentId: n.parentId,
+    content: n.content as Record<string, unknown>,
+    state: n.state,
+}));
+---
+
+<AdminLayout>
+    <div class="flex items-center gap-2 border-b border-base-300 pt-2 pb-4 text-sm">
+        <a href="/admin/settings" class="text-base-content/50 hover:text-base-content transition-colors">Settings</a>
+        <span class="text-base-content/30">/</span>
+        <span class="text-base-content/50">History</span>
+        <span class="text-base-content/30">/</span>
+        <span class="font-semibold truncate max-w-64" title={contentType?.title}>{contentType?.title} Prefab</span>
+    </div>
+
+    <div class="mt-4">
+        <HistoryView
+            client:load
+            entityType="prefab"
+            entityId={prefabSetting.id}
+            currentContent={prefabSetting.value as Record<string, unknown>}
+            nodes={serializedNodes}
+        />
+    </div>
+</AdminLayout>

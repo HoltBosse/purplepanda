@@ -1,0 +1,29 @@
+---
+import AdminBareLayout from '../../../../layouts/AdminBareLayout.astro';
+import PrefabPuckEditor from '../../../../components/PrefabPuckEditor';
+import { getDb } from '../../../../db/db.js';
+import { resolveTemplateSetting } from '../../../../db/templates.js';
+import { resolvePrefabSetting } from '../../../../db/prefabs.js';
+import type { Data } from '@puckeditor/core';
+
+const db = getDb();
+
+const [templateSetting, prefabSetting] = await Promise.all([
+	resolveTemplateSetting(db),
+	resolvePrefabSetting(db),
+]);
+
+const templateData = templateSetting?.templates?.content as Data | undefined;
+
+const editorProps = {
+	...(prefabSetting ? { initialData: prefabSetting.value as Data } : {}),
+	...(templateData ? { templateData } : {}),
+};
+---
+<AdminBareLayout>
+    <PrefabPuckEditor
+        client:only="react"
+		saveUrl="/admin/settings/prefab/update"
+		{...editorProps}
+    />
+</AdminBareLayout>

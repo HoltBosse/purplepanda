@@ -1,0 +1,39 @@
+---
+import AdminBareLayout from '../../../../layouts/AdminBareLayout.astro';
+import PrefabPuckEditor from '../../../../components/PrefabPuckEditor';
+import { getDb } from '../../../../db/db.js';
+import { resolveTemplateSetting } from '../../../../db/templates.js';
+import { resolvePrefabSetting } from '../../../../db/prefabs.js';
+import externalPuckConfig from 'virtual:purplepanda/puck-config';
+import type { Data } from '@puckeditor/core';
+
+const { uuid } = Astro.params;
+const contentTypes = externalPuckConfig?.contentTypes ?? [];
+const contentType = contentTypes.find(ct => ct.id === uuid);
+
+if (!uuid || !contentType) {
+	return Astro.rewrite('/admin/__not-found');
+}
+
+const db = getDb();
+
+const [templateSetting, prefabSetting] = await Promise.all([
+	resolveTemplateSetting(db, uuid),
+	resolvePrefabSetting(db, uuid),
+]);
+
+const templateData = templateSetting?.templates?.content as Data | undefined;
+
+const editorProps = {
+	...(prefabSetting ? { initialData: prefabSetting.value as Data } : {}),
+	...(templateData ? { templateData } : {}),
+};
+---
+<AdminBareLayout>
+    <PrefabPuckEditor
+        client:only="react"
+		contentTypeId={uuid}
+		saveUrl={`/admin/settings/prefab/update/${uuid}`}
+		{...editorProps}
+    />
+</AdminBareLayout>

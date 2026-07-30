@@ -67,7 +67,7 @@ interface Edge {
 }
 
 export interface HistoryViewProps {
-  entityType: "page" | "template" | "content" | "form";
+  entityType: "page" | "template" | "content" | "form" | "prefab";
   entityId: string;
   currentContent: Record<string, unknown>;
   nodes: DagNodeData[];

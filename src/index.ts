@@ -532,6 +532,36 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/settings/prefab/default",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/settings/prefab/default.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/settings/prefab/update",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/settings/prefab/update.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/settings/prefab/update/[uuid]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/settings/prefab/update.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/settings/prefab/history/default",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/settings/prefab/history/default.astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/settings/prefab/history/[uuid]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/settings/prefab/history/[uuid].astro",
+        });
+
+        injectRoute({
+          pattern: "/admin/settings/prefab/[uuid]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/settings/prefab/[uuid].astro",
+        });
+
+        injectRoute({
           pattern: "/admin/components/data",
           entrypoint: "@holtbosse/purplepanda/pages/admin/components/data.ts",
         });

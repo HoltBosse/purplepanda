@@ -89,10 +89,10 @@ export function getSettingsForm(
                             name: `content-prefab-option-${contentType.id}`,
                             type: 'Html' as const,
                             markup: `<div class="flex items-center justify-end gap-2">
-                                <a href="#" class="btn btn-ghost btn-sm btn-square" title="Source Control">
+                                <a href="/admin/settings/prefab/history/${contentType.id}" class="btn btn-ghost btn-sm btn-square" title="Source Control">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-git-branch"><path d="M15 6a9 9 0 0 0-9 9V3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/></svg>
                                 </a>
-                                <a href="#" class="btn btn-ghost btn-sm">Edit</a>
+                                <a href="/admin/settings/prefab/${contentType.id}" class="btn btn-ghost btn-sm">Edit</a>
                             </div>`,
                         },
                     ],
@@ -167,10 +167,10 @@ export function getSettingsForm(
                                 name: 'dp-option',
                                 type: 'Html',
                                 markup: `<div class="flex items-center justify-end gap-2">
-                                    <a href="#" class="btn btn-ghost btn-sm btn-square" title="Source Control">
+                                    <a href="/admin/settings/prefab/history/default" class="btn btn-ghost btn-sm btn-square" title="Source Control">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-git-branch"><path d="M15 6a9 9 0 0 0-9 9V3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/></svg>
                                     </a>
-                                    <a href="#" class="btn btn-ghost btn-sm">Edit</a>
+                                    <a href="/admin/settings/prefab/default" class="btn btn-ghost btn-sm">Edit</a>
                                 </div>`,
                             },
                         ],
