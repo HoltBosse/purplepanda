@@ -10,6 +10,7 @@ const Player = createPlayer({ features: videoFeatures });
 
 export type VideoProps = {
   url: string;
+  autoplay: boolean;
 };
 
 const Video: ComponentConfig<VideoProps> = {
@@ -20,11 +21,20 @@ const Video: ComponentConfig<VideoProps> = {
       type: "text",
       label: "Video URL",
     },
+    autoplay: {
+      type: "radio",
+      label: "Autoplay",
+      options: [
+        { label: "Yes", value: true },
+        { label: "No", value: false },
+      ],
+    },
   },
   defaultProps: {
     url: "",
+    autoplay: false,
   },
-  render: ({ url }) => {
+  render: ({ url, autoplay }) => {
     if (!url) {
       return (
         <div className="rounded-lg border-2 border-dashed border-base-300 bg-base-200 p-6 text-center text-base-content/50">
@@ -34,6 +44,30 @@ const Video: ComponentConfig<VideoProps> = {
     }
 
     const isVimeo = parseVimeoSource(url) !== null;
+
+    // Autoplay implies a chromeless background-style video, so the control skin (which
+    // always renders its control bar regardless of any per-instance props) is skipped entirely.
+    if (autoplay) {
+      return (
+        <Player.Provider>
+          <div style={{ aspectRatio: "16 / 9" } as CSSProperties}>
+            {isVimeo ? (
+              <VimeoVideo src={url} autoplay muted loop controls={false} />
+            ) : (
+              <Html5Video
+                src={url}
+                playsInline
+                autoPlay
+                muted
+                loop
+                controls={false}
+                style={{ width: "100%", height: "100%" }}
+              />
+            )}
+          </div>
+        </Player.Provider>
+      );
+    }
 
     return (
       <Player.Provider>
