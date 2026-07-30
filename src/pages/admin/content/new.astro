@@ -5,6 +5,7 @@ import { getDb } from '../../../db/db.js';
 import { pages } from '../../../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { resolveTemplateSetting } from '../../../db/templates.js';
+import { resolvePrefabSetting } from '../../../db/prefabs.js';
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Data } from '@puckeditor/core';
 
@@ -24,11 +25,12 @@ if (id) {
     saveUrl += `/${id}`;
 }
 
-const [templateSetting, existingPage] = await Promise.all([
+const [templateSetting, existingPage, prefabSetting] = await Promise.all([
     resolveTemplateSetting(db, typeId),
     id
         ? db.select().from(pages).where(eq(pages.id, id)).limit(1).then(rows => rows[0])
         : Promise.resolve(undefined),
+    id ? Promise.resolve(undefined) : resolvePrefabSetting(db, typeId),
 ]);
 
 if (id && !existingPage) {
@@ -36,9 +38,12 @@ if (id && !existingPage) {
 }
 
 const templateData = templateSetting?.templates?.content as Data | undefined;
+const prefabData = prefabSetting?.value as Data | undefined;
 
 const editorProps = {
-    ...(existingPage ? { initialData: existingPage.content as Data } : {}),
+    ...(existingPage
+        ? { initialData: existingPage.content as Data }
+        : (prefabData ? { initialData: prefabData } : {})),
     ...(templateData ? { templateData } : {}),
 };
 ---

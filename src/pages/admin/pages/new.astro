@@ -3,6 +3,7 @@ import AdminBareLayout from '../../../layouts/AdminBareLayout.astro';
 import PagePuckEditor from '../../../components/PagePuckEditor';
 import { getDb } from '../../../db/db.js';
 import { settings, templates, pages } from '../../../db/schema.js';
+import { resolvePrefabSetting } from '../../../db/prefabs.js';
 import { eq, sql } from 'drizzle-orm';
 import type { Data } from '@puckeditor/core';
 
@@ -15,7 +16,7 @@ if (id) {
     saveUrl += `/${id}`;
 }
 
-const [defaultTemplate, allPages, existingPage] = await Promise.all([
+const [defaultTemplate, allPages, existingPage, prefabSetting] = await Promise.all([
     db
         .select()
         .from(settings)
@@ -33,6 +34,7 @@ const [defaultTemplate, allPages, existingPage] = await Promise.all([
     id
         ? db.select().from(pages).where(eq(pages.id, id)).limit(1).then(rows => rows[0])
         : Promise.resolve(undefined),
+    id ? Promise.resolve(undefined) : resolvePrefabSetting(db),
 ]);
 
 if (id && !existingPage) {
@@ -40,9 +42,12 @@ if (id && !existingPage) {
 }
 
 const templateData = defaultTemplate?.templates?.content as Data | undefined;
+const prefabData = prefabSetting?.value as Data | undefined;
 
 const editorProps = {
-    ...(existingPage ? { initialData: existingPage.content as Data } : {}),
+    ...(existingPage
+        ? { initialData: existingPage.content as Data }
+        : (prefabData ? { initialData: prefabData } : {})),
     ...(templateData ? { templateData } : {}),
 };
 
