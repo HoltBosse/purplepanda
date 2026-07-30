@@ -53,7 +53,7 @@ export function getSettingsForm(
                             id: `content-template-header-${contentType.id}`,
                             name: `content-template-header-${contentType.id}`,
                             type: 'Html' as const,
-                            markup: '<h2 class="text-md font-medium flex items-center">Default Template</h2>',
+                            markup: '<h2 class="text-md font-medium flex items-center settings-search-label">Default Template</h2>',
                         },
                         {
                             id: templateFieldName,
@@ -82,7 +82,7 @@ export function getSettingsForm(
                             id: `content-prefab-header-${contentType.id}`,
                             name: `content-prefab-header-${contentType.id}`,
                             type: 'Html' as const,
-                            markup: '<h2 class="text-md font-medium flex items-center">Default Prefab</h2>',
+                            markup: '<h2 class="text-md font-medium flex items-center settings-search-label">Default Prefab</h2>',
                         },
                         {
                             id: `content-prefab-option-${contentType.id}`,
@@ -111,13 +111,13 @@ export function getSettingsForm(
                 name: 'dt-group-wrapper',
                 type: "Group",
                 fields: fields,
-                classList: "p-6 bg-base-100 rounded-lg",
+                classList: "p-6 bg-base-100 rounded-lg settings-search-section",
                 groupFields: [
                     {
                         id: 'dt-group-header',
                         name: 'dt-group-header',
                         type: 'Html',
-                        markup: '<h2 class="text-lg font-medium">Pages</h2>',
+                        markup: '<h2 class="text-lg font-medium settings-search-label">Pages</h2>',
                     },
                     {
                         id: 'dt-group',
@@ -130,7 +130,7 @@ export function getSettingsForm(
                                 id: 'dt-group-header',
                                 name: 'dt-group-header',
                                 type: 'Html',
-                                markup: '<h2 class="text-md font-medium flex items-center">Default Template</h2>',
+                                markup: '<h2 class="text-md font-medium flex items-center settings-search-label">Default Template</h2>',
                             },
                             {
                                 id: 'dt-option',
@@ -160,7 +160,7 @@ export function getSettingsForm(
                                 id: 'dp-group-header',
                                 name: 'dp-group-header',
                                 type: 'Html',
-                                markup: '<h2 class="text-md font-medium flex items-center">Default Prefab</h2>',
+                                markup: '<h2 class="text-md font-medium flex items-center settings-search-label">Default Prefab</h2>',
                             },
                             {
                                 id: 'dp-option',
@@ -182,13 +182,13 @@ export function getSettingsForm(
                 name: 'content-group-wrapper',
                 type: 'Group',
                 fields: fields,
-                classList: 'p-6 bg-base-100 rounded-lg',
+                classList: 'p-6 bg-base-100 rounded-lg settings-search-section',
                 groupFields: [
                     {
                         id: 'content-group-header',
                         name: 'content-group-header',
                         type: 'Html',
-                        markup: '<h2 class="text-lg font-medium">Content</h2>',
+                        markup: '<h2 class="text-lg font-medium settings-search-label">Content</h2>',
                     },
                     ...contentTypeGroups,
                 ],
@@ -198,13 +198,13 @@ export function getSettingsForm(
                 name: 'turnstile-group-wrapper',
                 type: "Group",
                 fields: fields,
-                classList: "p-6 bg-base-100 rounded-lg",
+                classList: "p-6 bg-base-100 rounded-lg settings-search-section",
                 groupFields: [
                     {
                         id: 'turnstile-group-header',
                         name: 'turnstile-group-header',
                         type: 'Html',
-                        markup: '<h2 class="text-lg font-medium">Turnstile</h2>',
+                        markup: '<h2 class="text-lg font-medium settings-search-label">Turnstile</h2>',
                     },
                     {
                         id: 'turnstile-site-key-group',
@@ -217,7 +217,7 @@ export function getSettingsForm(
                                 id: 'turnstile-site-key-header',
                                 name: 'turnstile-site-key-header',
                                 type: 'Html',
-                                markup: '<h2 class="text-md font-medium flex items-center">Site Key</h2>',
+                                markup: '<h2 class="text-md font-medium flex items-center settings-search-label">Site Key</h2>',
                             },
                             {
                                 id: 'turnstile-site-key',
@@ -240,7 +240,7 @@ export function getSettingsForm(
                                 id: 'turnstile-secret-key-header',
                                 name: 'turnstile-secret-key-header',
                                 type: 'Html',
-                                markup: '<h2 class="text-md font-medium flex items-center">Secret Key</h2>',
+                                markup: '<h2 class="text-md font-medium flex items-center settings-search-label">Secret Key</h2>',
                             },
                             {
                                 id: 'turnstile-secret-key',
