@@ -1,0 +1,218 @@
+---
+import type { BaseFieldProps } from "../types";
+import BaseField from "../BaseField.astro";
+import { extractFamilyFromLink } from "./font-utils";
+
+interface Props extends BaseFieldProps {
+  placeholder?: string;
+  sampleText?: string;
+}
+
+const { placeholder, sampleText, ...baseProps } = Astro.props as Props;
+const { id, name, value } = baseProps;
+const currentFamily = extractFamilyFromLink(value);
+const buttonLabel = currentFamily ?? placeholder ?? "Select a font";
+const sample = sampleText ?? "The quick brown fox jumps over the lazy dog";
+const dialogId = `${id}-dialog`;
+---
+
+<BaseField {...baseProps}>
+  <div class="flex items-center gap-3" data-font-picker data-field-id={id}>
+    <input type="hidden" name={name} id={id} value={value ?? ""} data-font-picker-input />
+    <button
+      type="button"
+      class="btn btn-outline justify-start flex-1 h-auto py-2 px-3"
+      data-font-picker-trigger
+    >
+      <span class="flex flex-col items-start gap-0.5 overflow-hidden">
+        <span class="text-xs text-base-content/50" data-font-picker-label>{buttonLabel}</span>
+        <span
+          class="text-base truncate"
+          data-font-picker-sample
+          style={currentFamily ? `font-family: '${currentFamily}';` : ""}
+        >
+          {sample}
+        </span>
+      </span>
+    </button>
+    {currentFamily && <link rel="stylesheet" href={value} data-font-picker-preview-link />}
+  </div>
+</BaseField>
+
+<dialog
+  id={dialogId}
+  closedby="any"
+  data-font-picker-dialog
+  data-sample-text={sample}
+  class="relative m-auto w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] md:max-w-2xl rounded-xl bg-base-100 p-6 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm"
+>
+  <button type="button" class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" data-font-picker-close>✕</button>
+  <h3 class="text-lg font-semibold mb-4">Select a font</h3>
+  <input
+    type="text"
+    placeholder="Search fonts..."
+    class="input input-bordered w-full mb-4"
+    data-font-picker-search
+    autocomplete="off"
+  />
+  <div class="max-h-96 overflow-y-auto space-y-1 pr-1" data-font-picker-list>
+    <p class="text-sm text-base-content/50 p-4" data-font-picker-status>Loading fonts…</p>
+  </div>
+</dialog>
+
+<script>
+  import {
+    BUNNY_FONT_LIST_URL,
+    buildFontLink,
+    pickDefaultWeights,
+    extractFamilyFromLink,
+    type BunnyFont,
+  } from "./font-utils";
+
+  type Font = BunnyFont & { slug: string };
+
+  let fontListPromise: Promise<Font[]> | null = null;
+
+  function loadFontList(): Promise<Font[]> {
+    if (!fontListPromise) {
+      fontListPromise = fetch(BUNNY_FONT_LIST_URL)
+        .then((res) => res.json())
+        .then((data: Record<string, BunnyFont>) =>
+          Object.entries(data)
+            .map(([slug, font]) => ({ ...font, slug }))
+            .sort((a, b) => a.familyName.localeCompare(b.familyName))
+        );
+    }
+    return fontListPromise;
+  }
+
+  const loadedStylesheets = new Set<string>();
+
+  function ensureStylesheet(href: string) {
+    if (loadedStylesheets.has(href)) return;
+    loadedStylesheets.add(href);
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    document.head.appendChild(link);
+  }
+
+  const MAX_VISIBLE_ROWS = 500;
+
+  document.querySelectorAll<HTMLElement>("[data-font-picker]").forEach((wrapper) => {
+    if (wrapper.dataset.fontPickerInitialized) return;
+    wrapper.dataset.fontPickerInitialized = "true";
+
+    const fieldId = wrapper.dataset.fieldId!;
+    const hiddenInput = wrapper.querySelector<HTMLInputElement>("[data-font-picker-input]");
+    const trigger = wrapper.querySelector<HTMLButtonElement>("[data-font-picker-trigger]");
+    const label = wrapper.querySelector<HTMLElement>("[data-font-picker-label]");
+    const sampleEl = wrapper.querySelector<HTMLElement>("[data-font-picker-sample]");
+    const dialog = document.getElementById(`${fieldId}-dialog`) as HTMLDialogElement | null;
+    if (!hiddenInput || !trigger || !label || !sampleEl || !dialog) return;
+
+    const searchInput = dialog.querySelector<HTMLInputElement>("[data-font-picker-search]")!;
+    const list = dialog.querySelector<HTMLElement>("[data-font-picker-list]")!;
+    const status = dialog.querySelector<HTMLElement>("[data-font-picker-status]");
+    const closeButton = dialog.querySelector<HTMLButtonElement>("[data-font-picker-close]");
+    const sampleText = dialog.dataset.sampleText ?? "The quick brown fox jumps over the lazy dog";
+
+    closeButton?.addEventListener("click", () => dialog.close());
+
+    let observer: IntersectionObserver | null = null;
+    let allFonts: Font[] = [];
+    let rendered = false;
+
+    function selectFont(font: Font) {
+      const href = buildFontLink(font.familyName, pickDefaultWeights(font.weights));
+      hiddenInput!.value = href;
+      label!.textContent = font.familyName;
+      sampleEl!.style.fontFamily = `'${font.familyName}'`;
+      ensureStylesheet(href);
+      dialog!.close();
+    }
+
+    function renderList(query: string) {
+      list.innerHTML = "";
+      const q = query.trim().toLowerCase();
+      const currentFamily = extractFamilyFromLink(hiddenInput!.value);
+      const matches = q ? allFonts.filter((f) => f.familyName.toLowerCase().includes(q)) : allFonts;
+
+      if (matches.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "text-sm text-base-content/50 p-4";
+        empty.textContent = "No fonts match your search.";
+        list.appendChild(empty);
+        return;
+      }
+
+      observer?.disconnect();
+      observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            const row = entry.target as HTMLElement;
+            observer!.unobserve(row);
+            const font = allFonts.find((f) => f.slug === row.dataset.slug);
+            if (!font) continue;
+            const href = buildFontLink(font.familyName, pickDefaultWeights(font.weights));
+            ensureStylesheet(href);
+            const rowSample = row.querySelector<HTMLElement>("[data-row-sample]");
+            if (rowSample) rowSample.style.fontFamily = `'${font.familyName}'`;
+          }
+        },
+        { root: list, rootMargin: "200px" }
+      );
+
+      const visible = matches.slice(0, MAX_VISIBLE_ROWS);
+      for (const font of visible) {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.dataset.slug = font.slug;
+        row.className =
+          "w-full text-left px-4 py-3 rounded-lg hover:bg-base-200 flex flex-col gap-1 border " +
+          (font.familyName === currentFamily ? "border-primary bg-base-200" : "border-transparent");
+
+        const meta = document.createElement("span");
+        meta.className = "text-xs text-base-content/50";
+        meta.textContent = `${font.familyName} · ${font.category}`;
+
+        const rowSample = document.createElement("span");
+        rowSample.className = "text-lg truncate";
+        rowSample.dataset.rowSample = "true";
+        rowSample.textContent = sampleText;
+
+        row.append(meta, rowSample);
+        row.addEventListener("click", () => selectFont(font));
+        list.appendChild(row);
+        observer.observe(row);
+      }
+
+      if (matches.length > visible.length) {
+        const note = document.createElement("p");
+        note.className = "text-xs text-base-content/40 p-2 text-center";
+        note.textContent = `Showing ${visible.length} of ${matches.length} matching fonts. Refine your search to narrow results.`;
+        list.appendChild(note);
+      }
+    }
+
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    searchInput.addEventListener("input", () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => renderList(searchInput.value), 150);
+    });
+
+    trigger.addEventListener("click", async () => {
+      dialog.showModal();
+      if (rendered) return;
+      try {
+        allFonts = await loadFontList();
+        rendered = true;
+        renderList(searchInput.value);
+      } catch {
+        fontListPromise = null;
+        if (status) status.textContent = "Failed to load fonts. Please try again.";
+      }
+    });
+  });
+</script>

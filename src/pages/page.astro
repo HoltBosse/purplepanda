@@ -4,6 +4,8 @@ import { getDb } from '../db/db.js';
 import { pages, redirects } from '../db/schema.js';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { resolveTemplateSetting } from '../db/templates.js';
+import { resolveFontSettings } from '../db/fonts.js';
+import { extractFamilyFromLink } from '../form/fields/font-utils.js';
 import type { Data } from '@puckeditor/core';
 import externalPuckConfig from 'virtual:purplepanda/puck-config';
 import { has404Page } from 'virtual:purplepanda/has-404';
@@ -53,7 +55,7 @@ async function resolvePlainPage(path: string) {
 
 const contentTypeRoute = matchContentTypeRoute(requestPath);
 
-const [matchedPage, templateSetting] = await Promise.all([
+const [matchedPage, templateSetting, fontSettings] = await Promise.all([
     contentTypeRoute
         ? db
             .select()
@@ -67,7 +69,11 @@ const [matchedPage, templateSetting] = await Promise.all([
             .then(rows => rows[0])
         : resolvePlainPage(requestPath),
     resolveTemplateSetting(db, contentTypeRoute?.contentType.id),
+    resolveFontSettings(db),
 ]);
+
+const headingFontFamily = extractFamilyFromLink(fontSettings.headingFontLink);
+const bodyFontFamily = extractFamilyFromLink(fontSettings.bodyFontLink);
 
 if (!matchedPage) {
     const fromPath = '/' + requestPath;
@@ -103,6 +109,17 @@ const title: string = (pageData as any)?.root?.props?.title ?? '';
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
+    {fontSettings.bodyFontLink && <link rel="stylesheet" href={fontSettings.bodyFontLink} />}
+    {fontSettings.headingFontLink && fontSettings.headingFontLink !== fontSettings.bodyFontLink && (
+        <link rel="stylesheet" href={fontSettings.headingFontLink} />
+    )}
+    <style define:vars={{
+        bodyFontFamily: bodyFontFamily ? `'${bodyFontFamily}', sans-serif` : 'inherit',
+        headingFontFamily: headingFontFamily ? `'${headingFontFamily}', sans-serif` : 'inherit',
+    }}>
+        body { font-family: var(--bodyFontFamily); }
+        h1, h2, h3, h4, h5, h6 { font-family: var(--headingFontFamily); }
+    </style>
 </head>
 <body data-purplepanda-islands>
     <PageRenderer pageData={pageData} templateData={templateData} />

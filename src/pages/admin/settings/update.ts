@@ -26,6 +26,8 @@ export async function POST(context: APIContext): Promise<Response> {
     const defaultTemplateId = getFieldByName(form, 'dt-option')?.value;
     const turnstileSiteKey = getFieldByName(form, 'turnstile-site-key')?.value ?? '';
     const turnstileSecretKey = getFieldByName(form, 'turnstile-secret-key')?.value ?? '';
+    const headingFontLink = getFieldByName(form, 'heading-font')?.value ?? '';
+    const bodyFontLink = getFieldByName(form, 'body-font')?.value ?? '';
 
     await db
         .insert(settings)
@@ -41,6 +43,16 @@ export async function POST(context: APIContext): Promise<Response> {
         .insert(settings)
         .values({ key: 'turnstile_secret_key', value: turnstileSecretKey })
         .onConflictDoUpdate({ target: settings.key, set: { value: turnstileSecretKey } });
+
+    await db
+        .insert(settings)
+        .values({ key: 'heading_font_link', value: headingFontLink })
+        .onConflictDoUpdate({ target: settings.key, set: { value: headingFontLink } });
+
+    await db
+        .insert(settings)
+        .values({ key: 'body_font_link', value: bodyFontLink })
+        .onConflictDoUpdate({ target: settings.key, set: { value: bodyFontLink } });
 
     for (const contentType of contentTypes) {
         const templateFormKey = `content-default-template-${contentType.id}`;

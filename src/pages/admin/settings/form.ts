@@ -21,10 +21,14 @@ export function getSettingsForm(
     flash: Record<string, string> = {},
     contentTypes: ContentType[] = [],
     contentTemplateDefaults: Record<string, string> = {},
+    headingFontLink?: string,
+    bodyFontLink?: string,
 ): FormSection {
     const dtOptionValue = flash['dt-option'] ?? defaultTemplateId;
     const turnstileSiteKeyValue = flash['turnstile-site-key'] ?? turnstileSiteKey;
     const turnstileSecretKeyValue = flash['turnstile-secret-key'] ?? turnstileSecretKey;
+    const headingFontValue = flash['heading-font'] ?? headingFontLink;
+    const bodyFontValue = flash['body-font'] ?? bodyFontLink;
     const contentTypeGroups = contentTypes.map((contentType) => {
         const templateFieldName = `content-default-template-${contentType.id}`;
         const defaultTemplateValue = flash[templateFieldName] ?? contentTemplateDefaults[contentType.id];
@@ -176,6 +180,69 @@ export function getSettingsForm(
                         ],
                     },
                 ]
+            },
+            {
+                id: 'fonts-group-wrapper',
+                name: 'fonts-group-wrapper',
+                type: "Group",
+                fields: fields,
+                classList: "p-6 bg-base-100 rounded-lg settings-search-section",
+                groupFields: [
+                    {
+                        id: 'fonts-group-header',
+                        name: 'fonts-group-header',
+                        type: 'Html',
+                        markup: '<h2 class="text-lg font-medium settings-search-label">Fonts</h2>',
+                    },
+                    {
+                        id: 'heading-font-group',
+                        name: 'heading-font-group',
+                        type: "Group",
+                        fields: fields,
+                        classList: "grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6 mt-6",
+                        groupFields: [
+                            {
+                                id: 'heading-font-header',
+                                name: 'heading-font-header',
+                                type: 'Html',
+                                markup: '<h2 class="text-md font-medium flex items-center settings-search-label">Heading Font</h2>',
+                            },
+                            {
+                                id: 'heading-font',
+                                name: 'heading-font',
+                                type: 'FontPicker',
+                                placeholder: 'Select a heading font',
+                                sampleText: 'Heading Sample',
+                                ...(headingFontValue ? { value: headingFontValue } : {}),
+                                validator: z.string().optional(),
+                            },
+                        ],
+                    },
+                    {
+                        id: 'body-font-group',
+                        name: 'body-font-group',
+                        type: "Group",
+                        fields: fields,
+                        classList: "grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6 mt-6",
+                        groupFields: [
+                            {
+                                id: 'body-font-header',
+                                name: 'body-font-header',
+                                type: 'Html',
+                                markup: '<h2 class="text-md font-medium flex items-center settings-search-label">Body Font</h2>',
+                            },
+                            {
+                                id: 'body-font',
+                                name: 'body-font',
+                                type: 'FontPicker',
+                                placeholder: 'Select a body font',
+                                sampleText: 'The quick brown fox jumps over the lazy dog',
+                                ...(bodyFontValue ? { value: bodyFontValue } : {}),
+                                validator: z.string().optional(),
+                            },
+                        ],
+                    },
+                ],
             },
             {
                 id: 'content-group-wrapper',
