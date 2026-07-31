@@ -6,6 +6,7 @@ import { Render } from "@puckeditor/core";
 import React, { cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Save } from "../puck/icons.js";
+import { extractFamilyFromLink } from "../form/fields/font-utils.js";
 
 const ROOT_SLOT_NAME = "default-zone";
 
@@ -47,7 +48,15 @@ function TemplateSlotRenderer() {
 
 const useTypedPuck = createUsePuck();
 
-function createOverrides(onSave?: (data: Data) => void): Partial<Overrides<Config>> {
+interface FontLinks {
+  headingFontLink: string | undefined;
+  bodyFontLink: string | undefined;
+}
+
+function createOverrides(onSave?: (data: Data) => void, fontLinks?: FontLinks): Partial<Overrides<Config>> {
+  const headingFontFamily = extractFamilyFromLink(fontLinks?.headingFontLink);
+  const bodyFontFamily = extractFamilyFromLink(fontLinks?.bodyFontLink);
+
   return {
     headerActions: ({ children }) => {
       const appStateData = useTypedPuck((state) => state.appState.data);
@@ -77,10 +86,35 @@ function createOverrides(onSave?: (data: Data) => void): Partial<Overrides<Confi
 
     iframe: ({ children, document }) => {
       useEffect(() => {
-        if (document) {
-          document.documentElement.setAttribute("data-theme", "false");
+        if (!document) return;
+        document.documentElement.setAttribute("data-theme", "false");
+
+        document.documentElement.style.setProperty(
+          "--pp-body-font",
+          bodyFontFamily ? `'${bodyFontFamily}', sans-serif` : "inherit",
+        );
+        document.documentElement.style.setProperty(
+          "--pp-heading-font",
+          headingFontFamily ? `'${headingFontFamily}', sans-serif` : "inherit",
+        );
+
+        if (!document.getElementById("purplepanda-font-styles")) {
+          const style = document.createElement("style");
+          style.id = "purplepanda-font-styles";
+          style.textContent =
+            "body { font-family: var(--pp-body-font, inherit); } " +
+            "h1, h2, h3, h4, h5, h6 { font-family: var(--pp-heading-font, inherit); }";
+          document.head.appendChild(style);
         }
-      }, [document]);
+
+        for (const href of [fontLinks?.bodyFontLink, fontLinks?.headingFontLink]) {
+          if (!href || document.head.querySelector(`link[href="${href}"]`)) continue;
+          const link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = href;
+          document.head.appendChild(link);
+        }
+      }, [document, fontLinks?.headingFontLink, fontLinks?.bodyFontLink]);
 
       return <>{children}</>;
     },
@@ -93,6 +127,8 @@ interface PuckEditorProps {
   templateData?: Data;
   onPublish: (data: Data) => void;
   onSave?: (data: Data) => void;
+  headingFontLink?: string;
+  bodyFontLink?: string;
 }
 
 function hasTemplateSlot(value: unknown): boolean {
@@ -124,8 +160,11 @@ function ensureTemplateSlot(data: Data): Data {
   };
 }
 
-export default function PuckEditor({ config, data, templateData, onPublish, onSave }: PuckEditorProps) {
-  const overrides = useMemo(() => createOverrides(onSave), [onSave]);
+export default function PuckEditor({ config, data, templateData, onPublish, onSave, headingFontLink, bodyFontLink }: PuckEditorProps) {
+  const overrides = useMemo(
+    () => createOverrides(onSave, { headingFontLink, bodyFontLink }),
+    [onSave, headingFontLink, bodyFontLink],
+  );
 
   // Memoized because it feeds the root render below: a fresh object each render would rebuild the
   // root component's identity and remount the whole canvas on every keystroke.

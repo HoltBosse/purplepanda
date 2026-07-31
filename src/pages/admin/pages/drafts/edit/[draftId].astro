@@ -4,6 +4,7 @@ import PagePuckEditor from '../../../../../components/PagePuckEditor';
 import { getDb } from '../../../../../db/db.js';
 import { settings, templates, pages, dagNodes } from '../../../../../db/schema.js';
 import { eq, sql } from 'drizzle-orm';
+import { resolveFontSettings } from '../../../../../db/fonts.js';
 import type { Data } from '@puckeditor/core';
 
 const db = getDb();
@@ -17,7 +18,7 @@ if (!draft || draft.nodeType !== 'draft' || draft.entityType !== 'page' || draft
 const saveUrl = `/admin/pages/drafts/update/${draftId}`;
 const draftPublishUrl = `/admin/pages/drafts/publish/${draftId}`;
 
-const [defaultTemplate, allPages] = await Promise.all([
+const [defaultTemplate, allPages, fontSettings] = await Promise.all([
     db
         .select()
         .from(settings)
@@ -32,6 +33,7 @@ const [defaultTemplate, allPages] = await Promise.all([
         })
         .from(pages)
         .where(eq(pages.state, 1)),
+    resolveFontSettings(db),
 ]);
 
 const templateData = defaultTemplate?.templates?.content as Data | undefined;
@@ -46,5 +48,7 @@ const pageOptions = allPages.map(p => ({ id: p.id, title: p.title ?? '' }));
         pages={pageOptions}
         isDraft
         {...(templateData ? { templateData } : {})}
+        {...(fontSettings.headingFontLink ? { headingFontLink: fontSettings.headingFontLink } : {})}
+        {...(fontSettings.bodyFontLink ? { bodyFontLink: fontSettings.bodyFontLink } : {})}
     />
 </AdminBareLayout>

@@ -5,6 +5,7 @@ import { getDb } from '../../../../../db/db.js';
 import { pages, dagNodes } from '../../../../../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { resolveTemplateSetting } from '../../../../../db/templates.js';
+import { resolveFontSettings } from '../../../../../db/fonts.js';
 import type { Data } from '@puckeditor/core';
 
 const db = getDb();
@@ -23,7 +24,10 @@ if (!entity || !entity.contentType) {
 const saveUrl = `/admin/content/drafts/update/${draftId}`;
 const draftPublishUrl = `/admin/content/drafts/publish/${draftId}`;
 
-const templateSetting = await resolveTemplateSetting(db, entity.contentType);
+const [templateSetting, fontSettings] = await Promise.all([
+    resolveTemplateSetting(db, entity.contentType),
+    resolveFontSettings(db),
+]);
 
 const templateData = templateSetting?.templates?.content as Data | undefined;
 ---
@@ -36,5 +40,7 @@ const templateData = templateSetting?.templates?.content as Data | undefined;
         initialData={draft.content as Data}
         isDraft
         {...(templateData ? { templateData } : {})}
+        {...(fontSettings.headingFontLink ? { headingFontLink: fontSettings.headingFontLink } : {})}
+        {...(fontSettings.bodyFontLink ? { bodyFontLink: fontSettings.bodyFontLink } : {})}
     />
 </AdminBareLayout>

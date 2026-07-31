@@ -6,6 +6,7 @@ import { pages } from '../../../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { resolveTemplateSetting } from '../../../db/templates.js';
 import { resolvePrefabSetting } from '../../../db/prefabs.js';
+import { resolveFontSettings } from '../../../db/fonts.js';
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Data } from '@puckeditor/core';
 
@@ -25,12 +26,13 @@ if (id) {
     saveUrl += `/${id}`;
 }
 
-const [templateSetting, existingPage, prefabSetting] = await Promise.all([
+const [templateSetting, existingPage, prefabSetting, fontSettings] = await Promise.all([
     resolveTemplateSetting(db, typeId),
     id
         ? db.select().from(pages).where(eq(pages.id, id)).limit(1).then(rows => rows[0])
         : Promise.resolve(undefined),
     id ? Promise.resolve(undefined) : resolvePrefabSetting(db, typeId),
+    resolveFontSettings(db),
 ]);
 
 if (id && !existingPage) {
@@ -45,6 +47,8 @@ const editorProps = {
         ? { initialData: existingPage.content as Data }
         : (prefabData ? { initialData: prefabData } : {})),
     ...(templateData ? { templateData } : {}),
+    ...(fontSettings.headingFontLink ? { headingFontLink: fontSettings.headingFontLink } : {}),
+    ...(fontSettings.bodyFontLink ? { bodyFontLink: fontSettings.bodyFontLink } : {}),
 };
 ---
 <AdminBareLayout>

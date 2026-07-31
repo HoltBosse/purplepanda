@@ -4,6 +4,7 @@ import PagePuckEditor from '../../../components/PagePuckEditor';
 import { getDb } from '../../../db/db.js';
 import { settings, templates, pages } from '../../../db/schema.js';
 import { resolvePrefabSetting } from '../../../db/prefabs.js';
+import { resolveFontSettings } from '../../../db/fonts.js';
 import { eq, sql } from 'drizzle-orm';
 import type { Data } from '@puckeditor/core';
 
@@ -16,7 +17,7 @@ if (id) {
     saveUrl += `/${id}`;
 }
 
-const [defaultTemplate, allPages, existingPage, prefabSetting] = await Promise.all([
+const [defaultTemplate, allPages, existingPage, prefabSetting, fontSettings] = await Promise.all([
     db
         .select()
         .from(settings)
@@ -35,6 +36,7 @@ const [defaultTemplate, allPages, existingPage, prefabSetting] = await Promise.a
         ? db.select().from(pages).where(eq(pages.id, id)).limit(1).then(rows => rows[0])
         : Promise.resolve(undefined),
     id ? Promise.resolve(undefined) : resolvePrefabSetting(db),
+    resolveFontSettings(db),
 ]);
 
 if (id && !existingPage) {
@@ -49,6 +51,8 @@ const editorProps = {
         ? { initialData: existingPage.content as Data }
         : (prefabData ? { initialData: prefabData } : {})),
     ...(templateData ? { templateData } : {}),
+    ...(fontSettings.headingFontLink ? { headingFontLink: fontSettings.headingFontLink } : {}),
+    ...(fontSettings.bodyFontLink ? { bodyFontLink: fontSettings.bodyFontLink } : {}),
 };
 
 const pageOptions = allPages.map(p => ({ id: p.id, title: p.title ?? '' }));

@@ -11,6 +11,8 @@ interface ContentPuckEditorProps {
   draftPublishUrl?: string;
   onPublish?: (data: Data) => void;
   isDraft?: boolean;
+  headingFontLink?: string;
+  bodyFontLink?: string;
 }
 
 export default function ContentPuckEditor({
@@ -21,6 +23,8 @@ export default function ContentPuckEditor({
   draftPublishUrl,
   onPublish,
   isDraft,
+  headingFontLink,
+  bodyFontLink,
 }: ContentPuckEditorProps) {
   const contentType = useMemo(
     () => (externalPuckConfig?.contentTypes ?? []).find(ct => ct.id === contentTypeId),
@@ -39,6 +43,8 @@ export default function ContentPuckEditor({
     ...(rootConfig !== undefined ? { rootConfig } : {}),
     ...(isDraft !== undefined ? { isDraft } : {}),
     ...(draftPublishUrl !== undefined ? { draftPublishUrl } : {}),
+    ...(headingFontLink !== undefined ? { headingFontLink } : {}),
+    ...(bodyFontLink !== undefined ? { bodyFontLink } : {}),
   };
 
   return (

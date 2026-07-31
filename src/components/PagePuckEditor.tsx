@@ -52,9 +52,11 @@ interface PagePuckEditorProps {
   isDraft?: boolean;
   pages?: PageOption[];
   rootConfig?: { label?: string; fields?: Fields; defaultProps?: Record<string, unknown> };
+  headingFontLink?: string;
+  bodyFontLink?: string;
 }
 
-export default function PagePuckEditor({ initialData, templateData, saveUrl = "/admin/pages/update", draftPublishUrl, onPublish, onSave, isDraft = false, pages = [], rootConfig }: PagePuckEditorProps = {}) {
+export default function PagePuckEditor({ initialData, templateData, saveUrl = "/admin/pages/update", draftPublishUrl, onPublish, onSave, isDraft = false, pages = [], rootConfig, headingFontLink, bodyFontLink }: PagePuckEditorProps = {}) {
   const defaultSave = (data: Data) => {
     const form = document.createElement("form");
     form.method = "POST";
@@ -139,6 +141,8 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
   const optionalProps = {
     ...(templateData ? { templateData } : {}),
     ...(resolvedOnSave ? { onSave: resolvedOnSave } : {}),
+    ...(headingFontLink ? { headingFontLink } : {}),
+    ...(bodyFontLink ? { bodyFontLink } : {}),
   };
 
   return (
