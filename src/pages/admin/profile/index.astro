@@ -27,7 +27,7 @@ const form = getProfileForm(user, fields, '/admin/profile/update', flash, true);
 
 <AdminLayout>
 	<Form form={form} fields={fields}>
-		<div slot="before-fields" class="flex items-center justify-between align-middle border-b border-base-300 pt-2">
+		<div slot="before-fields" class="flex flex-wrap items-center justify-between gap-3 align-middle border-b border-base-300 pt-2 sticky top-0 z-10 bg-base-200">
 			<h1 class="text-2xl font-semibold">{capitalize(user.fname)} {capitalize(user.lname)}</h1>
 			<button class="btn btn-primary">Save</button>
 		</div>
