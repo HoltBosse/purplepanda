@@ -71,11 +71,22 @@ export async function POST(context: APIContext): Promise<Response> {
                 return context.redirect(folder.data ? `/admin/media/${folder.data}` : "/admin/media");
             }
 
-            await addAction("mediamove", {
-                id: updatedMedia.id,
-                oldFolderId: oldFolderById.get(media.data[i]!) ?? null,
-                newFolderId: folder.data,
-            }, userId);
+            await addAction(
+                "mediamove",
+                {
+                    id: updatedMedia.id,
+                    oldFolderId: oldFolderById.get(media.data[i]!) ?? null,
+                    newFolderId: folder.data,
+                },
+                userId,
+                {
+                    message: "Media {id} was moved to {newFolderId}",
+                    placeholders: {
+                        id: { lookupColumn: mediaschema.id, displayColumn: mediaschema.title },
+                        newFolderId: { lookupColumn: mediafolders.id, displayColumn: mediafolders.name },
+                    },
+                },
+            );
 
             continue;
         }

@@ -62,7 +62,17 @@ export async function POST(context: APIContext): Promise<Response> {
     }).returning();
 
     const userId = await context.session?.get("userId");
-    await addAction(isNewPrefab ? "prefabcreate" : "prefabupdate", { id: settingRow.id, version: publishNode?.id ?? null }, userId);
+    await addAction(
+        isNewPrefab ? "prefabcreate" : "prefabupdate",
+        { id: settingRow.id, version: publishNode?.id ?? null },
+        userId,
+        {
+            message: isNewPrefab ? "Prefab {id} was created" : "Prefab {id} was updated",
+            placeholders: {
+                id: { lookupColumn: settings.id, displayColumn: settings.key },
+            },
+        },
+    );
 
     const message = isNewPrefab ? "Prefab created successfully." : "Prefab updated successfully.";
     const alert = createAlert(alertType.success, message);

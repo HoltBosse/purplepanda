@@ -83,7 +83,17 @@ export async function POST(context: APIContext): Promise<Response> {
     }).returning();
 
     const userId = await context.session?.get("userId");
-    await addAction(isNewPage ? "pagecreate" : "pageupdate", { id: page.id, version: publishNode?.id ?? null }, userId);
+    await addAction(
+        isNewPage ? "pagecreate" : "pageupdate",
+        { id: page.id, version: publishNode?.id ?? null },
+        userId,
+        {
+            message: isNewPage ? "Page {id} was created" : "Page {id} was updated",
+            placeholders: {
+                id: { lookupColumn: pages.id, displayColumn: pages.content, displayPath: ["root", "props", "title"] },
+            },
+        },
+    );
 
     const alert = createAlert(alertType.success, isNewPage ? "Page created successfully." : "Page updated successfully.");
     await addAlertToSession(context.session, alert);

@@ -103,6 +103,12 @@ export const userActions = pgTable("user_actions", {
   data: jsonb("data").notNull(),
 });
 
+export const actionSchemas = pgTable("action_schemas", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  type: varchar("type", { length: 255 }).notNull().unique(),
+  schema: jsonb("schema").notNull(),
+});
+
 export const dagNodes = pgTable("dag_nodes", {
   id: uuid("id").defaultRandom().primaryKey(),
   state: integer("state").notNull().default(1), // 1 = active, -1 = deleted

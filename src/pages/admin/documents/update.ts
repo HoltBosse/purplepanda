@@ -44,7 +44,17 @@ export async function POST(context: APIContext): Promise<Response> {
     }
 
     const userId = await context.session?.get("userId");
-    await addAction("documentupdate", { id: id.data }, userId);
+    await addAction(
+        "documentupdate",
+        { id: id.data },
+        userId,
+        {
+            message: "Document {id} was updated",
+            placeholders: {
+                id: { lookupColumn: documents.id, displayColumn: documents.title },
+            },
+        },
+    );
 
     const alert = createAlert(alertType.success, "Document updated successfully.");
     await addAlertToSession(context.session, alert);

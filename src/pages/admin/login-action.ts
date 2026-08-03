@@ -29,6 +29,13 @@ export async function POST(context: APIContext): Promise<Response> {
   }
 
   await context.session?.set("userId", user.id);
-  await addAction("adminlogin", { method: "password" }, user.id);
+  await addAction(
+    "adminlogin",
+    { method: "password" },
+    user.id,
+    {
+      message: "Logged in via {method}",
+    },
+  );
   return context.redirect("/admin");
 }

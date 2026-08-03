@@ -38,7 +38,17 @@ export async function POST(context: APIContext): Promise<Response> {
         }
 
         const docId = inserted.id;
-        await addAction("documentcreate", { id: docId }, userId);
+        await addAction(
+            "documentcreate",
+            { id: docId },
+            userId,
+            {
+                message: "Document {id} was created",
+                placeholders: {
+                    id: { lookupColumn: documents.id, displayColumn: documents.title },
+                },
+            },
+        );
         const documentPath = getDocumentPath();
         const dir = `${documentPath}/${docId.slice(0, 2)}/${docId.slice(2, 4)}`;
 

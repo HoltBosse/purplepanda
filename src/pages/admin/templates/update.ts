@@ -93,7 +93,17 @@ export async function POST(context: APIContext): Promise<Response> {
     }).returning();
 
     const userId = await context.session?.get("userId");
-    await addAction(isNewTemplate ? "templatecreate" : "templateupdate", { id: template.id, version: publishNode?.id ?? null }, userId);
+    await addAction(
+        isNewTemplate ? "templatecreate" : "templateupdate",
+        { id: template.id, version: publishNode?.id ?? null },
+        userId,
+        {
+            message: isNewTemplate ? "Template {id} was created" : "Template {id} was updated",
+            placeholders: {
+                id: { lookupColumn: templates.id, displayColumn: templates.content, displayPath: ["root", "props", "title"] },
+            },
+        },
+    );
 
     let message = "Template updated successfully.";
     if(isNewTemplate) {

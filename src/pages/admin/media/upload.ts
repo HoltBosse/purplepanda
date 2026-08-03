@@ -106,10 +106,24 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const userId = await context.session?.get("userId");
     if(uploadedIds.length > 0) {
-        await addAction("mediaupload", { ids: uploadedIds }, userId);
+        await addAction(
+            "mediaupload",
+            { ids: uploadedIds },
+            userId,
+            {
+                message: "Media {ids} was uploaded",
+            },
+        );
     }
     if(updatedIds.length > 0) {
-        await addAction("mediaupdate", { ids: updatedIds }, userId);
+        await addAction(
+            "mediaupdate",
+            { ids: updatedIds },
+            userId,
+            {
+                message: "Media {ids} was updated",
+            },
+        );
     }
 
     let message = "Media uploaded successfully.";

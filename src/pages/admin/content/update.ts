@@ -88,7 +88,17 @@ export async function POST(context: APIContext): Promise<Response> {
     }).returning();
 
     const userId = await context.session?.get("userId");
-    await addAction(isNew ? "contentcreate" : "contentupdate", { id: page.id, version: publishNode?.id ?? null }, userId);
+    await addAction(
+        isNew ? "contentcreate" : "contentupdate",
+        { id: page.id, version: publishNode?.id ?? null },
+        userId,
+        {
+            message: isNew ? "Content {id} was created" : "Content {id} was updated",
+            placeholders: {
+                id: { lookupColumn: pages.id, displayColumn: pages.content, displayPath: ["root", "props", "title"] },
+            },
+        },
+    );
 
     const alert = createAlert(alertType.success, isNew ? "Content created successfully." : "Content updated successfully.");
     await addAlertToSession(context.session, alert);

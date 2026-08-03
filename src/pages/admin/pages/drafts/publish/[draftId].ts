@@ -54,7 +54,17 @@ export async function POST(context: APIContext): Promise<Response> {
     }).returning();
 
     const userId = await context.session?.get("userId");
-    await addAction("pagepublish", { id: page.id, draftId: draft.id, version: publishNode?.id ?? null }, userId);
+    await addAction(
+        "pagepublish",
+        { id: page.id, draftId: draft.id, version: publishNode?.id ?? null },
+        userId,
+        {
+            message: "Page {id} was published",
+            placeholders: {
+                id: { lookupColumn: pages.id, displayColumn: pages.content, displayPath: ["root", "props", "title"] },
+            },
+        },
+    );
 
     const alert = createAlert(alertType.success, "Draft published successfully.");
     await addAlertToSession(context.session, alert);

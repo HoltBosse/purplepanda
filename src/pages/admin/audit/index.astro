@@ -1,6 +1,7 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getDb } from '../../../db/db.js';
+import { describeAction } from '../../../actions/index.js';
 import { userActions, users } from '../../../db/schema.js';
 import { desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -66,6 +67,7 @@ const actions = await applySearchJoins(
         .select({
             id: userActions.id,
             type: userActions.type,
+            data: userActions.data,
             date: userActions.date,
             userFname: users.fname,
             userLname: users.lname,
@@ -79,6 +81,10 @@ const actions = await applySearchJoins(
     .orderBy(desc(userActions.date))
     .limit(itemsPerPage)
     .offset(offset);
+
+const actionDescriptions = await Promise.all(
+    actions.map((action) => describeAction({ type: action.type, data: action.data })),
+);
 
 const totalActions = await applySearchJoins(
     db.select({ count: sql<number>`COUNT(*)` }).from(userActions).$dynamic(),
@@ -112,9 +118,12 @@ const totalPages = Math.ceil(totalActions / itemsPerPage);
                     </td>
                 </tr>
             )}
-            {actions.map((action) => (
+            {actions.map((action, i) => (
                 <tr>
-                    <td class="font-bold">{action.type}</td>
+                    <td>
+                        <div class="font-bold">{actionDescriptions[i]}</div>
+                        <div class="text-sm text-base-content/60">{action.type}</div>
+                    </td>
                     <td>{action.userEmail ? `${action.userFname} ${action.userLname}` : 'System'}</td>
                     <td class="w-px whitespace-nowrap"><LocalDateTime date={action.date} /></td>
                 </tr>

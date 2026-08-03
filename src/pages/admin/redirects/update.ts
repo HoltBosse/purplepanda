@@ -33,7 +33,17 @@ export async function POST(context: APIContext): Promise<Response> {
         }).returning({ id: redirects.id });
 
         if (inserted) {
-            await addAction("redirectcreate", { id: inserted.id }, userId);
+            await addAction(
+                "redirectcreate",
+                { id: inserted.id },
+                userId,
+                {
+                    message: "Redirect {id} was created",
+                    placeholders: {
+                        id: { lookupColumn: redirects.id, displayColumn: redirects.from },
+                    },
+                },
+            );
         }
     } else {
         const [existing] = await db.select({ id: redirects.id }).from(redirects).where(eq(redirects.id, id)).limit(1);
@@ -43,7 +53,17 @@ export async function POST(context: APIContext): Promise<Response> {
             return context.redirect("/admin/redirects");
         }
         await db.update(redirects).set({ from: fromResult.data, to: toResult.data }).where(eq(redirects.id, id));
-        await addAction("redirectupdate", { id }, userId);
+        await addAction(
+            "redirectupdate",
+            { id },
+            userId,
+            {
+                message: "Redirect {id} was updated",
+                placeholders: {
+                    id: { lookupColumn: redirects.id, displayColumn: redirects.from },
+                },
+            },
+        );
     }
 
     const alert = createAlert(alertType.success, isNew ? "Redirect created successfully." : "Redirect updated successfully.");

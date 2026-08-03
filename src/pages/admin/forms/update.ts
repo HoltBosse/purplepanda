@@ -82,7 +82,17 @@ export async function POST(context: APIContext): Promise<Response> {
     }).returning();
 
     const userId = await context.session?.get("userId");
-    await addAction(isNewForm ? "formcreate" : "formupdate", { id: form.id, version: publishNode?.id ?? null }, userId);
+    await addAction(
+        isNewForm ? "formcreate" : "formupdate",
+        { id: form.id, version: publishNode?.id ?? null },
+        userId,
+        {
+            message: isNewForm ? "Form {id} was created" : "Form {id} was updated",
+            placeholders: {
+                id: { lookupColumn: forms.id, displayColumn: forms.content, displayPath: ["root", "props", "name"] },
+            },
+        },
+    );
 
     const alert = createAlert(alertType.success, isNewForm ? "Form created successfully." : "Form updated successfully.");
     await addAlertToSession(context.session, alert);
