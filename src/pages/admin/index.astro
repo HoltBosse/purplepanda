@@ -1,7 +1,320 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getDb } from '../../db/db.js';
+import { users, roles, userRoles, userActions, pages, templates, forms, formSubmissions, media, documents, tags, redirects } from '../../db/schema.js';
+import { eq, desc, and, gt, isNull, sql } from 'drizzle-orm';
+import { capitalize } from '../../string';
+import { describeAction } from '../../actions/index.js';
+import LocalDateTime from '../../components/LocalDateTime.astro';
+import externalPuckConfig from "virtual:purplepanda/puck-config";
+import {
+	Activity,
+	UserRound,
+	ChartPie,
+	Database,
+	Plus,
+	FileText,
+	ClipboardList,
+	LayoutTemplate,
+	Images,
+	FileStack,
+	Tags,
+	Link2,
+	Users,
+	Shapes,
+	Inbox,
+} from '@lucide/astro';
+
+const db = getDb();
+
+const userId = await Astro.session?.get('userId');
+const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+if (!user) {
+	throw new Error('User not found');
+}
+
+const contentTypes = (externalPuckConfig ? externalPuckConfig.contentTypes : []) ?? [];
+
+const myRoles = await db
+	.select({ title: roles.title, adminAccess: roles.adminAccess })
+	.from(userRoles)
+	.innerJoin(roles, eq(userRoles.roleId, roles.id))
+	.where(eq(userRoles.userId, user.id));
+
+const recentActions = await db
+	.select({
+		id: userActions.id,
+		type: userActions.type,
+		data: userActions.data,
+		date: userActions.date,
+		userFname: users.fname,
+		userLname: users.lname,
+		userEmail: users.email,
+	})
+	.from(userActions)
+	.leftJoin(users, eq(userActions.userId, users.id))
+	.orderBy(desc(userActions.date))
+	.limit(10);
+
+const recentDescriptions = await Promise.all(
+	recentActions.map((action) => describeAction({ type: action.type, data: action.data })),
+);
+
+// `pages` doubles as both plain pages and content-type entries — a null contentType is the former.
+const isPlainPage = isNull(pages.contentType);
+
+const [
+	totalPages,
+	publishedPages,
+	templateCount,
+	formCount,
+	mediaCount,
+	documentCount,
+	userCount,
+	tagCount,
+	redirectCount,
+] = await Promise.all([
+	db.select({ count: sql<number>`COUNT(*)` }).from(pages).where(and(isPlainPage, gt(pages.state, -1))).then(r => r[0]?.count ?? 0),
+	db.select({ count: sql<number>`COUNT(*)` }).from(pages).where(and(isPlainPage, eq(pages.state, 1))).then(r => r[0]?.count ?? 0),
+	db.select({ count: sql<number>`COUNT(*)` }).from(templates).where(gt(templates.state, -1)).then(r => r[0]?.count ?? 0),
+	db.select({ count: sql<number>`COUNT(*)` }).from(forms).where(gt(forms.state, -1)).then(r => r[0]?.count ?? 0),
+	db.select({ count: sql<number>`COUNT(*)` }).from(media).where(gt(media.state, -1)).then(r => r[0]?.count ?? 0),
+	db.select({ count: sql<number>`COUNT(*)` }).from(documents).where(gt(documents.state, -1)).then(r => r[0]?.count ?? 0),
+	db.select({ count: sql<number>`COUNT(*)` }).from(users).where(gt(users.state, -1)).then(r => r[0]?.count ?? 0),
+	db.select({ count: sql<number>`COUNT(*)` }).from(tags).where(gt(tags.state, -1)).then(r => r[0]?.count ?? 0),
+	db.select({ count: sql<number>`COUNT(*)` }).from(redirects).where(gt(redirects.state, -1)).then(r => r[0]?.count ?? 0),
+]);
+
+const draftPages = totalPages - publishedPages;
+const publishedRatio = totalPages > 0 ? publishedPages / totalPages : 0;
+const RADIUS = 46;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+// Per-content-type breakdown for the "Content" widget — separate from the "Pages" donut above,
+// since content-type entries and plain pages are unrelated pools that only share a table.
+const contentTypeCounts = contentTypes.length > 0
+	? await Promise.all(contentTypes.map(async (ct) => {
+		const [row] = await db
+			.select({
+				total: sql<number>`COUNT(*)`,
+				published: sql<number>`COUNT(*) FILTER (WHERE ${pages.state} = 1)`,
+			})
+			.from(pages)
+			.where(and(eq(pages.contentType, ct.id), gt(pages.state, -1)));
+		return { id: ct.id, title: ct.title, total: row?.total ?? 0, published: row?.published ?? 0 };
+	}))
+	: [];
+const totalContentEntries = contentTypeCounts.reduce((sum, ct) => sum + ct.total, 0);
+
+const [recentSubmissions, submissionCount] = await Promise.all([
+	db
+		.select({ id: formSubmissions.id, createdAt: formSubmissions.createdAt, formContent: forms.content })
+		.from(formSubmissions)
+		.innerJoin(forms, eq(formSubmissions.formId, forms.id))
+		.where(gt(formSubmissions.state, -1))
+		.orderBy(desc(formSubmissions.createdAt))
+		.limit(10),
+	db.select({ count: sql<number>`COUNT(*)` }).from(formSubmissions).where(gt(formSubmissions.state, -1)).then(r => r[0]?.count ?? 0),
+]);
+
+const statItems = [
+	{ label: 'Pages', count: totalPages, href: '/admin/pages', Icon: FileText },
+	...(contentTypes.length > 0
+		? [{ label: 'Content Entries', count: totalContentEntries, href: `/admin/content/${contentTypes[0].id}`, Icon: LayoutTemplate }]
+		: []),
+	{ label: 'Templates', count: templateCount, href: '/admin/templates', Icon: LayoutTemplate },
+	{ label: 'Forms', count: formCount, href: '/admin/forms', Icon: ClipboardList },
+	{ label: 'Media', count: mediaCount, href: '/admin/media', Icon: Images },
+	{ label: 'Documents', count: documentCount, href: '/admin/documents', Icon: FileStack },
+	{ label: 'Users', count: userCount, href: '/admin/users', Icon: Users },
+	{ label: 'Tags', count: tagCount, href: '/admin/tags', Icon: Tags },
+	{ label: 'Redirects', count: redirectCount, href: '/admin/redirects', Icon: Link2 },
+];
 ---
 
 <AdminLayout>
-	<p>hellloooooo from admin root</p>
+	<div class="flex flex-col gap-6">
+		<div>
+			<h1 class="text-2xl font-semibold">Hello, {capitalize(user.fname)}</h1>
+			<p class="text-base-content/60">Welcome to your administration panel</p>
+		</div>
+
+		<div class="flex flex-wrap gap-2">
+			<a href="/admin/pages/new" class="btn btn-sm btn-outline gap-2"><Plus size={14} />New Page</a>
+			<a href="/admin/templates/new" class="btn btn-sm btn-outline gap-2"><Plus size={14} />New Template</a>
+			<a href="/admin/forms/new" class="btn btn-sm btn-outline gap-2"><Plus size={14} />New Form</a>
+			<a href="/admin/users/new" class="btn btn-sm btn-outline gap-2"><Plus size={14} />Invite User</a>
+			<a href="/admin/media" class="btn btn-sm btn-outline gap-2"><Images size={14} />Media Library</a>
+		</div>
+
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+			<div class="bg-base-100 rounded-lg p-5 flex flex-col aspect-[3/2] overflow-hidden">
+				<h2 class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-4 shrink-0">
+					<Activity size={14} />
+					Recent Activity
+				</h2>
+				<div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+					{recentActions.length === 0 ? (
+						<div class="h-full flex items-center justify-center text-base-content/60">No activity yet.</div>
+					) : (
+						<ul class="flex flex-col divide-y divide-base-300">
+							{recentActions.map((action, i) => (
+								<li class="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
+									<div class="min-w-0">
+										<div class="font-medium truncate">{recentDescriptions[i]}</div>
+										<div class="text-sm text-base-content/60">
+											{action.userEmail ? `${capitalize(action.userFname ?? '')} ${capitalize(action.userLname ?? '')}` : 'System'}
+										</div>
+									</div>
+									<LocalDateTime
+										date={action.date}
+										class="text-sm text-base-content/60 shrink-0"
+										format={{ month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }}
+									/>
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
+				<a href="/admin/audit" class="link link-info link-hover text-sm mt-3 inline-block shrink-0">View audit log</a>
+			</div>
+
+			<div class="bg-base-100 rounded-lg p-5 flex flex-col aspect-[3/2] overflow-hidden">
+				<div class="flex items-center justify-between mb-4 shrink-0">
+					<h2 class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-base-content/60">
+						<UserRound size={14} />
+						Profile
+					</h2>
+					<a href="/admin/profile" class="link link-info link-hover text-sm">Profile settings</a>
+				</div>
+				<div class="flex-1 flex flex-col items-center justify-center text-center gap-2 py-3">
+					<div class="avatar avatar-placeholder">
+						<div class="bg-primary text-primary-content rounded-full w-16">
+							<span class="text-xl font-semibold">{user.fname[0]?.toUpperCase()}{user.lname[0]?.toUpperCase()}</span>
+						</div>
+					</div>
+					<div class="text-lg font-bold">{capitalize(user.fname)} {capitalize(user.lname)}</div>
+					<div class="text-sm text-base-content/60">{user.email}</div>
+					<div class="flex flex-wrap justify-center gap-1 mt-1">
+						{myRoles.length === 0 ? (
+							<span class="text-sm text-base-content/60">No roles assigned</span>
+						) : myRoles.map(role => (
+							<span class:list={['badge badge-sm', role.adminAccess ? 'badge-primary' : 'badge-ghost']}>{role.title}</span>
+						))}
+					</div>
+				</div>
+			</div>
+
+			<div class="bg-base-100 rounded-lg p-5 flex flex-col aspect-[3/2] overflow-hidden">
+				<h2 class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-4 shrink-0">
+					<ChartPie size={14} />
+					Pages
+				</h2>
+				{totalPages === 0 ? (
+					<div class="flex-1 flex items-center justify-center text-base-content/60">No pages yet.</div>
+				) : (
+					<div class="flex-1 flex items-center justify-center gap-6 py-2">
+						<div class="relative w-28 h-28 shrink-0">
+							<svg viewBox="0 0 112 112" class="-rotate-90 w-28 h-28">
+								<circle cx="56" cy="56" r={RADIUS} fill="none" stroke="currentColor" stroke-width="14" class="text-base-300" />
+								<circle
+									cx="56" cy="56" r={RADIUS} fill="none" stroke="currentColor" stroke-width="14"
+									class="text-success"
+									stroke-linecap="round"
+									stroke-dasharray={`${publishedRatio * CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+								/>
+							</svg>
+							<div class="absolute inset-0 flex flex-col items-center justify-center">
+								<span class="text-2xl font-bold">{totalPages}</span>
+								<span class="text-xs text-base-content/60">pages</span>
+							</div>
+						</div>
+						<div class="flex flex-col gap-2 text-sm">
+							<div class="flex items-center gap-2">
+								<span class="inline-block w-2.5 h-2.5 rounded-full bg-success"></span>
+								Published <span class="font-semibold">{publishedPages}</span>
+							</div>
+							<div class="flex items-center gap-2">
+								<span class="inline-block w-2.5 h-2.5 rounded-full bg-base-300"></span>
+								Draft <span class="font-semibold">{draftPages}</span>
+							</div>
+						</div>
+					</div>
+				)}
+			</div>
+
+			<div class="bg-base-100 rounded-lg p-5 flex flex-col aspect-[3/2] overflow-hidden">
+				<h2 class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-4 shrink-0">
+					<Shapes size={14} />
+					Content
+				</h2>
+				<div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+					{contentTypeCounts.length === 0 ? (
+						<div class="h-full flex items-center justify-center text-base-content/60 text-center">No content types configured.</div>
+					) : (
+						<ul class="flex flex-col divide-y divide-base-300">
+							{contentTypeCounts.map(ct => (
+								<li class="py-2.5 first:pt-0 last:pb-0">
+									<a href={`/admin/content/${ct.id}`} class="flex items-center justify-between gap-3 hover:text-primary transition-colors">
+										<span class="font-medium">{ct.title}</span>
+										<span class="font-semibold">{ct.total}</span>
+									</a>
+									<div class="text-xs text-base-content/60">{ct.published} published, {ct.total - ct.published} draft</div>
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
+			</div>
+
+			<div class="bg-base-100 rounded-lg p-5 flex flex-col aspect-[3/2] overflow-hidden">
+				<h2 class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-4 shrink-0">
+					<Database size={14} />
+					Project Statistics
+				</h2>
+				<div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden grid grid-cols-2 content-start gap-x-4 gap-y-1">
+					{statItems.map(item => (
+						<a href={item.href} class="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-base-200 transition-colors min-w-0">
+							<div class="flex items-center justify-center w-8 h-8 rounded-lg bg-base-200 text-base-content/70 shrink-0">
+								<item.Icon size={16} />
+							</div>
+							<div class="min-w-0">
+								<div class="text-base-content/60 text-xs">{item.label}</div>
+								<div class="font-semibold">{item.count}</div>
+							</div>
+						</a>
+					))}
+				</div>
+			</div>
+
+			<div class="bg-base-100 rounded-lg p-5 flex flex-col aspect-[3/2] overflow-hidden">
+				<h2 class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-4 shrink-0">
+					<Inbox size={14} />
+					Form Submissions
+				</h2>
+				<div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+					{recentSubmissions.length === 0 ? (
+						<div class="h-full flex items-center justify-center text-base-content/60">No submissions yet.</div>
+					) : (
+						<ul class="flex flex-col divide-y divide-base-300">
+							{recentSubmissions.map(submission => (
+								<li class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+									<span class="font-medium truncate">{(submission.formContent as any)?.root?.props?.name || 'Untitled form'}</span>
+									<LocalDateTime
+										date={submission.createdAt}
+										class="text-sm text-base-content/60 shrink-0"
+										format={{ month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }}
+									/>
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
+				<a href="/admin/forms/submissions" class="link link-info link-hover text-sm mt-3 inline-block shrink-0">
+					View all {submissionCount} {submissionCount === 1 ? 'submission' : 'submissions'}
+				</a>
+			</div>
+		</div>
+	</div>
 </AdminLayout>
