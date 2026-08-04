@@ -7,7 +7,7 @@ export type SelectOption = {
   value: string;
 };
 
-export type OptionsSource = "manual" | "content" | "users";
+export type OptionsSource = "manual" | "content" | "users" | "tags";
 
 export type SelectProps = {
   label: string;
@@ -111,11 +111,12 @@ function SelectField({
   );
 }
 
-// The stored "options" prop only ever reflects the manual source — for content/users it's
+// The stored "options" prop only ever reflects the manual source — for content/users/tags it's
 // whatever was left over from before the source was switched (that field is hidden from the
-// editor once source !== "manual"; see resolveFields below), never the live list. So content/users
-// can't be checked against a static enum the way manual can; each posted value is instead checked
-// against the real source with an async DB lookup (isUserOptionValid/isContentOptionValid).
+// editor once source !== "manual"; see resolveFields below), never the live list. So content/
+// users/tags can't be checked against a static enum the way manual can; each posted value is
+// instead checked against the real source with an async DB lookup (isUserOptionValid/
+// isContentOptionValid/isTagOptionValid).
 function buildOptionSchema({ source, contentType, options }: SelectProps): z.ZodTypeAny {
   if (source === "users") {
     return z.string().refine(async (value) => {
@@ -129,6 +130,13 @@ function buildOptionSchema({ source, contentType, options }: SelectProps): z.Zod
       if (!contentType) return false;
       const { isContentOptionValid } = await import("./Select.server.js");
       return isContentOptionValid(contentType, value);
+    }, "Invalid option");
+  }
+
+  if (source === "tags") {
+    return z.string().refine(async (value) => {
+      const { isTagOptionValid } = await import("./Select.server.js");
+      return isTagOptionValid(value);
     }, "Invalid option");
   }
 
@@ -204,6 +212,7 @@ const Select: ComponentConfig<SelectProps> = {
         { label: "Manual", value: "manual" },
         { label: "Content", value: "content" },
         { label: "Users", value: "users" },
+        { label: "Tags", value: "tags" },
       ],
     },
     contentType: contentTypeField,
@@ -239,8 +248,8 @@ const Select: ComponentConfig<SelectProps> = {
     multiple: false,
   },
   // Only the field(s) relevant to the chosen source are shown: "options" (manual entry) for
-  // manual, "contentType" for content — users needs no further picker, since there's only one
-  // users list to draw from.
+  // manual, "contentType" for content — users and tags need no further picker, since there's
+  // only one users/tags list to draw from.
   resolveFields: async (data, { fields }) => {
     const { source } = data.props;
     const resolved: Partial<Fields<SelectProps>> = {
@@ -255,7 +264,7 @@ const Select: ComponentConfig<SelectProps> = {
         ...contentTypeField,
         options: [{ label: "— select a content type —", value: "" }, ...(await getContentTypeOptions())],
       };
-    } else if (source !== "users") {
+    } else if (source !== "users" && source !== "tags") {
       resolved.options = optionsField;
     }
 
@@ -264,9 +273,10 @@ const Select: ComponentConfig<SelectProps> = {
 
     return resolved as Fields<SelectProps>;
   },
-  // Resolves the actual runtime options from the chosen source. Only content/users need a server
-  // round-trip (published pages via resolveDataForSSR, the editor via /admin/components/data —
-  // see client-data-wrapper.tsx); manual sources are used as authored and need no resolution.
+  // Resolves the actual runtime options from the chosen source. Only content/users/tags need a
+  // server round-trip (published pages via resolveDataForSSR, the editor via
+  // /admin/components/data — see client-data-wrapper.tsx); manual sources are used as authored
+  // and need no resolution.
   data: async ({ source, contentType }: SelectProps) => {
     if (!import.meta.env.SSR) return {};
     if (source === "users") {
@@ -277,6 +287,10 @@ const Select: ComponentConfig<SelectProps> = {
       if (!contentType) return { options: [] };
       const { getContentOptions } = await import("./Select.server.js");
       return { options: await getContentOptions(contentType) };
+    }
+    if (source === "tags") {
+      const { getTagOptions } = await import("./Select.server.js");
+      return { options: await getTagOptions() };
     }
     return {};
   },

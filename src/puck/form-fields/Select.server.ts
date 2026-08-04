@@ -1,5 +1,5 @@
 import { getDb } from "../../db/db.js";
-import { pages, users } from "../../db/schema.js";
+import { pages, tags, users } from "../../db/schema.js";
 import { and, eq } from "drizzle-orm";
 import * as z from "zod";
 import type { SelectOption } from "./Select.js";
@@ -15,6 +15,19 @@ export async function getUserOptions(): Promise<SelectOption[]> {
 
   return rows.map((row) => ({
     label: `${row.fname} ${row.lname}`.trim() || row.email,
+    value: row.id,
+  }));
+}
+
+export async function getTagOptions(): Promise<SelectOption[]> {
+  const db = getDb();
+  const rows = await db
+    .select({ id: tags.id, title: tags.title })
+    .from(tags)
+    .where(eq(tags.state, 1));
+
+  return rows.map((row) => ({
+    label: row.title,
     value: row.id,
   }));
 }
@@ -59,6 +72,17 @@ export async function isContentOptionValid(contentTypeId: string, value: string)
     .select({ id: pages.id })
     .from(pages)
     .where(and(eq(pages.state, 1), eq(pages.contentType, contentTypeId), eq(pages.id, value)))
+    .limit(1);
+  return rows.length > 0;
+}
+
+export async function isTagOptionValid(value: string): Promise<boolean> {
+  if (!uuidSchema.safeParse(value).success) return false;
+  const db = getDb();
+  const rows = await db
+    .select({ id: tags.id })
+    .from(tags)
+    .where(and(eq(tags.state, 1), eq(tags.id, value)))
     .limit(1);
   return rows.length > 0;
 }
