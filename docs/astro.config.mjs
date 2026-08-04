@@ -25,6 +25,7 @@ export default defineConfig({
 						{ label: 'Components', slug: 'devs/components' },
 						{ label: 'Content Types', slug: 'devs/content-types' },
 						{ label: 'Image REST API', slug: 'devs/image-rest-api' },
+						{ label: 'Actions API', slug: 'devs/actions-api' },
 					],
 				},
 			],
