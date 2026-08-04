@@ -21,6 +21,7 @@ const turnstileSecretKey = turnstileSettings.find(s => s.key === 'turnstile_secr
 const fontSettings = await db.select().from(settings).where(inArray(settings.key, ['heading_font_link', 'body_font_link']));
 const headingFontLink = fontSettings.find(s => s.key === 'heading_font_link')?.value as string | undefined;
 const bodyFontLink = fontSettings.find(s => s.key === 'body_font_link')?.value as string | undefined;
+const fontFamilies = externalPuckConfig?.fontFamilies ?? [];
 const contentTypes = (externalPuckConfig?.contentTypes ?? []);
 const contentSettingsKeys = contentTypes.map((ct) => `content_default_template_${ct.id}`);
 const contentSettings = contentSettingsKeys.length > 0
@@ -46,6 +47,7 @@ const form = getSettingsForm(
 	contentTemplateDefaults,
 	headingFontLink,
 	bodyFontLink,
+	fontFamilies,
 );
 ---
 

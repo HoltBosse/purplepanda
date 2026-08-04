@@ -23,6 +23,7 @@ export function getSettingsForm(
     contentTemplateDefaults: Record<string, string> = {},
     headingFontLink?: string,
     bodyFontLink?: string,
+    fontFamilies: string[] = [],
 ): FormSection {
     const dtOptionValue = flash['dt-option'] ?? defaultTemplateId;
     const turnstileSiteKeyValue = flash['turnstile-site-key'] ?? turnstileSiteKey;
@@ -213,6 +214,7 @@ export function getSettingsForm(
                                 type: 'FontPicker',
                                 placeholder: 'Select a heading font',
                                 sampleText: 'Heading Sample',
+                                fontFamilies,
                                 ...(headingFontValue ? { value: headingFontValue } : {}),
                                 validator: z.string().optional(),
                             },
@@ -237,6 +239,7 @@ export function getSettingsForm(
                                 type: 'FontPicker',
                                 placeholder: 'Select a body font',
                                 sampleText: 'The quick brown fox jumps over the lazy dog',
+                                fontFamilies,
                                 ...(bodyFontValue ? { value: bodyFontValue } : {}),
                                 validator: z.string().optional(),
                             },

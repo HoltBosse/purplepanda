@@ -63,6 +63,7 @@ type ConfigWithDataResolvers<TConfig extends Config> = Omit<TConfig, "components
     [TName in keyof TConfig["components"]]: ComponentWithDataResolver<TConfig["components"][TName]>;
   };
   contentTypes?: ContentType[];
+  fontFamilies?: string[];
 };
 
 declare module "@puckeditor/core" {

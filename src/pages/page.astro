@@ -118,7 +118,7 @@ const title: string = (pageData as any)?.root?.props?.title ?? '';
         headingFontFamily: headingFontFamily ? `'${headingFontFamily}', sans-serif` : 'inherit',
     }}>
         body { font-family: var(--bodyFontFamily); }
-        h1, h2, h3, h4, h5, h6 { font-family: var(--headingFontFamily); }
+        :global(h1), :global(h2), :global(h3), :global(h4), :global(h5), :global(h6) { font-family: var(--headingFontFamily); }
     </style>
 </head>
 <body data-purplepanda-islands>

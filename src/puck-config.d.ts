@@ -2,7 +2,7 @@ declare module "virtual:purplepanda/puck-config" {
   import type { Config } from "@puckeditor/core";
   import type { ContentType } from "./puck/index.js";
 
-  const config: (Partial<Config> & { contentTypes?: ContentType[] }) | undefined;
+  const config: (Partial<Config> & { contentTypes?: ContentType[]; fontFamilies?: string[] }) | undefined;
   export default config;
 }
 
