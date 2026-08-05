@@ -81,10 +81,32 @@ declare module "@puckeditor/core" {
     // across a form's components by buildFormSubmissionSchema (./form-fields/schema.js). Only
     // components used as form fields need to implement this; others are left unvalidated.
     toSubmissionSchema?: (props: any) => z.ZodTypeAny;
+    // For a form field whose posted value needs a server-side side effect before it's stored —
+    // writing an uploaded file to disk, inserting a DB row, calling an external API — rather than
+    // being stored as posted. Given the raw FormData value(s) for this field (before the
+    // File→{name,size,type} metadata collapse `submit.ts` applies to build the plain submission
+    // object) and this component's own stored props, returns the value to store in the
+    // submission's `data` JSON in its place; that value is what toSubmissionSchema above then
+    // validates. Only runs once a submission has already passed spam/CSRF checks (see submit.ts),
+    // so a rejected bot submission never triggers the side effect. Throw to reject the submission
+    // with a field-specific error message. Components without this hook have their posted value
+    // stored as-is (subject only to toSubmissionSchema). See form-fields/Image.tsx for an example.
+    processSubmission?: (
+      raw: FormDataEntryValue | FormDataEntryValue[] | undefined,
+      props: any,
+      context?: App.Locals,
+    ) => Promise<unknown>;
     // Set to false to hide this field from the admin submissions viewer (packages/purplepanda/
     // src/pages/admin/forms/submissions/[id].astro) — for fields whose stored value isn't a
     // meaningful answer to show an admin, e.g. Turnstile's verification token. Defaults to shown.
     submissionDisplay?: boolean;
+    // Custom rendering of this field's stored submission value in the admin submissions viewer,
+    // for values the viewer's default text formatting wouldn't render usefully — e.g. Image.tsx's
+    // persisted { id, title, alt } media reference is far more useful shown as a thumbnail than
+    // printed as an object. Given the stored value and this component's own props, returns an
+    // HTML string the viewer injects as-is (so it must already be safe/escaped); omit to fall
+    // back to the viewer's default formatting.
+    renderSubmissionValue?: (value: unknown, props: any) => string | Promise<string>;
   }
 }
 

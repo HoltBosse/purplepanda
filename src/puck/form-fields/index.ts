@@ -4,6 +4,7 @@ export { default as Select } from "./Select.js";
 export { default as Checkbox } from "./Checkbox.js";
 export { default as RadioGroup } from "./RadioGroup.js";
 export { default as Turnstile } from "./Turnstile.js";
+export { default as Image } from "./Image.js";
 
 export type { TextInputProps } from "./TextInput.js";
 export type { TextareaProps } from "./Textarea.js";
@@ -11,3 +12,4 @@ export type { SelectProps } from "./Select.js";
 export type { CheckboxProps } from "./Checkbox.js";
 export type { RadioGroupProps } from "./RadioGroup.js";
 export type { TurnstileProps } from "./Turnstile.js";
+export type { ImageProps } from "./Image.js";

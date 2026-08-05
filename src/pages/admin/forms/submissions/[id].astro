@@ -59,6 +59,11 @@ const labelByFieldName: Record<string, string> = {};
 const optionsByFieldName: Record<string, FieldOption[]> = {};
 const checkboxLabelByFieldName: Record<string, string> = {};
 const hiddenFieldNames = new Set<string>();
+// Which component owns each field (and its stored props), so a component that implements
+// `renderSubmissionValue` (see puck/index.ts) can be looked up and run per field below — kept
+// generic so any future field type can opt into custom rendering the same way, not just Image.
+const typeByFieldName: Record<string, string> = {};
+const propsByFieldName: Record<string, Record<string, unknown>> = {};
 
 function collectFieldMeta(node: unknown): void {
     if (Array.isArray(node)) {
@@ -79,8 +84,12 @@ function collectFieldMeta(node: unknown): void {
         } else if (typeof props.checkboxLabel === 'string') {
             checkboxLabelByFieldName[fieldName] = props.checkboxLabel;
         }
-        if (typeof type === 'string' && formConfig.components?.[type]?.submissionDisplay === false) {
-            hiddenFieldNames.add(fieldName);
+        if (typeof type === 'string') {
+            typeByFieldName[fieldName] = type;
+            propsByFieldName[fieldName] = props;
+            if (formConfig.components?.[type]?.submissionDisplay === false) {
+                hiddenFieldNames.add(fieldName);
+            }
         }
     }
 
@@ -107,6 +116,18 @@ function formatValue(key: string, value: unknown): string {
 }
 
 const fields = Object.entries(submission.data as Record<string, unknown>).filter(([key]) => !hiddenFieldNames.has(key));
+
+// Pre-render any field whose component opts into custom submission rendering (e.g. Image.tsx
+// showing its stored media reference as a thumbnail instead of a printed object) — computed
+// ahead of time since Astro template expressions below can't themselves be async.
+const renderedByFieldName: Record<string, string> = {};
+for (const [key, value] of fields) {
+    const type = typeByFieldName[key];
+    const renderSubmissionValue = type ? (formConfig.components as any)?.[type]?.renderSubmissionValue : undefined;
+    if (typeof renderSubmissionValue === 'function') {
+        renderedByFieldName[key] = await renderSubmissionValue(value, propsByFieldName[key]);
+    }
+}
 ---
 
 <AdminLayout>
@@ -132,7 +153,11 @@ const fields = Object.entries(submission.data as Record<string, unknown>).filter
             {fields.map(([key, value]) => (
                 <tr>
                     <td class="w-px whitespace-nowrap font-medium">{resolveFieldLabel(key)}</td>
-                    <td class="whitespace-pre-wrap break-words">{formatValue(key, value)}</td>
+                    <td class="whitespace-pre-wrap break-words">
+                        {renderedByFieldName[key] !== undefined
+                            ? <Fragment set:html={renderedByFieldName[key]} />
+                            : formatValue(key, value)}
+                    </td>
                 </tr>
             ))}
         </tbody>

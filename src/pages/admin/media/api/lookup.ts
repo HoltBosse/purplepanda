@@ -57,12 +57,18 @@ export async function GET(context: APIContext): Promise<Response> {
   const page = pageParsed.success ? pageParsed.data : 1;
   const offset = (page - 1) * PER_PAGE;
 
+  // Opt-in for pickers whose whole point is choosing among folders regardless of visibility
+  // (e.g. picking a hidden upload-destination folder) — normal browsing/search still hides them.
+  const includeHidden = context.url.searchParams.get("includeHidden") === "1";
+  // Opt-in for folder-only pickers, skipping the (paginated) images query entirely.
+  const foldersOnly = context.url.searchParams.get("foldersOnly") === "1";
+
   const db = getDb();
   const hiddenFolderIds = await getHiddenFolderIds(db);
 
   // The folder being browsed is itself hidden (or under a hidden ancestor) — don't leak its
-  // contents just because they were requested directly.
-  if (!search && folderId && hiddenFolderIds.has(folderId)) {
+  // contents just because they were requested directly, unless the caller explicitly opted in.
+  if (!includeHidden && !search && folderId && hiddenFolderIds.has(folderId)) {
     return json({ folders: [], images: [], page, totalPages: 1 });
   }
 
@@ -78,31 +84,35 @@ export async function GET(context: APIContext): Promise<Response> {
     ? and(eq(media.state, 1), or(ilike(media.title, `%${search}%`), ilike(media.alt, `%${search}%`)), hiddenFolderExclusion)
     : and(folderId ? eq(media.folder, folderId) : isNull(media.folder), eq(media.state, 1), hiddenFolderExclusion);
 
-  const images = await db
-    .select({ id: media.id, title: media.title, alt: media.alt })
-    .from(media)
-    .where(imageWhere)
-    .orderBy(media.title)
-    .limit(PER_PAGE)
-    .offset(offset);
+  const images = foldersOnly
+    ? []
+    : await db
+        .select({ id: media.id, title: media.title, alt: media.alt })
+        .from(media)
+        .where(imageWhere)
+        .orderBy(media.title)
+        .limit(PER_PAGE)
+        .offset(offset);
 
-  const totalImages = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(media)
-    .where(imageWhere)
-    .then((result) => Number(result[0]?.count ?? 0));
+  const totalImages = foldersOnly
+    ? 0
+    : await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(media)
+        .where(imageWhere)
+        .then((result) => Number(result[0]?.count ?? 0));
 
   const totalPages = Math.max(1, Math.ceil(totalImages / PER_PAGE));
 
   const folders = search
     ? []
     : await db
-        .select({ id: mediafolders.id, name: mediafolders.name })
+        .select({ id: mediafolders.id, name: mediafolders.name, visibility: mediafolders.visibility })
         .from(mediafolders)
         .where(and(
           folderId ? eq(mediafolders.parent, folderId) : isNull(mediafolders.parent),
           eq(mediafolders.state, 1),
-          hiddenFolderIds.size > 0 ? notInArray(mediafolders.id, [...hiddenFolderIds]) : undefined,
+          !includeHidden && hiddenFolderIds.size > 0 ? notInArray(mediafolders.id, [...hiddenFolderIds]) : undefined,
         ))
         .orderBy(mediafolders.name);
 

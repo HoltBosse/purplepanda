@@ -47,3 +47,32 @@ export function buildFormSubmissionSchema(config: Config, data: Data): z.ZodObje
   // ./spam-guard.js).
   return z.object(shape).passthrough();
 }
+
+export type SubmissionFieldProcessor = {
+  props: Record<string, unknown>;
+  processSubmission: (
+    raw: FormDataEntryValue | FormDataEntryValue[] | undefined,
+    props: Record<string, unknown>,
+    context?: unknown,
+  ) => Promise<unknown>;
+};
+
+// Mirrors buildFormSubmissionSchema's node walk, but collects components that opt into
+// `processSubmission` (see ../index.js) rather than `toSubmissionSchema` — these need to run
+// against the raw FormData value for their field, before the rest of the submission is reduced
+// to plain JSON and validated (see submit.ts).
+export function collectSubmissionFieldProcessors(config: Config, data: Data): Map<string, SubmissionFieldProcessor> {
+  const nodes = collectComponentNodes(data.content);
+  collectComponentNodes((data.root as { props?: unknown })?.props, nodes);
+
+  const processors = new Map<string, SubmissionFieldProcessor>();
+  for (const node of nodes) {
+    const component = (config.components as Record<string, unknown> | undefined)?.[node.type] as
+      | { processSubmission?: SubmissionFieldProcessor["processSubmission"] }
+      | undefined;
+    const id = node.props?.id;
+    if (!component?.processSubmission || typeof id !== "string") continue;
+    processors.set(`field-${id}`, { props: node.props, processSubmission: component.processSubmission });
+  }
+  return processors;
+}

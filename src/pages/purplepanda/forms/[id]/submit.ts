@@ -8,7 +8,7 @@ import { getDb } from "../../../../db/db.js";
 import { forms, formSubmissions } from "../../../../db/schema.js";
 import { has404Page } from "virtual:purplepanda/has-404";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
-import { buildFormSubmissionSchema } from "../../../../puck/form/schema.js";
+import { buildFormSubmissionSchema, collectSubmissionFieldProcessors } from "../../../../puck/form/schema.js";
 import {
   isHoneypotTripped,
   isSubmittedTooFast,
@@ -25,6 +25,12 @@ const rateLimiter = new RateLimiterMemory({
   duration: 60,
   blockDuration: 300,
 });
+
+// Rejected by Content-Length before the body is ever buffered into memory — request.formData()
+// below has no size limit of its own, so without this a single oversized POST (well beyond any
+// one field's own validation, e.g. Image.tsx's 10MB cap) could be used to exhaust memory. Sized
+// for one image upload plus multipart boundary/header overhead and any other form fields.
+const MAX_REQUEST_BYTES = 15 * 1024 * 1024;
 
 function hostOf(headerValue: string | null): string | null {
   if (!headerValue) return null;
@@ -102,7 +108,7 @@ async function formDataToJson(formData: FormData): Promise<Record<string, unknow
   return result;
 }
 
-export const POST: APIRoute = async ({ params, request, rewrite, clientAddress, session }) => {
+export const POST: APIRoute = async ({ params, request, rewrite, clientAddress, session, locals }) => {
   const parsedId = uuidSchema.safeParse(params.id);
   if (!parsedId.success) {
     if (has404Page) return rewrite("/404");
@@ -115,6 +121,11 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress, 
 
   if (!isTrustedDomain(request, new URL(request.url).host)) {
     return new Response("Forbidden", { status: 403 });
+  }
+
+  const contentLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BYTES) {
+    return new Response("Payload Too Large", { status: 413 });
   }
 
   try {
@@ -155,6 +166,29 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress, 
   }
 
   stripSpamGuardFields(data);
+
+  // Fields backed by a component that needs a server-side side effect (e.g. Image.tsx writing an
+  // uploaded file to disk and inserting a media row) run against the *raw* FormData value here —
+  // formDataToJson above already collapsed any File to bare {name,size,type} metadata, discarding
+  // its actual content, so the real value has to be re-read from formData before it's gone. This
+  // deliberately runs after the spam/CSRF checks above: a bot's submission never reaches disk or
+  // the database, only ones that already passed those gates do.
+  const processors = collectSubmissionFieldProcessors(externalPuckConfig as Config, form.content as Data);
+  if (processors.size > 0) {
+    const processorErrors: Record<string, string[]> = {};
+    for (const [key, { props, processSubmission }] of processors) {
+      const values = formData.getAll(key);
+      const raw = values.length > 1 ? values : values[0];
+      try {
+        data[key] = await processSubmission(raw, props, locals);
+      } catch (err) {
+        processorErrors[key] = [err instanceof Error ? err.message : "Invalid submission"];
+      }
+    }
+    if (Object.keys(processorErrors).length > 0) {
+      return validationFailureResponse(session, request, processorErrors);
+    }
+  }
 
   // Validated against a schema derived from the form's own stored fields, not trusted client
   // input, since the `required`/`inputType` constraints rendered into the HTML are trivially
