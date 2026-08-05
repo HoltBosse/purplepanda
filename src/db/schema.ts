@@ -13,6 +13,7 @@ export const users = pgTable("users", {
 export const mediafolders = pgTable("mediafolders", {
   id: uuid("id").defaultRandom().primaryKey(),
   state: integer("state").notNull().default(1),
+  visibility: integer("visibility").notNull().default(1),
   name: varchar("name", { length: 255 }).notNull(),
   parent: uuid("parent").references((): any => mediafolders.id),
 });

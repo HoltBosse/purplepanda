@@ -3,7 +3,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { createHash } from 'node:crypto';
 import { getDb } from '../../../db/db.js';
 import { users } from '../../../db/schema.js';
-import { Folder } from '@lucide/astro';
+import { Folder, Eye, EyeOff } from '@lucide/astro';
 import { capitalize } from '../../../string';
 import Input from '../../../form/fields/Input.astro';
 import { mediafolders, media } from "../../../db/schema.js";
@@ -72,6 +72,7 @@ const offset = (page - 1) * itemsPerPage;
 const folders = isSearching ? [] : await db.select({
     id: mediafolders.id,
     name: mediafolders.name,
+    visibility: mediafolders.visibility,
     innerFolders: sql<number>`(SELECT COUNT(*) FROM ${mediafolders} AS mf WHERE mf.parent = "mediafolders"."id" AND mf.state = 1)`,
     innerMedia: sql<number>`(SELECT COUNT(*) FROM ${media} WHERE ${media}.folder = "mediafolders"."id" AND ${media}.state = 1)`,
 }).from(mediafolders).where(and(id ? eq(mediafolders.parent, id) : isNull(mediafolders.parent), eq(mediafolders.state, 1))).orderBy(mediafolders.name);
@@ -276,10 +277,23 @@ if(id && !isSearching) {
                             <div class="bg-info text-white px-2 py-1 rounded flex items-center justify-center h-full aspect-square">
                                 <Folder size={20} />
                             </div>
-                            <div class="min-w-0">
+                            <div class="min-w-0 flex-1">
                                 <h3 class="font-semibold text-base-content">{folder.name}</h3>
                                 <p class="text-sm text-base-content/60">{folder.innerFolders} folders, {folder.innerMedia} assets</p>
                             </div>
+                            {folder.visibility === -1 && (
+                                <EyeOff size={18} class="select-mode-hide shrink-0 text-base-content/40" />
+                            )}
+                            <button
+                                type="button"
+                                data-visibility-toggle
+                                data-folder-id={folder.id}
+                                aria-label={folder.visibility === -1 ? "Show folder" : "Hide folder"}
+                                title={folder.visibility === -1 ? "Show folder" : "Hide folder"}
+                                class="btn btn-ghost btn-square btn-sm select-mode-toggable hidden shrink-0 text-primary"
+                            >
+                                {folder.visibility === -1 ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
                         </a>
                     ))}
                 </div>

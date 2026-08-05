@@ -2,8 +2,9 @@ import type { APIRoute } from "astro";
 import * as z from "zod";
 import { eq, and } from "drizzle-orm";
 import { getDb } from "../../db/db.js";
-import { media } from "../../db/schema.js";
+import { media, mediafolders } from "../../db/schema.js";
 import { getMediaPath } from "../../media/media.js";
+import { isAdminSession } from "../../auth/index.js";
 import { createReadStream } from "node:fs";
 import { open, stat } from "node:fs/promises";
 import { Readable } from "node:stream";
@@ -62,7 +63,57 @@ function etagMatches(ifNoneMatch: string | null, etag: string): boolean {
   return ifNoneMatch.split(",").some((tag) => tag.trim().replace(/^W\//, "") === etag);
 }
 
-export const GET: APIRoute = async ({ params, request, rewrite }) => {
+// Walks the folder's ancestor chain (not just the immediate parent) since a folder
+// inherits hiddenness from any hidden ancestor.
+async function isInHiddenFolder(db: ReturnType<typeof getDb>, folderId: string | null): Promise<boolean> {
+  let currentId = folderId;
+  const visited = new Set<string>();
+
+  while (currentId && !visited.has(currentId)) {
+    visited.add(currentId);
+
+    const [folder] = await db
+      .select({ parent: mediafolders.parent, visibility: mediafolders.visibility })
+      .from(mediafolders)
+      .where(eq(mediafolders.id, currentId))
+      .limit(1);
+
+    if (!folder) break;
+    if (folder.visibility === -1) return true;
+
+    currentId = folder.parent;
+  }
+
+  return false;
+}
+
+// Referer paths allowed to bypass a hidden folder's visibility — the only admin
+// views that actually render media assets directly.
+const VISIBILITY_BYPASS_REFERER_PREFIXES = ["/admin/media", "/admin/forms/submissions"];
+
+// A hidden asset is only ever served to a request that is both (a) an
+// authenticated admin session and (b) actually navigating from one of the admin
+// views above — requiring both means a logged-in admin browsing the public site
+// doesn't leak hidden images there, and a spoofed Referer alone can't pull a
+// hidden image without a real admin session behind it.
+async function canBypassVisibility(request: Request, session: Parameters<typeof isAdminSession>[0]): Promise<boolean> {
+  const referer = request.headers.get("referer");
+  if (!referer) return false;
+
+  let refererUrl: URL;
+  try {
+    refererUrl = new URL(referer);
+  } catch {
+    return false;
+  }
+
+  if (refererUrl.origin !== new URL(request.url).origin) return false;
+  if (!VISIBILITY_BYPASS_REFERER_PREFIXES.some((prefix) => refererUrl.pathname.startsWith(prefix))) return false;
+
+  return isAdminSession(session);
+}
+
+export const GET: APIRoute = async ({ params, request, rewrite, session }) => {
   const parsed = uuidSchema.safeParse(params.id);
   if (!parsed.success) {
     if (has404Page) {
@@ -86,7 +137,7 @@ export const GET: APIRoute = async ({ params, request, rewrite }) => {
   const db = getDb();
 
   const [row] = await db
-    .select({ id: media.id, state: media.state })
+    .select({ id: media.id, state: media.state, folder: media.folder })
     .from(media)
     .where(and(eq(media.id, id), eq(media.state, 1)))
     .limit(1);
@@ -96,6 +147,21 @@ export const GET: APIRoute = async ({ params, request, rewrite }) => {
       return rewrite('/404');
     }
     return new Response('Not Found', { status: 404, headers: { "Cache-Control": "no-store" } });
+  }
+
+  // A bypassed response must never be cached: HTTP caching keys on URL, not on
+  // Referer or session, so a cached copy would keep serving a hidden asset to
+  // later same-URL requests (e.g. from a public page in the same browser) that
+  // wouldn't themselves pass the bypass check.
+  let bypassed = false;
+  if (await isInHiddenFolder(db, row.folder)) {
+    if (!(await canBypassVisibility(request, session))) {
+      if (has404Page) {
+        return rewrite('/404');
+      }
+      return new Response('Not Found', { status: 404, headers: { "Cache-Control": "no-store" } });
+    }
+    bypassed = true;
   }
 
   const mediaPath = getMediaPath();
@@ -126,10 +192,12 @@ export const GET: APIRoute = async ({ params, request, rewrite }) => {
     .update(`${id}:${fileStat.mtimeMs}:${fileStat.size}:${paramString}`)
     .digest("hex")}"`;
 
-  if (etagMatches(request.headers.get("if-none-match"), etag)) {
+  const cacheControl = bypassed ? "private, no-store" : IMAGE_CACHE_CONTROL;
+
+  if (!bypassed && etagMatches(request.headers.get("if-none-match"), etag)) {
     return new Response(null, {
       status: 304,
-      headers: { "ETag": etag, "Cache-Control": IMAGE_CACHE_CONTROL },
+      headers: { "ETag": etag, "Cache-Control": cacheControl },
     });
   }
 
@@ -182,8 +250,8 @@ export const GET: APIRoute = async ({ params, request, rewrite }) => {
       headers: {
         "Content-Type": mimeType,
         "Content-Length": String(outputBuffer.byteLength),
-        "ETag": etag,
-        "Cache-Control": IMAGE_CACHE_CONTROL,
+        ...(bypassed ? {} : { "ETag": etag }),
+        "Cache-Control": cacheControl,
       },
     });
   }
@@ -202,8 +270,8 @@ export const GET: APIRoute = async ({ params, request, rewrite }) => {
     headers: {
       "Content-Type": mimeType,
       "Content-Length": String(fileStat.size),
-      "ETag": etag,
-      "Cache-Control": IMAGE_CACHE_CONTROL,
+      ...(bypassed ? {} : { "ETag": etag }),
+      "Cache-Control": cacheControl,
     },
   });
 };

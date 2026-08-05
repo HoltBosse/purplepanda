@@ -512,6 +512,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/media/togglefoldervisibility/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/media/togglefoldervisibility/[id].ts",
+        });
+
+        injectRoute({
           pattern: "/admin/media/api/lookup",
           entrypoint: "@holtbosse/purplepanda/pages/admin/media/api/lookup.ts",
         });

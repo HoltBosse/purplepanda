@@ -59,7 +59,7 @@ document.querySelector("#select-mode-trigger")?.addEventListener("click", (e) =>
 
     document.body.dataset.mediaSelectMode = selectModeActive ? "true" : "false";
     target.innerText = selectModeActive ? "Unselect" : "Select";
-    document.querySelectorAll(".select-mode-toggable").forEach(el => {
+    document.querySelectorAll(".select-mode-toggable, .select-mode-hide").forEach(el => {
         el.classList.toggle("hidden");
         if (el instanceof HTMLInputElement && el.type === "checkbox") {
             el.checked = false;
@@ -315,6 +315,32 @@ const postMoveMediaToFolder = (mediaIds: string[], folderId: string) => {
     document.body.append(form);
     form.submit();
 };
+
+const postToggleFolderVisibility = (folderId: string) => {
+    const form = document.createElement("form");
+    form.method = "post";
+    form.action = `/admin/media/togglefoldervisibility/${folderId}`;
+    form.style.display = "none";
+
+    document.body.append(form);
+    form.submit();
+};
+
+document.querySelectorAll("[data-visibility-toggle]").forEach((toggle) => {
+    toggle.addEventListener("pointerdown", (event) => {
+        event.stopPropagation();
+    });
+
+    toggle.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const folderId = (toggle as HTMLElement).dataset.folderId;
+        if (folderId) {
+            postToggleFolderVisibility(folderId);
+        }
+    });
+});
 
 const dragDropManager = new DragDropManager({
     plugins: defaultPreset.plugins.map((p) => (p === Feedback ? Feedback.configure({ feedback: "none" }) : p)),
