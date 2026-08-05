@@ -87,7 +87,22 @@ function createOverrides(onSave?: (data: Data) => void, fontLinks?: FontLinks): 
     iframe: ({ children, document }) => {
       useEffect(() => {
         if (!document) return;
-        document.documentElement.setAttribute("data-theme", "false");
+
+        // Puck's AutoFrame copies every attribute from the parent page's <html> onto the
+        // iframe's (to mirror host styling), which stomps this back to the parent's theme
+        // right after we set it — Puck's sync effect runs as a parent of this one, so it
+        // always fires later. A MutationObserver reasserts "false" whenever that happens.
+        const enforceLightTheme = () => {
+          if (document.documentElement.getAttribute("data-theme") !== "false") {
+            document.documentElement.setAttribute("data-theme", "false");
+          }
+        };
+        enforceLightTheme();
+        const themeObserver = new MutationObserver(enforceLightTheme);
+        themeObserver.observe(document.documentElement, {
+          attributes: true,
+          attributeFilter: ["data-theme"],
+        });
 
         document.documentElement.style.setProperty(
           "--pp-body-font",
@@ -114,6 +129,8 @@ function createOverrides(onSave?: (data: Data) => void, fontLinks?: FontLinks): 
           link.href = href;
           document.head.appendChild(link);
         }
+
+        return () => themeObserver.disconnect();
       }, [document, fontLinks?.headingFontLink, fontLinks?.bodyFontLink]);
 
       return <>{children}</>;

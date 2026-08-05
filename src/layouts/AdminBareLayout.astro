@@ -1,8 +1,18 @@
 ---
 import '../styles/global.css';
+import { getDb } from '../db/db.js';
+import { users } from '../db/schema.js';
+import { eq } from 'drizzle-orm';
+
+const db = getDb();
+
+const userId = await Astro.session?.get('userId');
+const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+const theme = user && user.theme !== 'system' ? user.theme : undefined;
 ---
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme={theme}>
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
