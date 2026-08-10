@@ -1,7 +1,7 @@
 import { Button, Puck, createUsePuck } from "@puckeditor/core";
 import "@puckeditor/core/puck.css";
 import "../styles/puck-theme.css";
-import type { Config, Data, Overrides, PuckContext } from "@puckeditor/core";
+import type { Config, Data, Dictionary, Overrides, PuckContext } from "@puckeditor/core";
 import { Render } from "@puckeditor/core";
 import React, { cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
@@ -146,6 +146,7 @@ interface PuckEditorProps {
   onSave?: (data: Data) => void;
   headingFontLink?: string;
   bodyFontLink?: string;
+  dictionary?: Dictionary;
 }
 
 function hasTemplateSlot(value: unknown): boolean {
@@ -177,7 +178,7 @@ function ensureTemplateSlot(data: Data): Data {
   };
 }
 
-export default function PuckEditor({ config, data, templateData, onPublish, onSave, headingFontLink, bodyFontLink }: PuckEditorProps) {
+export default function PuckEditor({ config, data, templateData, onPublish, onSave, headingFontLink, bodyFontLink, dictionary }: PuckEditorProps) {
   const overrides = useMemo(
     () => createOverrides(onSave, { headingFontLink, bodyFontLink }),
     [onSave, headingFontLink, bodyFontLink],
@@ -285,7 +286,7 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
       >
         <img src="/admin/assets/favicon.svg" alt="Admin" style={{ height: "28px", width: "28px" }} />
       </a>
-      <Puck config={configCopy} data={data} onPublish={onPublish} overrides={overrides}/>
+      <Puck config={configCopy} data={data} onPublish={onPublish} overrides={overrides} {...(dictionary ? { dictionary } : {})} />
     </div>
   );
 }

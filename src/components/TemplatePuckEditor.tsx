@@ -100,6 +100,7 @@ export default function TemplatePuckEditor({
     <PuckEditor
       config={config}
       data={initialData ?? defaultInitialData}
+      dictionary={{ "label-page": "Template" }}
       {...optionalProps}
       onPublish={onPublish ?? defaultSave}
     />

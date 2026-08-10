@@ -1,4 +1,4 @@
-import type { Config, Data, Fields } from "@puckeditor/core";
+import type { Config, Data, Dictionary, Fields } from "@puckeditor/core";
 import { useMemo } from "react";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
@@ -54,9 +54,10 @@ interface PagePuckEditorProps {
   rootConfig?: { label?: string; fields?: Fields; defaultProps?: Record<string, unknown> };
   headingFontLink?: string;
   bodyFontLink?: string;
+  dictionary?: Dictionary;
 }
 
-export default function PagePuckEditor({ initialData, templateData, saveUrl = "/admin/pages/update", draftPublishUrl, onPublish, onSave, isDraft = false, pages = [], rootConfig, headingFontLink, bodyFontLink }: PagePuckEditorProps = {}) {
+export default function PagePuckEditor({ initialData, templateData, saveUrl = "/admin/pages/update", draftPublishUrl, onPublish, onSave, isDraft = false, pages = [], rootConfig, headingFontLink, bodyFontLink, dictionary }: PagePuckEditorProps = {}) {
   const defaultSave = (data: Data) => {
     const form = document.createElement("form");
     form.method = "POST";
@@ -143,6 +144,7 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
     ...(resolvedOnSave ? { onSave: resolvedOnSave } : {}),
     ...(headingFontLink ? { headingFontLink } : {}),
     ...(bodyFontLink ? { bodyFontLink } : {}),
+    ...(dictionary ? { dictionary } : {}),
   };
 
   return (

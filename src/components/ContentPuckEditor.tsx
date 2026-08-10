@@ -36,11 +36,17 @@ export default function ContentPuckEditor({
     [contentType],
   );
 
+  const dictionary = useMemo(
+    () => contentType ? { "label-page": contentType.title } : undefined,
+    [contentType],
+  );
+
   const optionalProps = {
     ...(initialData !== undefined ? { initialData } : {}),
     ...(templateData !== undefined ? { templateData } : {}),
     ...(onPublish !== undefined ? { onPublish } : {}),
     ...(rootConfig !== undefined ? { rootConfig } : {}),
+    ...(dictionary !== undefined ? { dictionary } : {}),
     ...(isDraft !== undefined ? { isDraft } : {}),
     ...(draftPublishUrl !== undefined ? { draftPublishUrl } : {}),
     ...(headingFontLink !== undefined ? { headingFontLink } : {}),

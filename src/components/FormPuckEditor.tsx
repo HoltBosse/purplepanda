@@ -82,6 +82,7 @@ export default function FormPuckEditor({ initialData, saveUrl = "/admin/forms/up
       config={configWithRootFields}
       data={initialData ?? defaultInitialData}
       onPublish={onPublish ?? defaultSave}
+      dictionary={{ "label-page": "Form" }}
       {...optionalProps}
     />
   );
