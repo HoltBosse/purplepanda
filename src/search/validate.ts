@@ -1,7 +1,10 @@
 import { valueSchemaForField } from "./schema.js";
-import type { SearchAst, SearchFieldSpec, ValidatedSearchAst } from "./types.js";
+import type { SearchAst, SearchFieldSpec, SearchFieldType, SearchOperator, ValidatedSearchAst } from "./types.js";
 
 const NULL_LITERAL = "null";
+
+/** Field types with a well-defined ordering, i.e. the only ones a relational operator applies to. */
+const COMPARABLE_TYPES: ReadonlySet<SearchFieldType> = new Set(["date", "datetime", "time"]);
 
 /**
  * Cross-checks a parsed AST against a concrete list of fields, annotating each term with whether
@@ -25,16 +28,25 @@ export function validateSearchAst<TField extends SearchFieldSpec>(
       return { node, valid: false, error: `Unknown field "${node.field}"` };
     }
 
-    const error = validateFieldValue(field, node.value, node.wildcard);
+    const error = validateFieldValue(field, node.value, node.wildcard, node.operator);
     return { node, valid: error === undefined, error, field };
   });
 }
 
 /** Returns an error message, or `undefined` if the raw value is valid for the given field. */
-function validateFieldValue(field: SearchFieldSpec, rawValue: string, wildcard: boolean): string | undefined {
+function validateFieldValue(
+  field: SearchFieldSpec,
+  rawValue: string,
+  wildcard: boolean,
+  operator: SearchOperator,
+): string | undefined {
   if (rawValue.length === 0) return "Expected a value";
 
-  if (field.nullable && rawValue === NULL_LITERAL) return undefined;
+  if (operator !== "eq" && !COMPARABLE_TYPES.has(field.type)) {
+    return `>, >=, <, <= are not supported for "${field.name}" (expected ${describeType(field)})`;
+  }
+
+  if (field.nullable && operator === "eq" && rawValue === NULL_LITERAL) return undefined;
 
   if (wildcard) {
     if (field.type !== "text") return `Wildcards are not supported for "${field.name}" (expected ${describeType(field)})`;

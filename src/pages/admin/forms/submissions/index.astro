@@ -58,7 +58,12 @@ const formNameExpr = sql`${forms.content} -> 'root' -> 'props' ->> 'name'`;
 // hard-filters the deleted ones out, so there would be nothing left to filter on.
 const searchFields: SearchFieldSpec[] = [
     { name: 'form', type: 'text', label: 'Form', description: 'Form name contains' },
-    { name: 'submitted', type: 'date', label: 'Submitted', description: 'Date submitted (YYYY-MM-DD)' },
+    {
+        name: 'submitted',
+        type: 'date',
+        label: 'Submitted',
+        description: 'Date submitted (YYYY-MM-DD); prefix with >, >=, <, or <= to search a range',
+    },
 ];
 
 const searchConfig: DrizzleSearchConfig = {

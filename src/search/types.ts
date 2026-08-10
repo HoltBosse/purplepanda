@@ -6,6 +6,14 @@
 export type SearchFieldType = "text" | "boolean" | "date" | "datetime" | "time" | "enum";
 
 /**
+ * How a field term's value relates to the column: `eq` (the default, `field:value`) or one of the
+ * relational operators below, written immediately after the `:` — e.g. `submitted:>=2024-01-01`.
+ * Only meaningful for ordered field types (date/datetime/time); a "between" search is just two
+ * terms for the same field ANDed together (`submitted:>=2024-01-01 submitted:<=2024-01-31`).
+ */
+export type SearchOperator = "eq" | "gt" | "gte" | "lt" | "lte";
+
+/**
  * Describes one searchable field for the purposes of parsing/validating/autocompleting a query
  * (e.g. `state:enabled`). This is the client-safe subset shared by the GUI and the grammar
  * validator; the Drizzle query builder extends this with a `column` reference (see ./drizzle.ts).
@@ -30,6 +38,11 @@ export interface SearchFieldSpec {
 export interface RawToken {
   /** The field name before `:`, if this token was of the form `field:value`. */
   field?: string | undefined;
+  /**
+   * A relational operator (`>`, `>=`, `<`, `<=`) consumed immediately after `field:`, before the
+   * value. Only recognized for unquoted values with a `field:` prefix. `undefined` means `eq`.
+   */
+  operator?: SearchOperator | undefined;
   /** The value text with quotes removed and escapes resolved. */
   value: string;
   /** Whether the value was wrapped in `'...'` or `"..."`. */
@@ -42,11 +55,13 @@ export interface RawToken {
 }
 
 /** A `field:value` term, e.g. `state:enabled` or `created:2020-01-01`. */
-export interface FieldTermNode extends Omit<RawToken, "field"> {
+export interface FieldTermNode extends Omit<RawToken, "field" | "operator"> {
   kind: "field";
   field: string;
   /** True if the (unquoted) value contains `*` or `?`. */
   wildcard: boolean;
+  /** Defaults to `"eq"` when no operator was written. */
+  operator: SearchOperator;
 }
 
 /** A bare search term with no field qualifier, e.g. `foo` or `"foo"`. */

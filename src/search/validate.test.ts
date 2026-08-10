@@ -85,6 +85,27 @@ describe('validateSearchAst', () => {
         expect(validateOne('strict:foo*bar')).toMatchObject({ valid: false });
     });
 
+    it('accepts a relational operator on a comparable (date/datetime/time) field', () => {
+        expect(validateOne('created:>2020-01-01')).toMatchObject({ valid: true });
+        expect(validateOne('created:>=2020-01-01')).toMatchObject({ valid: true });
+        expect(validateOne('meeting:<2020-01-01T10:00')).toMatchObject({ valid: true });
+        expect(validateOne('starts:<=10:00')).toMatchObject({ valid: true });
+    });
+
+    it('rejects a relational operator on a non-comparable field', () => {
+        expect(validateOne('name:>foo')).toMatchObject({ valid: false, error: expect.stringContaining('name') });
+        expect(validateOne('state:>=enabled')).toMatchObject({ valid: false });
+        expect(validateOne('member:>true')).toMatchObject({ valid: false });
+    });
+
+    it('still validates the value shape when an operator is present', () => {
+        expect(validateOne('created:>not-a-date')).toMatchObject({ valid: false });
+    });
+
+    it('rejects the null literal combined with a relational operator', () => {
+        expect(validateOne('created:>null')).toMatchObject({ valid: false });
+    });
+
     it('validates every term in a composite query independently', () => {
         const results = validateSearchAst(parseSearchQuery('state:enabled bogus:x free text'), fields);
         expect(results.map((r) => r.valid)).toEqual([true, false, true, true]);

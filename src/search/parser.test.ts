@@ -46,6 +46,32 @@ describe('parseSearchQuery', () => {
         });
     });
 
+    it('defaults a field term to the eq operator when none is written', () => {
+        expect(parseSearchQuery('created:2020-01-01')[0]).toMatchObject({ operator: 'eq' });
+    });
+
+    it('parses a relational operator prefix on a field value', () => {
+        expect(parseSearchQuery('created:>2020-01-01')[0]).toMatchObject({ operator: 'gt', value: '2020-01-01' });
+        expect(parseSearchQuery('created:>=2020-01-01')[0]).toMatchObject({ operator: 'gte', value: '2020-01-01' });
+        expect(parseSearchQuery('created:<2020-01-01')[0]).toMatchObject({ operator: 'lt', value: '2020-01-01' });
+        expect(parseSearchQuery('created:<=2020-01-01')[0]).toMatchObject({ operator: 'lte', value: '2020-01-01' });
+    });
+
+    it('keeps the full operator+value span in raw/start/end', () => {
+        const [term] = parseSearchQuery('created:>=2020-01-01');
+        expect(term).toMatchObject({ raw: 'created:>=2020-01-01', start: 0, end: 20 });
+    });
+
+    it('does not recognize an operator prefix on a quoted field value', () => {
+        const [term] = parseSearchQuery('created:">2020-01-01"');
+        expect(term).toMatchObject({ operator: 'eq', value: '>2020-01-01', quoted: true });
+    });
+
+    it('does not recognize an operator prefix on a bare text term', () => {
+        const [term] = parseSearchQuery('>foo');
+        expect(term).toMatchObject({ kind: 'text', value: '>foo' });
+    });
+
     it('parses a quoted value containing spaces', () => {
         const [term] = parseSearchQuery('name:"foo bar"');
         expect(term).toMatchObject({ kind: 'field', field: 'name', value: 'foo bar', quoted: true });

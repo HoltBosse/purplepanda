@@ -168,6 +168,38 @@ describe('buildSearchWhere', () => {
         expect(params).toContain('2020-01-02');
     });
 
+    it('builds an after (gt) condition for a date field from the next day onward', () => {
+        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('created:>2020-01-01'), baseConfig)!);
+        expect(sql).toContain('>=');
+        expect(params).toEqual(['2020-01-02']);
+    });
+
+    it('builds an on-or-after (gte) condition for a date field from that day', () => {
+        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('created:>=2020-01-01'), baseConfig)!);
+        expect(sql).toContain('>=');
+        expect(params).toEqual(['2020-01-01']);
+    });
+
+    it('builds a before (lt) condition for a date field up to that day', () => {
+        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('created:<2020-01-01'), baseConfig)!);
+        expect(sql).toContain('<');
+        expect(params).toEqual(['2020-01-01']);
+    });
+
+    it('builds an on-or-before (lte) condition for a date field through the end of that day', () => {
+        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('created:<=2020-01-01'), baseConfig)!);
+        expect(sql).toContain('<');
+        expect(params).toEqual(['2020-01-02']);
+    });
+
+    it('ANDs two operator terms on the same field into a between-style range', () => {
+        const { sql, params } = toQuery(
+            buildSearchWhere(parseSearchQuery('created:>=2020-01-01 created:<=2020-01-31'), baseConfig)!,
+        );
+        expect(sql.toLowerCase()).toContain(' and ');
+        expect(params).toEqual(['2020-01-01', '2020-02-01']);
+    });
+
     it('translates a wildcard field value into an ILIKE pattern', () => {
         const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('title:foo*bar'), baseConfig)!);
         expect(sql.toLowerCase()).toContain('ilike');

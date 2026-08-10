@@ -30,6 +30,7 @@ function toTermNode(token: RawToken): SearchTermNode {
       value: token.value,
       quoted: token.quoted,
       wildcard: !token.quoted && WILDCARD_RE.test(token.value),
+      operator: token.operator ?? "eq",
       raw: token.raw,
       start: token.start,
       end: token.end,

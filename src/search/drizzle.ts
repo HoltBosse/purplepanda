@@ -3,7 +3,7 @@
 // `./index.js` (or the individual grammar/validate modules) there instead.
 import { and, eq, ilike, isNull, like, or, type SQL, sql } from "drizzle-orm";
 import type { AnyPgColumn, PgSelect, PgTable } from "drizzle-orm/pg-core";
-import type { FieldTermNode, SearchAst, SearchFieldSpec, TextTermNode } from "./types.js";
+import type { FieldTermNode, SearchAst, SearchFieldSpec, SearchOperator, TextTermNode } from "./types.js";
 import { validateSearchAst } from "./validate.js";
 
 // "simple" (not "english"): the english config strips common stopwords ("very", "the", "a", ...)
@@ -180,13 +180,13 @@ function buildFieldCondition(node: FieldTermNode, field: DrizzleSearchField): SQ
     case "boolean":
       return eqValue(field.column, node.value === "true");
     case "date":
-      return dateRangeCondition(field.column, node.value);
+      return dateComparisonCondition(field.column, node.operator, node.value);
     case "datetime":
       return /^\d{4}-\d{2}-\d{2}$/.test(node.value)
-        ? dateRangeCondition(field.column, node.value)
-        : eqValue(field.column, node.value);
+        ? dateComparisonCondition(field.column, node.operator, node.value)
+        : literalComparisonCondition(field.column, node.operator, node.value);
     case "time":
-      return eqValue(field.column, node.value);
+      return literalComparisonCondition(field.column, node.operator, node.value);
     case "enum": {
       const mapped = field.valueMap ? field.valueMap[node.value] : node.value;
       return mapped === undefined ? undefined : eqValue(field.column, mapped);
@@ -283,6 +283,47 @@ function regconfig(language: string): SQL {
 
 function dateRangeCondition(column: SearchColumn, isoDate: string): SQL {
   return sql`${column} >= ${isoDate} and ${column} < ${nextIsoDate(isoDate)}`;
+}
+
+/**
+ * A bare date has no time component, so a relational comparison against it has to pick which side
+ * of the day it lands on: "after 2024-01-01" (`gt`) means from 2024-01-02 onward, while "on or
+ * before 2024-01-01" (`lte`) means anything up through the end of that day. `eq` keeps the existing
+ * whole-day range. This mirrors `dateRangeCondition` above rather than replacing it.
+ */
+function dateComparisonCondition(column: SearchColumn, operator: SearchOperator, isoDate: string): SQL {
+  switch (operator) {
+    case "gt":
+      return sql`${column} >= ${nextIsoDate(isoDate)}`;
+    case "gte":
+      return sql`${column} >= ${isoDate}`;
+    case "lt":
+      return sql`${column} < ${isoDate}`;
+    case "lte":
+      return sql`${column} < ${nextIsoDate(isoDate)}`;
+    default:
+      return dateRangeCondition(column, isoDate);
+  }
+}
+
+// Raw `sql` comparisons rather than Drizzle's typed `gt`/`lt` helpers: those coerce their operand
+// through the *column's* driver mapping (e.g. a timestamp column expects a JS `Date`), but these
+// values are ISO strings straight from the query grammar — Postgres compares/casts them against a
+// date/timestamp/time column implicitly, same as the pre-existing `dateRangeCondition` below.
+/** Straightforward ordering for values that already carry the precision to compare directly (datetimes, times). */
+function literalComparisonCondition(column: SearchColumn, operator: SearchOperator, value: string): SQL {
+  switch (operator) {
+    case "gt":
+      return sql`${column} > ${value}`;
+    case "gte":
+      return sql`${column} >= ${value}`;
+    case "lt":
+      return sql`${column} < ${value}`;
+    case "lte":
+      return sql`${column} <= ${value}`;
+    default:
+      return eqValue(column, value);
+  }
 }
 
 function nextIsoDate(isoDate: string): string {
