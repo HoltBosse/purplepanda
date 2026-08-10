@@ -23,7 +23,7 @@ const Space: ComponentConfig<SpaceProps> = {
     },
   },
   defaultProps: {
-    direction: "",
+    direction: "vertical",
     size: 4,
   },
   inline: true,
