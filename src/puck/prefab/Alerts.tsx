@@ -1,6 +1,6 @@
 import type { ComponentConfig } from "@puckeditor/core";
-import type { Alert } from "../../alert/index.js";
 import { AlertList } from "../../alert/AlertList.js";
+import type { Alert } from "../../alert/index.js";
 
 export type AlertsProps = {
   alerts?: Alert[];

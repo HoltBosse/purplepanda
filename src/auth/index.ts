@@ -1,7 +1,7 @@
 import type { AstroSession } from "astro";
-import { eq, and, gte } from "drizzle-orm";
+import { and, eq, gte } from "drizzle-orm";
 import { getDb } from "../db/db.js";
-import { users, roles, userRoles } from "../db/schema.js";
+import { roles, userRoles, users } from "../db/schema.js";
 
 // Same check the /admin middleware gates on: a live user with an active role
 // that carries adminAccess. Shared here so other routes (e.g. /image) can grant

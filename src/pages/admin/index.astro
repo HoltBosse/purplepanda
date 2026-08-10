@@ -1,29 +1,29 @@
 ---
-import AdminLayout from '../../layouts/AdminLayout.astro';
-import { getDb } from '../../db/db.js';
-import { users, roles, userRoles, userActions, pages, templates, forms, formSubmissions, media, documents, tags, redirects } from '../../db/schema.js';
-import { eq, desc, and, gt, isNull, sql } from 'drizzle-orm';
-import { capitalize } from '../../string';
-import { describeAction } from '../../actions/index.js';
-import LocalDateTime from '../../components/LocalDateTime.astro';
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import {
 	Activity,
-	UserRound,
 	ChartPie,
-	Database,
-	Plus,
-	FileText,
 	ClipboardList,
-	LayoutTemplate,
-	Images,
+	Database,
 	FileStack,
-	Tags,
-	Link2,
-	Users,
-	Shapes,
+	FileText,
+	Images,
 	Inbox,
+	LayoutTemplate,
+	Link2,
+	Plus,
+	Shapes,
+	Tags,
+	UserRound,
+	Users,
 } from '@lucide/astro';
+import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { describeAction } from '../../actions/index.js';
+import LocalDateTime from '../../components/LocalDateTime.astro';
+import { getDb } from '../../db/db.js';
+import { documents, formSubmissions, forms, media, pages, redirects, roles, tags, templates, userActions, userRoles, users } from '../../db/schema.js';
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { capitalize } from '../../string';
 
 const db = getDb();
 

@@ -1,5 +1,5 @@
-import * as z from "zod";
 import type { Config, Data } from "@puckeditor/core";
+import * as z from "zod";
 
 type ComponentNode = { type: string; props: Record<string, unknown> };
 

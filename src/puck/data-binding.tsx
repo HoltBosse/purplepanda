@@ -20,8 +20,8 @@ export type BoundItem = Record<string, unknown>;
 const ITEM_CONTEXT_KEY = Symbol.for("@holtbosse/purplepanda/puck/ItemContext");
 type GlobalWithItemContext = typeof globalThis & { [ITEM_CONTEXT_KEY]?: Context<BoundItem | null> };
 const globalWithItemContext = globalThis as GlobalWithItemContext;
-export const ItemContext: Context<BoundItem | null> =
-  globalWithItemContext[ITEM_CONTEXT_KEY] ?? (globalWithItemContext[ITEM_CONTEXT_KEY] = createContext<BoundItem | null>(null));
+globalWithItemContext[ITEM_CONTEXT_KEY] ??= createContext<BoundItem | null>(null);
+export const ItemContext: Context<BoundItem | null> = globalWithItemContext[ITEM_CONTEXT_KEY];
 
 export function useBoundItem(): BoundItem | null {
   return useContext(ItemContext);
@@ -185,16 +185,14 @@ function wrapComponent(componentConfig: ComponentConfig, contentTypes: ContentTy
         return originalRender(props as never);
       }
 
-      // eslint-disable-next-line react-hooks/rules-of-hooks -- `bindable` is fixed per
-      // component config (module-load time), so this branch is stable across renders of any
-      // given component's render function; it's not a per-render conditional.
+      // biome-ignore lint/correctness/useHookAtTopLevel: `bindable` is fixed per component config (module-load time), so this branch is stable across renders of any given component's render function; it's not a per-render conditional
       const item = useContext(ItemContext);
       if (!item) return originalRender(props as never);
 
       const resolved: Record<string, unknown> = { ...props };
       for (const [propName, meta] of Object.entries(bindable)) {
         const boundFieldName = props[bindingFieldName(propName)];
-        if (!isNonEmptyString(boundFieldName) || !Object.prototype.hasOwnProperty.call(item, boundFieldName)) {
+        if (!isNonEmptyString(boundFieldName) || !Object.hasOwn(item, boundFieldName)) {
           continue;
         }
 
@@ -205,7 +203,7 @@ function wrapComponent(componentConfig: ComponentConfig, contentTypes: ContentTy
         if (overrideOn && isPlainObject(boundValue) && isPlainObject(overrideValue)) {
           const merged = { ...boundValue };
           for (const key of meta.overridable!.keys) {
-            if (Object.prototype.hasOwnProperty.call(overrideValue, key)) {
+            if (Object.hasOwn(overrideValue, key)) {
               merged[key] = overrideValue[key];
             }
           }

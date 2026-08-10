@@ -1,7 +1,7 @@
-import { FormMethod, FormEncType, type FormSection } from '../../../form/types.js';
-import { type InferSelectModel } from 'drizzle-orm';
-import { redirects } from '../../../db/schema.js';
+import type { InferSelectModel } from 'drizzle-orm';
 import * as z from 'zod';
+import type { redirects } from '../../../db/schema.js';
+import { FormEncType, FormMethod, type FormSection } from '../../../form/types.js';
 
 type Redirect = InferSelectModel<typeof redirects>;
 
@@ -40,7 +40,7 @@ export function getRedirectForm(redirect: Redirect, fields: Record<string, any>,
                                 type: 'Input',
                                 classList: inputClassList,
                                 placeholder: '/old-path',
-                                value: flash['from'] ?? redirect.from,
+                                value: flash.from ?? redirect.from,
                                 required: true,
                                 validator: z.string().min(1, "From path is required").max(2048),
                             },
@@ -51,7 +51,7 @@ export function getRedirectForm(redirect: Redirect, fields: Record<string, any>,
                                 type: 'Input',
                                 classList: inputClassList,
                                 placeholder: '/new-path',
-                                value: flash['to'] ?? redirect.to,
+                                value: flash.to ?? redirect.to,
                                 required: true,
                                 validator: z.string().min(1, "To path is required").max(2048),
                             },

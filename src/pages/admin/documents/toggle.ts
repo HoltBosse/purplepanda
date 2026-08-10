@@ -1,8 +1,8 @@
 import type { APIContext } from "astro";
+import { eq } from "drizzle-orm";
+import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
 import { getDb } from "../../../db/db.js";
 import { documents } from "../../../db/schema.js";
-import { eq } from "drizzle-orm";
-import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const { id } = context.params;

@@ -1,17 +1,17 @@
 ---
-import AdminBareLayout from '../../../../../layouts/AdminBareLayout.astro';
+import type { Data } from '@puckeditor/core';
+import { eq, sql } from 'drizzle-orm';
 import PagePuckEditor from '../../../../../components/PagePuckEditor';
 import { getDb } from '../../../../../db/db.js';
-import { settings, templates, pages, dagNodes } from '../../../../../db/schema.js';
-import { eq, sql } from 'drizzle-orm';
 import { resolveFontSettings } from '../../../../../db/fonts.js';
-import type { Data } from '@puckeditor/core';
+import { dagNodes, pages, settings, templates } from '../../../../../db/schema.js';
+import AdminBareLayout from '../../../../../layouts/AdminBareLayout.astro';
 
 const db = getDb();
 const { draftId } = Astro.params;
 
 const [draft] = await db.select().from(dagNodes).where(eq(dagNodes.id, draftId!)).limit(1);
-if (!draft || draft.nodeType !== 'draft' || draft.entityType !== 'page' || draft.state === -1) {
+if (draft?.nodeType !== 'draft' || draft.entityType !== 'page' || draft.state === -1) {
     return Astro.redirect('/admin/pages');
 }
 

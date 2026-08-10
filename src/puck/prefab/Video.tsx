@@ -1,10 +1,10 @@
 import "@videojs/react/video/skin.css";
 import type { ComponentConfig } from "@puckeditor/core";
-import type { CSSProperties } from "react";
-import { createPlayer } from "@videojs/react";
-import { Video as Html5Video, VideoSkin, videoFeatures } from "@videojs/react/video";
-import { VimeoVideo } from "@videojs/react/media/vimeo-video";
 import { parseVimeoSource } from "@videojs/core/dom/media/vimeo";
+import { createPlayer } from "@videojs/react";
+import { VimeoVideo } from "@videojs/react/media/vimeo-video";
+import { Video as Html5Video, VideoSkin, videoFeatures } from "@videojs/react/video";
+import type { CSSProperties } from "react";
 
 const Player = createPlayer({ features: videoFeatures });
 

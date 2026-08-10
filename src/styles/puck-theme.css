@@ -64,11 +64,8 @@
   overflow-x: clip;
 }
 
-.Puck:has([data-dnd-dragging]) [class*="_PuckCanvas_"] {
-  overflow-x: hidden !important;
-}
-
 .Puck [class*="_PuckCanvas_"] {
+  /* biome-ignore lint/complexity/noImportantStyles: overrides Puck's own canvas overflow so transient DnD placeholders can't reintroduce a page scrollbar (see comment above) */
   overflow-x: hidden !important;
 }
 
@@ -141,7 +138,6 @@
   border: 2px solid var(--puck-color-border);
 
   &:hover {
-    background-color: #ffffffe0;
     background-color: rgba(0, 0, 0, 0.1);
   }
 }

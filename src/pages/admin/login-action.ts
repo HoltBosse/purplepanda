@@ -1,9 +1,9 @@
 import type { APIContext } from "astro";
+import { eq } from 'drizzle-orm';
+import { addAction } from '../../actions/index.js';
 import { getDb } from "../../db/db.js";
 import {users} from "../../db/schema.js";
-import { eq } from 'drizzle-orm';
 import { verify } from '../../password/index.js';
-import { addAction } from '../../actions/index.js';
 
 export async function POST(context: APIContext): Promise<Response> {
   const db = getDb();

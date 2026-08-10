@@ -1,6 +1,6 @@
+import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Data } from "@puckeditor/core";
 import { useMemo } from "react";
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 import PagePuckEditor from "./PagePuckEditor.js";
 
 interface PrefabPuckEditorProps {

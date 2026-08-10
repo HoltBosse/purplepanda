@@ -1,12 +1,11 @@
 import type { APIContext } from "astro";
-import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
-import { validateForm, createUserAlertMessageFromArray, getFieldByName, formDataToRecord } from "../../../form/index.js";
-import { createFormFlashSession } from "../../../form/session.js";
-import { getProfileForm } from "./form.js";
-import { getAllFields } from "../../../form/index.js";
+import { eq } from "drizzle-orm";
+import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
 import { getDb } from "../../../db/db.js";
 import { users } from "../../../db/schema.js";
-import { eq } from "drizzle-orm";
+import { createUserAlertMessageFromArray, formDataToRecord, getAllFields, getFieldByName, validateForm } from "../../../form/index.js";
+import { createFormFlashSession } from "../../../form/session.js";
+import { getProfileForm } from "./form.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();

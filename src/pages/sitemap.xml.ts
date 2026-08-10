@@ -1,8 +1,8 @@
+import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { APIRoute } from "astro";
 import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "../db/db.js";
 import { dagNodes, pages } from "../db/schema.js";
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 
 function normalizeBaseUrl(baseUrl: string): string {
     return baseUrl.replace(/^\/+|\/+$/g, '');

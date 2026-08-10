@@ -1,8 +1,8 @@
 import type { APIContext } from "astro";
-import { z } from "zod";
-import { getDb } from "../db/db.js";
 import { inArray } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
+import { z } from "zod";
+import { getDb } from "../db/db.js";
 
 const ACTIONS = ["publish", "unpublish", "delete"] as const;
 type Action = typeof ACTIONS[number];

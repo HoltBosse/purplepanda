@@ -1,9 +1,9 @@
 import type { APIContext } from "astro";
-import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
-import { getDb } from "../../../db/db.js";
-import { tags } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
 import * as z from "zod";
+import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
+import { getDb } from "../../../db/db.js";
+import { tags } from "../../../db/schema.js";
 
 const titleSchema = z.string().min(1).max(255);
 const parentTagSchema = z.union([z.literal(""), z.uuid()]);

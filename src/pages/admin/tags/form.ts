@@ -1,7 +1,7 @@
-import { FormMethod, FormEncType, type FormSection } from '../../../form/types.js';
-import { type InferSelectModel } from 'drizzle-orm';
-import { tags } from '../../../db/schema.js';
+import type { InferSelectModel } from 'drizzle-orm';
 import * as z from 'zod';
+import type { tags } from '../../../db/schema.js';
+import { FormEncType, FormMethod, type FormSection } from '../../../form/types.js';
 
 type Tag = InferSelectModel<typeof tags>;
 
@@ -40,7 +40,7 @@ export function getTagForm(tag: Tag, fields: Record<string, any>, actionUrl: str
                                 type: 'Input',
                                 classList: inputClassList,
                                 placeholder: 'Tag title',
-                                value: flash['title'] ?? tag.title,
+                                value: flash.title ?? tag.title,
                                 required: true,
                                 validator: z.string().min(1, "Title is required").max(255),
                             },
@@ -52,7 +52,7 @@ export function getTagForm(tag: Tag, fields: Record<string, any>, actionUrl: str
                                 classList: inputClassList,
                                 optionsClassList: "bg-base-100 text-base-content",
                                 options: parentOptions,
-                                value: flash['parentTag'] ?? tag.parentTag ?? '',
+                                value: flash.parentTag ?? tag.parentTag ?? '',
                             },
                         ],
                     },

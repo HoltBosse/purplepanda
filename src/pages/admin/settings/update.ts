@@ -1,11 +1,11 @@
+import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { APIContext } from "astro";
-import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
-import { validateForm, createUserAlertMessageFromArray, getFieldByName, formDataToRecord } from "../../../form/index.js";
-import { createFormFlashSession } from "../../../form/session.js";
-import { getSettingsForm } from "./form.js";
+import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
 import { getDb } from "../../../db/db.js";
 import { settings } from "../../../db/schema.js";
-import externalPuckConfig from "virtual:purplepanda/puck-config";
+import { createUserAlertMessageFromArray, formDataToRecord, getFieldByName, validateForm } from "../../../form/index.js";
+import { createFormFlashSession } from "../../../form/session.js";
+import { getSettingsForm } from "./form.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();

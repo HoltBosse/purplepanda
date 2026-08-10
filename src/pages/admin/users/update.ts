@@ -1,14 +1,13 @@
 import type { APIContext } from "astro";
-import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
-import { validateForm, createUserAlertMessageFromArray, getFieldByName, formDataToRecord } from "../../../form/index.js";
-import { createFormFlashSession } from "../../../form/session.js";
-import { getProfileForm } from "../profile/form.js";
-import { getAllFields } from "../../../form/index.js";
-import { getDb } from "../../../db/db.js";
-import { users, userRoles } from "../../../db/schema.js";
 import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
-import { hash } from "../../../password/index.js";
 import * as z from "zod";
+import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
+import { getDb } from "../../../db/db.js";
+import { userRoles, users } from "../../../db/schema.js";
+import { createUserAlertMessageFromArray, formDataToRecord, getAllFields, getFieldByName, validateForm } from "../../../form/index.js";
+import { createFormFlashSession } from "../../../form/session.js";
+import { hash } from "../../../password/index.js";
+import { getProfileForm } from "../profile/form.js";
 
 const roleIdsSchema = z.array(z.uuid());
 
@@ -19,7 +18,7 @@ export async function POST(context: APIContext): Promise<Response> {
     console.log("ID:");
     console.log(id);
     const userId = id;
-    let isNewUser = !userId;
+    const isNewUser = !userId;
     let user: InferSelectModel<typeof users> | undefined;
 
     if (userId) {

@@ -1,12 +1,12 @@
 ---
-import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
+import { getDb } from '../../../db/db.js';
+import { roles, userRoles, users } from '../../../db/schema.js';
 import Form from '../../../form/Form.astro';
 import { getAllFields } from '../../../form/index.js';
-import { getDb } from '../../../db/db.js';
-import { users, roles, userRoles } from '../../../db/schema.js';
-import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
-import { getProfileForm } from '../profile/form.js';
 import { createFormFlashSession } from '../../../form/session.js';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getProfileForm } from '../profile/form.js';
 
 const db = getDb();
 
@@ -19,7 +19,7 @@ if(!user) {
 //get [id] from url
 const { id } = Astro.params;
 
-let user;
+let user: InferSelectModel<typeof users> | undefined;
 if(id) {
 	[user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
 	if(!user) {

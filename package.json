@@ -48,9 +48,11 @@
     "test": "vitest",
     "build": "tsc",
     "dev": "tsc -w",
-    "check": "astro check"
+    "check": "astro check",
+    "lint": "biome check"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.7",
     "@tailwindcss/typography": "^0.5.20",
     "@types/node": "^26.0.1",
     "@types/pg": "^8.20.0",

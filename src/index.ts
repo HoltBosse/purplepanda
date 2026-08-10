@@ -1,13 +1,13 @@
+import { copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { extname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
 import type { AstroIntegration } from "astro";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { setDb } from "./db/db.js";
-import { setMediaPath } from "./media/media.js";
 import { setDocumentPath } from "./document/document.js";
-import tailwindcss from "@tailwindcss/vite";
-import { fileURLToPath } from "node:url";
-import { extname, resolve, join } from "node:path";
-import { existsSync, createReadStream, readdirSync, statSync, copyFileSync, mkdirSync } from "node:fs";
 import { generateIslandsManifest } from "./islands-manifest.js";
+import { setMediaPath } from "./media/media.js";
 
 const VIRTUAL_PUCK_CONFIG_ID = "virtual:purplepanda/puck-config";
 const RESOLVED_VIRTUAL_PUCK_CONFIG_ID = `\0${VIRTUAL_PUCK_CONFIG_ID}`;
@@ -216,7 +216,7 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
                 configureServer(server) {
                   server.middlewares.use("/admin/assets", (req, res, next) => {
                     const urlPath = (req.url ?? "/").split("?")[0];
-                    const safePath = resolve(assetsDir, "." + urlPath);
+                    const safePath = resolve(assetsDir, `.${urlPath}`);
 
                     // Prevent directory traversal attacks
                     if (!safePath.startsWith(assetsDir)) {

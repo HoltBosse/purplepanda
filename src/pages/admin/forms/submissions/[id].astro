@@ -1,13 +1,13 @@
 ---
-import type { Config, Data } from '@puckeditor/core';
 import externalPuckConfig from 'virtual:purplepanda/puck-config';
-import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import type { Config, Data } from '@puckeditor/core';
+import { eq } from 'drizzle-orm';
+import LocalDateTime from '../../../../components/LocalDateTime.astro';
 import { getDb } from '../../../../db/db.js';
 import { formSubmissions, forms } from '../../../../db/schema.js';
-import { eq } from 'drizzle-orm';
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import { filterConfigByLocation } from '../../../../puck/index.js';
 import { resolveDataForSSR } from '../../../../puck/server-data-wrapper.js';
-import LocalDateTime from '../../../../components/LocalDateTime.astro';
 
 const db = getDb();
 const { id } = Astro.params;

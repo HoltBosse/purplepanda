@@ -1,12 +1,12 @@
 import type { ComponentConfig } from "@puckeditor/core";
+import { RichTextMenu } from "@puckeditor/core";
+import { Subscript as SubscriptExtension } from "@tiptap/extension-subscript";
+import { Superscript as SuperscriptExtension } from "@tiptap/extension-superscript";
+import { Placeholder } from '@tiptap/extensions';
+import type { Editor } from "@tiptap/react";
 import type { ReactNode, SyntheticEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Placeholder } from '@tiptap/extensions';
-import { RichTextMenu } from "@puckeditor/core";
-import type { Editor } from "@tiptap/react";
-import { Superscript as SuperscriptExtension } from "@tiptap/extension-superscript";
-import { Subscript as SubscriptExtension } from "@tiptap/extension-subscript";
 import { ChevronDown, Link as LinkIcon, Subscript, Superscript } from "../icons.js";
 
 type RichProps = {
@@ -169,6 +169,7 @@ function LinkMenu({
         title="Link"
       />
       {createPortal(
+        // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop-click-to-close on a native <dialog>, which already closes on Escape — there's no keyboard equivalent for "click outside the box" to add
         <dialog
           ref={dialogRef}
           className="fixed inset-0 m-auto w-80 rounded-md border border-gray-200 bg-white p-4 shadow-lg backdrop:bg-black/30 dark:border-gray-700 dark:bg-gray-800"

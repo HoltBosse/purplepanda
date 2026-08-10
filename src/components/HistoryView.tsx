@@ -1,14 +1,14 @@
+import type { Data } from "@puckeditor/core";
+import GitBranchPlus from "lucide-react/dist/esm/icons/git-branch-plus.mjs";
 import React, {
-  useState,
-  useRef,
   useCallback,
   useEffect,
   useMemo,
+  useRef,
+  useState,
 } from "react";
 import { createPortal } from "react-dom";
-import type { Data } from "@puckeditor/core";
 import PageRenderer from "./PageRenderer.js";
-import GitBranchPlus from "lucide-react/dist/esm/icons/git-branch-plus.mjs";
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
@@ -57,6 +57,9 @@ interface LayoutNode extends DagNodeData {
 }
 
 type EdgeKind = "main" | "branch-off" | "branch-line" | "merge-back";
+
+const laneKeyOf = (node: LayoutNode) =>
+  node.nodeType === "publish" ? "publish" : (node.name ?? "draft");
 
 interface Edge {
   x1: number;
@@ -173,7 +176,7 @@ function PreviewFrame({ children }: { children: React.ReactNode }) {
 
       document
         .querySelectorAll('link[rel="stylesheet"], style')
-        .forEach((node) => doc.head.appendChild(node.cloneNode(true)));
+        .forEach((node) => { doc.head.appendChild(node.cloneNode(true)); });
 
       setMountNode(doc.body);
     };
@@ -430,10 +433,13 @@ const TimelineMarks = React.memo(function TimelineMarks({
       ))}
 
       {/* Edges */}
-      {edges.map((edge, i) => {
+      {edges.map((edge) => {
+        // Edges have no id — the rendered geometry itself is a stable, unique identity
+        // (two edges sharing kind + endpoints would be visually indistinguishable anyway).
+        const key = `${edge.kind}-${edge.x1}-${edge.y1}-${edge.x2}-${edge.y2}`;
         if (edge.kind === "main") {
           return (
-            <line key={i}
+            <line key={key}
               x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2}
               stroke={PUBLISH.line} strokeWidth={2} strokeLinecap="round" opacity={0.6}
             />
@@ -441,7 +447,7 @@ const TimelineMarks = React.memo(function TimelineMarks({
         }
         if (edge.kind === "branch-line") {
           return (
-            <line key={i}
+            <line key={key}
               x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2}
               stroke={DRAFT.line} strokeWidth={1.5} strokeLinecap="round"
               strokeDasharray="4 3" opacity={0.6}
@@ -452,7 +458,7 @@ const TimelineMarks = React.memo(function TimelineMarks({
         const cp = Math.abs(sdx) * 0.55;
         const d = `M ${edge.x1} ${edge.y1} C ${edge.x1 + (sdx > 0 ? cp : -cp)} ${edge.y1} ${edge.x2 - (sdx > 0 ? cp : -cp)} ${edge.y2} ${edge.x2} ${edge.y2}`;
         return (
-          <path key={i} d={d} stroke={DRAFT.line}
+          <path key={key} d={d} stroke={DRAFT.line}
             strokeWidth={1.5}
             strokeDasharray={edge.kind === "branch-off" ? "4 3" : undefined}
             fill="none" strokeLinecap="round" opacity={0.6}
@@ -470,8 +476,19 @@ const TimelineMarks = React.memo(function TimelineMarks({
         const labelY = isPublish ? node.y - NODE_R - 10 : node.y + NODE_R + 13;
 
         return (
+          // biome-ignore lint/a11y/useSemanticElements: this is an SVG <g> wrapping SVG shape children (<circle>/<text>) — a real <button> isn't a valid SVG container here
           <g key={node.id}
+            role="button"
+            tabIndex={0}
+            aria-label={`Select revision from ${label}`}
+            aria-pressed={isSelected}
             onClick={() => onSelectNode(node.id, node.x)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelectNode(node.id, node.x);
+              }
+            }}
             style={{ cursor: "pointer" }}
           >
             {isSelected && (
@@ -781,9 +798,6 @@ function TimelineGraph({
     });
   }, [layout, layoutById]);
 
-  const laneKeyOf = (node: LayoutNode) =>
-    node.nodeType === "publish" ? "publish" : (node.name ?? "draft");
-
   // Drives the fade in/out of lane labels: a lane's label only shows while
   // at least one of its nodes is scrolled into the visible viewport.
   const laneVisible = useMemo(() => {
@@ -835,6 +849,7 @@ function TimelineGraph({
             onPointerUp={stopDrag}
             onPointerCancel={stopDrag}
           >
+            <title>Revision history timeline</title>
             <TimelineMarks
               layout={layout}
               edges={edges}
@@ -878,7 +893,7 @@ function TimelineGraph({
           </LaneLabel>
           {branchNames.map((name, i) => (
             <LaneLabel key={name} top={laneY(i)} color={DRAFT} visible={laneVisible.has(name)}>
-              {name.length > 7 ? name.slice(0, 6) + "…" : name}
+              {name.length > 7 ? `${name.slice(0, 6)}…` : name}
             </LaneLabel>
           ))}
         </div>

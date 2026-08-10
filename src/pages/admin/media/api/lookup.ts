@@ -1,8 +1,8 @@
 import type { APIContext } from "astro";
-import { getDb } from "../../../../db/db.js";
-import { media, mediafolders } from "../../../../db/schema.js";
 import { and, eq, ilike, isNull, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
+import { getDb } from "../../../../db/db.js";
+import { media, mediafolders } from "../../../../db/schema.js";
 
 const PER_PAGE = 24;
 

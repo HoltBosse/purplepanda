@@ -43,6 +43,7 @@ const FormEmbed: ComponentConfig<FormEmbedProps> = {
       // this div stretched full-width too — but once an island (e.g. the Select field's SlimSelect
       // enhancement) clears that class on hydration, the div loses its only reason to stay wide
       // and collapses to fit-content, visibly shrinking the whole form.
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: _html is server-rendered by FormEmbed.server.ts from the CMS's own admin-authored Puck form config via renderToStaticMarkup, not raw user input — this is the only way to embed that pre-rendered markup into the React tree
       return <div className="w-full" dangerouslySetInnerHTML={{ __html: _html }} />;
     }
     return (

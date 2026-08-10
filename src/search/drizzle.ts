@@ -1,10 +1,10 @@
 // Server-only: converts a validated search AST into a Drizzle Postgres `where` condition. Pulls
 // in `drizzle-orm`, so this must never be imported from a client-side React island — import
 // `./index.js` (or the individual grammar/validate modules) there instead.
-import { and, eq, ilike, isNull, like, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, ilike, isNull, like, or, type SQL, sql } from "drizzle-orm";
 import type { AnyPgColumn, PgSelect, PgTable } from "drizzle-orm/pg-core";
-import { validateSearchAst } from "./validate.js";
 import type { FieldTermNode, SearchAst, SearchFieldSpec, TextTermNode } from "./types.js";
+import { validateSearchAst } from "./validate.js";
 
 // "simple" (not "english"): the english config strips common stopwords ("very", "the", "a", ...)
 // from both the document vector and the query, so a search for a stopword-only term like "very"
@@ -191,7 +191,6 @@ function buildFieldCondition(node: FieldTermNode, field: DrizzleSearchField): SQ
       const mapped = field.valueMap ? field.valueMap[node.value] : node.value;
       return mapped === undefined ? undefined : eqValue(field.column, mapped);
     }
-    case "text":
     default:
       return buildTextFieldCondition(node, field);
   }

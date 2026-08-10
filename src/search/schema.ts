@@ -50,7 +50,6 @@ export function valueSchemaForField(field: Pick<SearchFieldSpec, "type" | "enumV
       return z.iso.time();
     case "enum":
       return z.enum((field.enumValues ?? []) as [string, ...string[]]);
-    case "text":
     default:
       return z.string().min(1);
   }

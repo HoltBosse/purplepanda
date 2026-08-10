@@ -1,12 +1,13 @@
-import { Button, Puck, createUsePuck } from "@puckeditor/core";
+import { Button, createUsePuck, Puck } from "@puckeditor/core";
 import "@puckeditor/core/puck.css";
 import "../styles/puck-theme.css";
 import type { Config, Data, Dictionary, Overrides, PuckContext } from "@puckeditor/core";
 import { Render } from "@puckeditor/core";
-import React, { cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useMemo } from "react";
+import type React from "react";
+import { cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Save } from "../puck/icons.js";
 import { extractFamilyFromLink } from "../form/fields/font-utils.js";
+import { Save } from "../puck/icons.js";
 
 const ROOT_SLOT_NAME = "default-zone";
 
@@ -85,6 +86,7 @@ function createOverrides(onSave?: (data: Data) => void, fontLinks?: FontLinks): 
     },
 
     iframe: ({ children, document }) => {
+      // biome-ignore lint/correctness/useExhaustiveDependencies: fontLinks?.headingFontLink/bodyFontLink are read below via a for-of over an array literal, which biome doesn't trace — removing them would let fontLinks change without re-running the effect
       useEffect(() => {
         if (!document) return;
 
@@ -225,7 +227,7 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
     );
   }, [normalizedTemplateData, slotContainer, templateRenderConfig]);
 
-  let configCopy = useMemo(() => {
+  const configCopy = useMemo(() => {
     const nextConfig = {
       ...config,
       root: {

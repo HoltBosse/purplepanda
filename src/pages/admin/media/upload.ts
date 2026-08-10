@@ -1,12 +1,12 @@
+import fs from "node:fs";
 import type { APIContext } from "astro";
-import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
-import { getDb } from "../../../db/db.js";
-import { getMediaPath } from "../../../media/media.js";
-import { mediafolders, media } from "../../../db/schema.js";
 import { eq, inArray } from 'drizzle-orm';
 import * as z from "zod";
-import fs from "fs";
 import { addAction } from "../../../actions/index.js";
+import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
+import { getDb } from "../../../db/db.js";
+import { media, mediafolders } from "../../../db/schema.js";
+import { getMediaPath } from "../../../media/media.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -22,7 +22,7 @@ export async function POST(context: APIContext): Promise<Response> {
     //console.log(id);
 
     if(!title.success || !alt.success || !file.success || !folder.success) {
-        let message = "Invalid form data. Please make sure to provide a title, alt text, and a file.";
+        const message = "Invalid form data. Please make sure to provide a title, alt text, and a file.";
         const alert = createAlert(alertType.error, message);
         await addAlertToSession(context.session, alert);
         return context.redirect("/admin/media");
@@ -33,7 +33,7 @@ export async function POST(context: APIContext): Promise<Response> {
         const dedupedFolders = [...new Set(folder.data)];
         const existingFolders = await db.select().from(mediafolders).where(inArray(mediafolders.id, folder.data));
         if(existingFolders.length !== dedupedFolders.length) {
-            let message = "One or more selected folders do not exist.";
+            const message = "One or more selected folders do not exist.";
             const alert = createAlert(alertType.error, message);
             await addAlertToSession(context.session, alert);
             return context.redirect("/admin/media");
@@ -51,7 +51,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     //loop over files, insert into media table. take the returned uuid from the db and save the file to the mediaPath with the uuid split into /cc/cc/cccc-cc..... format, making the folders if they dont exist
     for(let i = 0; i < file.data.length; i++) {
-        if(id && id.success && id.data && id.data[i]) {
+        if(id?.success && id.data?.[i]) {
             //update alt and title of existing media
             const [updatedMedia] = await db.update(media).set({
                 title: title.data[i]!,
@@ -60,7 +60,7 @@ export async function POST(context: APIContext): Promise<Response> {
             }).where(eq(media.id, id.data[i]!)).returning({ id: media.id });
 
             if(!updatedMedia) {
-                let message = "Failed to update media in database.";
+                const message = "Failed to update media in database.";
                 const alert = createAlert(alertType.error, message);
                 await addAlertToSession(context.session, alert);
                 return context.redirect(`/admin/media${redirectFolderId ? `/${redirectFolderId}` : ""}`);
@@ -78,7 +78,7 @@ export async function POST(context: APIContext): Promise<Response> {
         }).returning({ id: media.id });
 
         if(!insertedMedia) {
-            let message = "Failed to insert media into database.";
+            const message = "Failed to insert media into database.";
             const alert = createAlert(alertType.error, message);
             await addAlertToSession(context.session, alert);
             return context.redirect(`/admin/media${redirectFolderId ? `/${redirectFolderId}` : ""}`);
@@ -120,7 +120,7 @@ export async function POST(context: APIContext): Promise<Response> {
         );
     }
 
-    let message = "Media uploaded successfully.";
+    const message = "Media uploaded successfully.";
 
     const alert = createAlert(alertType.success, message);
     await addAlertToSession(context.session, alert);

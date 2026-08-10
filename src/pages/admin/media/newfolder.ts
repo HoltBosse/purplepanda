@@ -1,9 +1,9 @@
 import type { APIContext } from "astro";
-import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
+import { and, eq } from 'drizzle-orm';
+import * as z from "zod";
+import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
 import { getDb } from "../../../db/db.js";
 import { mediafolders } from "../../../db/schema.js";
-import { eq, and } from 'drizzle-orm';
-import * as z from "zod";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -17,7 +17,7 @@ export async function POST(context: APIContext): Promise<Response> {
     console.log(parent);
 
     if(!name.success || !parent.success) {
-        let message = "Invalid folder name or parent.";
+        const message = "Invalid folder name or parent.";
         const alert = createAlert(alertType.error, message);
         await addAlertToSession(context.session, alert);
         return context.redirect("/admin/media");
@@ -30,7 +30,7 @@ export async function POST(context: APIContext): Promise<Response> {
     }
     const [existingFolder] = await db.select().from(mediafolders).where(and(...conditions)).limit(1);
     if (existingFolder) {
-        let message = "Folder with the same name already exists in the selected parent.";
+        const message = "Folder with the same name already exists in the selected parent.";
         const alert = createAlert(alertType.error, message);
         await addAlertToSession(context.session, alert);
         return context.redirect("/admin/media");
@@ -42,10 +42,10 @@ export async function POST(context: APIContext): Promise<Response> {
         parent: parent.data || null
     });
 
-    let message = "Folder created successfully.";
+    const message = "Folder created successfully.";
 
     const alert = createAlert(alertType.success, message);
     await addAlertToSession(context.session, alert);
 
-    return context.redirect("/admin/media" + (parent.data ? `/${parent.data}` : ""));
+    return context.redirect(`/admin/media${parent.data ? `/${parent.data}` : ""}`);
 }

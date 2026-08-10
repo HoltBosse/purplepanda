@@ -1,5 +1,5 @@
-import { alertType, getAlertClass, type Alert } from "./index.js";
 import { CircleCheckBig, CircleX, Info, TriangleAlert } from "../puck/icons.js";
+import { type Alert, alertType, getAlertClass } from "./index.js";
 
 const ICONS: Record<alertType, typeof Info> = {
   [alertType.info]: Info,

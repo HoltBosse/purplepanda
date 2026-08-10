@@ -1,23 +1,23 @@
 ---
-import AdminBareLayout from '../../../../../layouts/AdminBareLayout.astro';
+import type { Data } from '@puckeditor/core';
+import { eq } from 'drizzle-orm';
 import ContentPuckEditor from '../../../../../components/ContentPuckEditor';
 import { getDb } from '../../../../../db/db.js';
-import { pages, dagNodes } from '../../../../../db/schema.js';
-import { eq } from 'drizzle-orm';
-import { resolveTemplateSetting } from '../../../../../db/templates.js';
 import { resolveFontSettings } from '../../../../../db/fonts.js';
-import type { Data } from '@puckeditor/core';
+import { dagNodes, pages } from '../../../../../db/schema.js';
+import { resolveTemplateSetting } from '../../../../../db/templates.js';
+import AdminBareLayout from '../../../../../layouts/AdminBareLayout.astro';
 
 const db = getDb();
 const { draftId } = Astro.params;
 
 const [draft] = await db.select().from(dagNodes).where(eq(dagNodes.id, draftId!)).limit(1);
-if (!draft || draft.nodeType !== 'draft' || draft.entityType !== 'content' || draft.state === -1) {
+if (draft?.nodeType !== 'draft' || draft.entityType !== 'content' || draft.state === -1) {
     return Astro.redirect('/admin/content');
 }
 
 const [entity] = await db.select().from(pages).where(eq(pages.id, draft.entityId)).limit(1);
-if (!entity || !entity.contentType) {
+if (!entity?.contentType) {
     return Astro.redirect('/admin/content');
 }
 

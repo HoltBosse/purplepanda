@@ -1,14 +1,14 @@
-import { getDb } from "../../db/db.js";
-import { forms } from "../../db/schema.js";
+import externalPuckConfig from "virtual:purplepanda/puck-config";
+import type { Config, Data } from "@puckeditor/core";
+import { Render } from "@puckeditor/core";
 import { eq } from "drizzle-orm";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Render } from "@puckeditor/core";
-import type { Config, Data } from "@puckeditor/core";
-import externalPuckConfig from "virtual:purplepanda/puck-config";
+import { getDb } from "../../db/db.js";
+import { forms } from "../../db/schema.js";
 import { filterConfigByLocation, wrapConfigWithIslands } from "../index.js";
-import { createCsrfToken, renderSpamGuardFieldsHtml } from "./spam-guard.js";
 import { resolveDataForSSR } from "../server-data-wrapper.js";
+import { createCsrfToken, renderSpamGuardFieldsHtml } from "./spam-guard.js";
 
 const hostConfig = (externalPuckConfig as Config) ?? ({} as Config);
 // Island wrapping so any form field flagged `island: true` (e.g. Select) emits its hydration

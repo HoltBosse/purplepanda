@@ -1,16 +1,16 @@
 import type { APIContext } from "astro";
-import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
-import { getDb } from "../../../db/db.js";
-import { forms, dagNodes } from "../../../db/schema.js";
-import { eq, and, desc, getTableColumns, type InferSelectModel } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
 import * as z from "zod";
 import { addAction } from "../../../actions/index.js";
+import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
+import { getDb } from "../../../db/db.js";
+import { dagNodes, forms } from "../../../db/schema.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
     const { id } = context.params;
     const formId = id;
-    let isNewForm = !formId;
+    const isNewForm = !formId;
     let form: InferSelectModel<typeof forms> | undefined;
 
     if (formId) {
@@ -39,7 +39,7 @@ export async function POST(context: APIContext): Promise<Response> {
         try {
             JSON.parse(val);
             return true;
-        } catch (e) {
+        } catch (_e) {
             return false;
         }
     }, "Content must be a valid JSON string");

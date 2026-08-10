@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from "react";
 import type { ComponentConfig, CustomField } from "@puckeditor/core";
 // Type-only: cropperjs defines custom elements (`class X extends HTMLElement`) at module
 // scope, which throws under SSR. It must only ever be loaded via dynamic import in the browser.
 import type Cropper from "cropperjs";
 import type { CropperImage } from "cropperjs";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /*
   TODO:
@@ -132,6 +132,7 @@ function ImageDisplay({ image, isEditing }: { image: ImageConfig; isEditing: boo
   const [loading, setLoading] = useState(true);
   const imgRef = useRef<HTMLImageElement>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: image.id isn't read in the body, it's an intentional re-trigger — this must re-run whenever the image identity changes, see the comment below
   useEffect(() => {
     // On a server-rendered page, the browser can finish loading this <img> (from the markup
     // it already parsed) before React hydrates and attaches the onLoad handler below, so that
@@ -443,6 +444,7 @@ function ImagePickerField({
           onClick={openCropDialog}
           disabled={!value || !naturalSize}
           className="btn btn-outline join-item px-2"
+          aria-label="Crop image"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -453,6 +455,7 @@ function ImagePickerField({
             strokeLinecap="round"
             strokeLinejoin="round"
             className="size-4"
+            aria-hidden="true"
           >
             <path d="M6 2v14a2 2 0 0 0 2 2h14" />
             <path d="M18 22V8a2 2 0 0 0-2-2H2" />
@@ -463,6 +466,7 @@ function ImagePickerField({
           onClick={openFocusDialog}
           disabled={!value}
           className="btn btn-outline join-item px-2 rounded-br-none"
+          aria-label="Set focus point"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -473,6 +477,7 @@ function ImagePickerField({
             strokeLinecap="round"
             strokeLinejoin="round"
             className="size-4"
+            aria-hidden="true"
           >
             <circle cx="12" cy="12" r="3" />
             <path d="M3 7V5a2 2 0 0 1 2-2h2" />
@@ -597,6 +602,7 @@ function ImagePickerField({
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             className="size-4"
+                            aria-hidden="true"
                           >
                             <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
                           </svg>
@@ -627,7 +633,7 @@ function ImagePickerField({
                         </div>
                         {value?.id === img.id && (
                           <div className="absolute top-1.5 right-1.5 bg-primary text-primary-content rounded-full p-0.5">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-3" aria-hidden="true">
                               <path fillRule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
                             </svg>
                           </div>
@@ -709,6 +715,7 @@ function ImagePickerField({
                       strokeWidth="2.5"
                       strokeLinecap="round"
                       className="size-4 text-primary"
+                      aria-hidden="true"
                     >
                       <path d="M12 5v14M5 12h14" />
                     </svg>

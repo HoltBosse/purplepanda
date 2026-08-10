@@ -1,11 +1,11 @@
 ---
-import AdminBareLayout from '../../../../layouts/AdminBareLayout.astro';
-import PrefabPuckEditor from '../../../../components/PrefabPuckEditor';
-import { getDb } from '../../../../db/db.js';
-import { resolveTemplateSetting } from '../../../../db/templates.js';
-import { resolvePrefabSetting } from '../../../../db/prefabs.js';
 import externalPuckConfig from 'virtual:purplepanda/puck-config';
 import type { Data } from '@puckeditor/core';
+import PrefabPuckEditor from '../../../../components/PrefabPuckEditor';
+import { getDb } from '../../../../db/db.js';
+import { resolvePrefabSetting } from '../../../../db/prefabs.js';
+import { resolveTemplateSetting } from '../../../../db/templates.js';
+import AdminBareLayout from '../../../../layouts/AdminBareLayout.astro';
 
 const { uuid } = Astro.params;
 const contentTypes = externalPuckConfig?.contentTypes ?? [];

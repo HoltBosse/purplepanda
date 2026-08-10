@@ -1,17 +1,17 @@
 import type { APIContext } from "astro";
-import { createAlert, alertType, addAlertToSession } from "../../../../../alert/index.js";
-import { getDb } from "../../../../../db/db.js";
-import { pages, dagNodes } from "../../../../../db/schema.js";
 import { eq } from 'drizzle-orm';
 import * as z from "zod";
 import { addAction } from "../../../../../actions/index.js";
+import { addAlertToSession, alertType, createAlert } from "../../../../../alert/index.js";
+import { getDb } from "../../../../../db/db.js";
+import { dagNodes, pages } from "../../../../../db/schema.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
     const { draftId } = context.params;
 
     const [draft] = await db.select().from(dagNodes).where(eq(dagNodes.id, draftId!)).limit(1);
-    if (!draft || draft.nodeType !== 'draft' || draft.entityType !== 'page') {
+    if (draft?.nodeType !== 'draft' || draft.entityType !== 'page') {
         return new Response("Draft not found", { status: 404 });
     }
 

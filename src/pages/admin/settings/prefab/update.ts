@@ -1,11 +1,11 @@
 import type { APIContext } from "astro";
-import { createAlert, alertType, addAlertToSession } from "../../../../alert/index.js";
-import { getDb } from "../../../../db/db.js";
-import { settings, dagNodes } from "../../../../db/schema.js";
-import { prefabSettingKey } from "../../../../db/prefabs.js";
-import { eq, and, desc } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import * as z from "zod";
 import { addAction } from "../../../../actions/index.js";
+import { addAlertToSession, alertType, createAlert } from "../../../../alert/index.js";
+import { getDb } from "../../../../db/db.js";
+import { prefabSettingKey } from "../../../../db/prefabs.js";
+import { dagNodes, settings } from "../../../../db/schema.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -19,7 +19,7 @@ export async function POST(context: APIContext): Promise<Response> {
         try {
             JSON.parse(val);
             return true;
-        } catch (e) {
+        } catch (_e) {
             return false;
         }
     }, "Content must be a valid JSON string");

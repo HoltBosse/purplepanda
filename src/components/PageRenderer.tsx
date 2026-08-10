@@ -1,6 +1,6 @@
+import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Config, Data } from "@puckeditor/core";
 import { Render, walkTree } from "@puckeditor/core";
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { wrapConfigWithDataBinding, wrapConfigWithIslands } from "../puck/index.js";
 
 // Island wrapping is applied first (innermost) so the props captured in each island marker are the

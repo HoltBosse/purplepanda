@@ -1,8 +1,8 @@
-import { FormMethod, FormEncType, type FormSection } from '../../../form/types.js';
-import { type InferSelectModel } from 'drizzle-orm';
-import { users } from '../../../db/schema.js';
-import { capitalize } from '../../../string/index.js';
+import type { InferSelectModel } from 'drizzle-orm';
 import * as z from 'zod';
+import type { users } from '../../../db/schema.js';
+import { FormEncType, FormMethod, type FormSection } from '../../../form/types.js';
+import { capitalize } from '../../../string/index.js';
 
 type User = InferSelectModel<typeof users>;
 
@@ -55,7 +55,7 @@ export function getProfileForm(user: User, fields: Record<string, any>, redirect
 								label: 'First Name',
 								type: 'Input',
 								classList: inputClassList,
-								value: flash['fname'] ?? user.fname,
+								value: flash.fname ?? user.fname,
 								required: true,
 								validator: z.string().min(1, "First name is required"),
 							},
@@ -65,7 +65,7 @@ export function getProfileForm(user: User, fields: Record<string, any>, redirect
 								label: 'Last Name',
 								type: 'Input',
 								classList: inputClassList,
-								value: flash['lname'] ?? user.lname,
+								value: flash.lname ?? user.lname,
 								required: true,
 								validator: z.string().min(1, "Last name is required"),
 							},
@@ -75,7 +75,7 @@ export function getProfileForm(user: User, fields: Record<string, any>, redirect
 								label: 'Email',
 								type: 'Input',
 								classList: inputClassList,
-								value: flash['email'] ?? user.email,
+								value: flash.email ?? user.email,
 								required: true,
 								validator: z.email("Invalid email address"),
 							},
@@ -87,7 +87,7 @@ export function getProfileForm(user: User, fields: Record<string, any>, redirect
 								classList: inputClassList,
 								optionsClassList: "bg-base-100 text-base-content",
 								options: THEME_OPTIONS,
-								value: flash['theme'] ?? user.theme,
+								value: flash.theme ?? user.theme,
 								required: true,
 								validator: z.enum(THEME_VALUES, { message: "Invalid theme" }),
 							}

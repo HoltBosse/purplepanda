@@ -1,10 +1,10 @@
 ---
-import AdminBareLayout from '../../../../layouts/AdminBareLayout.astro';
+import type { Data } from '@puckeditor/core';
 import PrefabPuckEditor from '../../../../components/PrefabPuckEditor';
 import { getDb } from '../../../../db/db.js';
-import { resolveTemplateSetting } from '../../../../db/templates.js';
 import { resolvePrefabSetting } from '../../../../db/prefabs.js';
-import type { Data } from '@puckeditor/core';
+import { resolveTemplateSetting } from '../../../../db/templates.js';
+import AdminBareLayout from '../../../../layouts/AdminBareLayout.astro';
 
 const db = getDb();
 

@@ -1,8 +1,8 @@
+import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { ComponentConfig, ComponentData, Config, CustomField, Field, ObjectField, Slot, SlotComponent } from "@puckeditor/core";
 import { createUsePuck } from "@puckeditor/core";
 import type { CSSProperties, ReactNode } from "react";
 import { Fragment, useState } from "react";
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { ItemContext } from "../data-binding.js";
 import { Monitor, Smartphone, Tablet } from "../icons.js";
 
@@ -202,7 +202,7 @@ function getSortableFieldOptions(contentTypeId: string) {
 // (drag refs, selection, drop targets) — used to draw non-interactive preview copies of the
 // card template while editing, since Puck only ever keeps one live/draggable instance per id.
 function renderStatic(node: ComponentData, config: Config): ReactNode {
-  const componentConfig = (config.components ?? {})[node.type as string];
+  const componentConfig = config.components?.[node.type as string];
   if (!componentConfig?.render) return null;
 
   const fields = componentConfig.fields ?? {};

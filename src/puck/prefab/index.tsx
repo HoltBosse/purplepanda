@@ -1,12 +1,12 @@
 export { default as Accordion } from "./Accordion.js";
-export { default as Alerts } from "./Alerts.js";
 export type { AlertsProps } from "./Alerts.js";
+export { default as Alerts } from "./Alerts.js";
+export type { CardCollectionItem, CardCollectionProps, OrderBy, OrderDirection } from "./CardCollection.js";
+export { default as CardCollection } from "./CardCollection.js";
 export { default as Flex } from "./Flex.js";
 export { default as Grid } from "./Grid.js";
 export { default as Margin } from "./Margin.js";
-export { default as Space } from "./Space.js";
 export { default as Rich } from "./Rich.js";
-export { default as Video } from "./Video.js";
+export { default as Space } from "./Space.js";
 export type { VideoProps } from "./Video.js";
-export { default as CardCollection } from "./CardCollection.js";
-export type { CardCollectionItem, CardCollectionProps, OrderBy, OrderDirection } from "./CardCollection.js";
+export { default as Video } from "./Video.js";

@@ -1,12 +1,12 @@
 ---
-import AdminBareLayout from '../../../layouts/AdminBareLayout.astro';
+import type { Data } from '@puckeditor/core';
+import { eq, sql } from 'drizzle-orm';
 import PagePuckEditor from '../../../components/PagePuckEditor';
 import { getDb } from '../../../db/db.js';
-import { settings, templates, pages } from '../../../db/schema.js';
-import { resolvePrefabSetting } from '../../../db/prefabs.js';
 import { resolveFontSettings } from '../../../db/fonts.js';
-import { eq, sql } from 'drizzle-orm';
-import type { Data } from '@puckeditor/core';
+import { resolvePrefabSetting } from '../../../db/prefabs.js';
+import { pages, settings, templates } from '../../../db/schema.js';
+import AdminBareLayout from '../../../layouts/AdminBareLayout.astro';
 
 const db = getDb();
 

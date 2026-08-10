@@ -1,15 +1,15 @@
 ---
-import AdminLayout from '../../../layouts/AdminLayout.astro';
-import { getDb } from '../../../db/db.js';
-import { describeAction } from '../../../actions/index.js';
-import { userActions, users } from '../../../db/schema.js';
 import { desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import Pagination from '../../../components/Pagination.astro';
+import { describeAction } from '../../../actions/index.js';
 import LocalDateTime from '../../../components/LocalDateTime.astro';
-import SearchBar from '../../../search/SearchBar';
-import { parseSearchQuery } from '../../../search/parser.js';
+import Pagination from '../../../components/Pagination.astro';
+import { getDb } from '../../../db/db.js';
+import { userActions, users } from '../../../db/schema.js';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
+import { parseSearchQuery } from '../../../search/parser.js';
+import SearchBar from '../../../search/SearchBar';
 import type { SearchFieldSpec } from '../../../search/types.js';
 
 const db = getDb();

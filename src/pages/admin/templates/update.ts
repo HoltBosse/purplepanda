@@ -1,10 +1,10 @@
 import type { APIContext } from "astro";
-import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
-import { getDb } from "../../../db/db.js";
-import { templates, dagNodes } from "../../../db/schema.js";
-import { eq, and, desc, getTableColumns, type InferSelectModel } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
 import * as z from "zod";
 import { addAction } from "../../../actions/index.js";
+import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
+import { getDb } from "../../../db/db.js";
+import { dagNodes, templates } from "../../../db/schema.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     console.log("POST request received for template update");
@@ -14,7 +14,7 @@ export async function POST(context: APIContext): Promise<Response> {
     console.log("ID:");
     console.log(id);
     const templateId = id;
-    let isNewTemplate = !templateId;
+    const isNewTemplate = !templateId;
     let template: InferSelectModel<typeof templates> | undefined;
 
     if (templateId) {
@@ -44,7 +44,7 @@ export async function POST(context: APIContext): Promise<Response> {
         try {
             JSON.parse(val);
             return true;
-        } catch (e) {
+        } catch (_e) {
             return false;
         }
     }, "Content must be a valid JSON string");

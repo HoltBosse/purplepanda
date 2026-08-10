@@ -1,6 +1,6 @@
+import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Config, Data, Dictionary, Fields } from "@puckeditor/core";
 import { useMemo } from "react";
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
 import { filterConfigByLocation, wrapConfigWithDataBinding } from "../puck/index.js";
 import PuckEditor from "./PuckEditor.js";

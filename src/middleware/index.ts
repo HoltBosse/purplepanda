@@ -1,5 +1,5 @@
 import { defineMiddleware } from "astro/middleware";
-import { getAlertsFromSession, clearAlertsFromSession } from "../alert/index.js";
+import { clearAlertsFromSession, getAlertsFromSession } from "../alert/index.js";
 import { isAdminSession } from "../auth/index.js";
 
 // Paths that do not require authentication

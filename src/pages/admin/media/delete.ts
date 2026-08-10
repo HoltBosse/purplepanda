@@ -1,9 +1,9 @@
 import type { APIContext } from "astro";
-import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
-import { getDb } from "../../../db/db.js";
-import { mediafolders, media } from "../../../db/schema.js";
 import { inArray } from 'drizzle-orm';
 import * as z from "zod";
+import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
+import { getDb } from "../../../db/db.js";
+import { media, mediafolders } from "../../../db/schema.js";
 
 async function getAllDescendantFolderIds(folderIds: string[]): Promise<string[]> {
     const db = getDb();

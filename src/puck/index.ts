@@ -1,12 +1,12 @@
 import type { Config, Field, Fields } from "@puckeditor/core";
-import type * as z from "zod";
 import type { Thing } from "schema-dts";
-export { ClientComponentDataWrapper, wrapConfigWithClientDataResolvers } from "./client-data-wrapper.js";
-export { wrapConfigWithDataBinding, ItemContext, useBoundItem } from "./data-binding.js";
-export type { BoundItem } from "./data-binding.js";
-export { wrapConfigWithIslands, ISLAND_NAME_ATTR, ISLAND_PROPS_ATTR } from "./islands.js";
+import type * as z from "zod";
 
 export type { ComponentConfig, Slot } from "@puckeditor/core";
+export { ClientComponentDataWrapper, wrapConfigWithClientDataResolvers } from "./client-data-wrapper.js";
+export type { BoundItem } from "./data-binding.js";
+export { ItemContext, useBoundItem, wrapConfigWithDataBinding } from "./data-binding.js";
+export { ISLAND_NAME_ATTR, ISLAND_PROPS_ATTR, wrapConfigWithIslands } from "./islands.js";
 
 type Awaitable<TValue> = TValue | Promise<TValue>;
 
@@ -122,7 +122,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function componentMatchesLocation(component: unknown, location: Location): boolean {
   if (!isObject(component)) return true;
-  const locs = component["locations"];
+  const locs = component.locations;
   if (locs === undefined || locs === null) return true;
   if (Array.isArray(locs)) return locs.length === 0 || locs.includes(location);
   return locs === location;

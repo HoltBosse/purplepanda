@@ -1,6 +1,6 @@
-import type { APIContext } from "astro";
-import type { Config } from "@puckeditor/core";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
+import type { Config } from "@puckeditor/core";
+import type { APIContext } from "astro";
 
 type JsonObject = Record<string, unknown>;
 

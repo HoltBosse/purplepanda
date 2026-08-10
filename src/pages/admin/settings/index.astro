@@ -1,13 +1,13 @@
 ---
-import AdminLayout from '../../../layouts/AdminLayout.astro';
-import Form from '../../../form/Form.astro';
-import { getAllFields } from '../../../form/index.js';
+import externalPuckConfig from 'virtual:purplepanda/puck-config';
+import { eq, inArray } from 'drizzle-orm';
 import { getDb } from '../../../db/db.js';
 import { settings } from '../../../db/schema.js';
-import { eq, inArray } from 'drizzle-orm';
-import { getSettingsForm } from './form.js';
+import Form from '../../../form/Form.astro';
+import { getAllFields } from '../../../form/index.js';
 import { createFormFlashSession } from '../../../form/session.js';
-import externalPuckConfig from 'virtual:purplepanda/puck-config';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getSettingsForm } from './form.js';
 
 const db = getDb();
 

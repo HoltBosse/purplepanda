@@ -1,8 +1,8 @@
 import type { APIContext } from "astro";
+import { inArray } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "../../../../db/db.js";
 import { pages } from "../../../../db/schema.js";
-import { inArray } from "drizzle-orm";
 
 const ACTIONS = ["publish", "unpublish", "delete"] as const;
 type Action = typeof ACTIONS[number];

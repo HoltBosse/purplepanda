@@ -1,5 +1,5 @@
-import type { CSSProperties } from "react";
 import type { ComponentConfig, Slot } from "@puckeditor/core";
+import type { CSSProperties } from "react";
 
 type MarginProps = {
   desktopWidth: number;

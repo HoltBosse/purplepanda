@@ -1,17 +1,17 @@
 ---
-import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { createHash } from 'node:crypto';
-import { getDb } from '../../../db/db.js';
-import { users, roles, userRoles } from '../../../db/schema.js';
 import { CircleCheck, CircleX } from '@lucide/astro';
-import { capitalize } from '../../../string';
 import { and, desc, eq, gt, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import Pagination from '../../../components/Pagination.astro';
-import SearchBar from '../../../search/SearchBar';
-import { parseSearchQuery } from '../../../search/parser.js';
+import { getDb } from '../../../db/db.js';
+import { roles, userRoles, users } from '../../../db/schema.js';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
+import { parseSearchQuery } from '../../../search/parser.js';
+import SearchBar from '../../../search/SearchBar';
 import type { SearchFieldSpec } from '../../../search/types.js';
+import { capitalize } from '../../../string';
 
 const db = getDb();
 

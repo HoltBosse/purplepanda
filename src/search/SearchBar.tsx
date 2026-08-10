@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CircleX } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { parseSearchQuery } from "./parser.js";
-import { validateSearchAst } from "./validate.js";
 import type { SearchAst, SearchFieldSpec, ValidatedSearchAst } from "./types.js";
+import { validateSearchAst } from "./validate.js";
 
 export interface SearchBarProps {
   /** The searchable fields, driving both validation/highlighting and the autocomplete dropdown. */
@@ -63,6 +63,7 @@ export default function SearchBar({
   const suggestions = useMemo(() => buildSuggestions(ast, fields, caret), [ast, fields, caret]);
   const errors = useMemo(() => validated.filter((t) => !t.valid && t.error), [validated]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: value/caret/scrollLeft aren't read in the body, they're intentional re-triggers — the mirror's rendered content and position depend on all three, so the caret measurement must redo whenever any of them change
   useLayoutEffect(() => {
     const marker = caretMirrorRef.current;
     const form = formRef.current;
@@ -74,6 +75,7 @@ export default function SearchBar({
     setDropdownLeft(Math.max(0, Math.min(caretX, form.clientWidth - 8)));
   }, [value, caret, scrollLeft]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: suggestions isn't read in the body, it's an intentional re-trigger — the highlighted index must reset whenever the suggestions list changes
   useEffect(() => {
     setHighlightIndex(-1);
   }, [suggestions]);
@@ -272,8 +274,8 @@ export default function SearchBar({
       {errors.length > 0 && (
         <div className="absolute top-full z-20 mt-1 w-full rounded-box border border-error/30 bg-base-100 p-2 shadow-lg">
           <ul className="space-y-0.5 text-xs text-error">
-            {errors.map((t, i) => (
-              <li key={i}>
+            {errors.map((t) => (
+              <li key={t.node.start}>
                 <span className="font-mono">{t.node.raw}</span> — {t.error}
               </li>
             ))}
@@ -292,8 +294,8 @@ function renderHighlighted(value: string, validated: ValidatedSearchAst) {
   const nodes: React.ReactNode[] = [];
   let cursor = 0;
 
-  validated.forEach((t, i) => {
-    if (t.node.start > cursor) nodes.push(<span key={`gap-${i}`}>{value.slice(cursor, t.node.start)}</span>);
+  validated.forEach((t) => {
+    if (t.node.start > cursor) nodes.push(<span key={`gap-${t.node.start}`}>{value.slice(cursor, t.node.start)}</span>);
     // Color (and, for invalid terms, a wavy underline) is the ONLY styling allowed to differ
     // per-token: both leave glyph advance widths untouched. Anything that changes width — most
     // notably font-weight (medium/bold glyphs are wider) — can't be matched by the uniform-weight
@@ -305,7 +307,7 @@ function renderHighlighted(value: string, validated: ValidatedSearchAst) {
           ? "text-success"
           : "text-error underline decoration-wavy decoration-error";
     nodes.push(
-      <span key={i} className={className}>
+      <span key={t.node.start} className={className}>
         {value.slice(t.node.start, t.node.end)}
       </span>,
     );

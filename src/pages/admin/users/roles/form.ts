@@ -1,7 +1,7 @@
-import { FormMethod, FormEncType, type FormSection } from '../../../../form/types.js';
-import { type InferSelectModel } from 'drizzle-orm';
-import { roles } from '../../../../db/schema.js';
+import type { InferSelectModel } from 'drizzle-orm';
 import * as z from 'zod';
+import type { roles } from '../../../../db/schema.js';
+import { FormEncType, FormMethod, type FormSection } from '../../../../form/types.js';
 
 type Role = InferSelectModel<typeof roles>;
 
@@ -45,7 +45,7 @@ export function getRoleForm(role: Role, fields: Record<string, any>, actionUrl: 
                                 type: 'Input',
                                 classList: inputClassList,
                                 placeholder: 'Role title',
-                                value: flash['title'] ?? role.title,
+                                value: flash.title ?? role.title,
                                 required: true,
                                 validator: z.string().min(1, "Title is required").max(255),
                             },
@@ -57,7 +57,7 @@ export function getRoleForm(role: Role, fields: Record<string, any>, actionUrl: 
                                 classList: inputClassList,
                                 optionsClassList: "bg-base-100 text-base-content",
                                 options: adminAccessOptions,
-                                value: flash['adminAccess'] ?? String(role.adminAccess ?? false),
+                                value: flash.adminAccess ?? String(role.adminAccess ?? false),
                                 required: true,
                                 validator: z.enum(['true', 'false']),
                             },

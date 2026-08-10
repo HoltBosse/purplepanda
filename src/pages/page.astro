@@ -1,18 +1,18 @@
 ---
 import '../styles/global.css';
-import { getDb } from '../db/db.js';
-import { pages, redirects } from '../db/schema.js';
-import { and, eq, isNull, sql } from 'drizzle-orm';
-import { resolveTemplateSetting } from '../db/templates.js';
-import { resolveFontSettings } from '../db/fonts.js';
-import { resolveSiteName, formatPageTitle } from '../db/site.js';
-import { extractFamilyFromLink } from '../form/fields/font-utils.js';
-import type { Data } from '@puckeditor/core';
-import type { BreadcrumbList } from 'schema-dts';
-import externalPuckConfig from 'virtual:purplepanda/puck-config';
 import { has404Page } from 'virtual:purplepanda/has-404';
-import { resolveDataForSSR } from '../puck/server-data-wrapper.js';
+import externalPuckConfig from 'virtual:purplepanda/puck-config';
+import type { Data } from '@puckeditor/core';
+import { and, eq, isNull, sql } from 'drizzle-orm';
+import type { BreadcrumbList } from 'schema-dts';
 import PageRenderer from '../components/PageRenderer.js';
+import { getDb } from '../db/db.js';
+import { resolveFontSettings } from '../db/fonts.js';
+import { pages, redirects } from '../db/schema.js';
+import { formatPageTitle, resolveSiteName } from '../db/site.js';
+import { resolveTemplateSetting } from '../db/templates.js';
+import { extractFamilyFromLink } from '../form/fields/font-utils.js';
+import { resolveDataForSSR } from '../puck/server-data-wrapper.js';
 
 const db = getDb();
 const requestPath = Astro.params.path ?? '';
@@ -98,7 +98,7 @@ const headingFontFamily = extractFamilyFromLink(fontSettings.headingFontLink);
 const bodyFontFamily = extractFamilyFromLink(fontSettings.bodyFontLink);
 
 if (!matchedPage) {
-    const fromPath = '/' + requestPath;
+    const fromPath = `/${requestPath}`;
     const [redirect] = await db
         .select()
         .from(redirects)

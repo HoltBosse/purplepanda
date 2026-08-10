@@ -1,10 +1,10 @@
 ---
-import AdminBareLayout from '../../../layouts/AdminBareLayout.astro';
+import type { Data } from '@puckeditor/core';
+import { eq } from 'drizzle-orm';
 import FormPuckEditor from '../../../components/FormPuckEditor';
 import { getDb } from '../../../db/db.js';
 import { forms } from '../../../db/schema.js';
-import { eq } from 'drizzle-orm';
-import type { Data } from '@puckeditor/core';
+import AdminBareLayout from '../../../layouts/AdminBareLayout.astro';
 
 const db = getDb();
 

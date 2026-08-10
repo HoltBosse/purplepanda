@@ -1,19 +1,19 @@
 ---
-import AdminLayout from '../../../layouts/AdminLayout.astro';
-import { getDb } from '../../../db/db.js';
-import { Folder, Eye, EyeOff } from '@lucide/astro';
-import Input from '../../../form/fields/Input.astro';
-import { mediafolders, media } from "../../../db/schema.js";
-import { eq, sql, isNull, and } from 'drizzle-orm';
-import { z } from 'zod';
-import sharp from 'sharp';
-import { promises as fs } from 'fs';
+import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
-import { getMediaPath } from '../../../media/media.js';
+import { Eye, EyeOff, Folder } from '@lucide/astro';
+import { and, eq, isNull, sql } from 'drizzle-orm';
+import sharp from 'sharp';
+import { z } from 'zod';
 import Pagination from '../../../components/Pagination.astro';
-import SearchBar from '../../../search/SearchBar';
-import { parseSearchQuery } from '../../../search/parser.js';
+import { getDb } from '../../../db/db.js';
+import { media, mediafolders } from "../../../db/schema.js";
+import Input from '../../../form/fields/Input.astro';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getMediaPath } from '../../../media/media.js';
 import { buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
+import { parseSearchQuery } from '../../../search/parser.js';
+import SearchBar from '../../../search/SearchBar';
 import type { SearchFieldSpec } from '../../../search/types.js';
 
 // This entrypoint is injected under both /admin/media and /admin/media/[id] (see index.ts),

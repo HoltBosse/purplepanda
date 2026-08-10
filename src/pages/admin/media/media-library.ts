@@ -1,4 +1,4 @@
-import { DragDropManager, Draggable, Droppable, Feedback, defaultPreset } from "@dnd-kit/dom";
+import { DragDropManager, Draggable, Droppable, defaultPreset, Feedback } from "@dnd-kit/dom";
 
 document.body.dataset.mediaSelectMode = "false";
 
@@ -30,7 +30,7 @@ document.querySelector(".select-mode-toggable.btn")?.addEventListener("click", (
     if (deleteFolderWarning) deleteFolderWarning.classList.toggle("hidden", checkedFolders.length === 0);
 
     // Clear previously injected id inputs, keep the currentfolderid hidden input
-    deleteConfirmForm.querySelectorAll('input[name="mediaid[]"], input[name="folderid[]"]').forEach((el) => el.remove());
+    deleteConfirmForm.querySelectorAll('input[name="mediaid[]"], input[name="folderid[]"]').forEach((el) => { el.remove(); });
 
     checkedMedia.forEach((card) => {
         const input = document.createElement("input");
@@ -86,7 +86,7 @@ let dragActive = false;
 let previewObjectUrls: string[] = [];
 
 const clearImageConfigurations = () => {
-    previewObjectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+    previewObjectUrls.forEach((objectUrl) => { URL.revokeObjectURL(objectUrl); });
     previewObjectUrls = [];
 
     if (newImagesList) {
@@ -97,7 +97,7 @@ const clearImageConfigurations = () => {
 const toDefaultImageText = (filename: string) => {
     const withoutExtension = filename.replace(/\.[^/.]+$/, "");
     return withoutExtension
-        .replace(/[\-_]+/g, " ")
+        .replace(/[-_]+/g, " ")
         .replace(/\s*\(\d+\)$/g, "")
         .replace(/\s+/g, " ")
         .trim();
@@ -217,7 +217,7 @@ if (uploadInput && uploadDropzone) {
         }
 
         const transfer = new DataTransfer();
-        Array.from(droppedFiles).forEach((file) => transfer.items.add(file));
+        Array.from(droppedFiles).forEach((file) => { transfer.items.add(file); });
         uploadInput.files = transfer.files;
         uploadInput.dispatchEvent(new Event("change", { bubbles: true }));
     });
@@ -609,8 +609,8 @@ dragDropManager.monitor.addEventListener("dragend", (event) => {
 
 window.addEventListener("pagehide", () => {
     removeDragPreview();
-    draggableInstances.forEach((instance) => instance.destroy());
-    droppableInstances.forEach((instance) => instance.destroy());
+    draggableInstances.forEach((instance) => { instance.destroy(); });
+    droppableInstances.forEach((instance) => { instance.destroy(); });
     dragDropManager.destroy();
 }, { once: true });
 

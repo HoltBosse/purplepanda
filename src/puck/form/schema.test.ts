@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
 import type { Config, Data } from "@puckeditor/core";
-import { buildFormSubmissionSchema } from "./schema";
-import TextInput from "../form-fields/TextInput";
-import Textarea from "../form-fields/Textarea";
-import Select from "../form-fields/Select";
+import { describe, expect, it } from "vitest";
 import Checkbox from "../form-fields/Checkbox";
 import RadioGroup from "../form-fields/RadioGroup";
+import Select from "../form-fields/Select";
+import Textarea from "../form-fields/Textarea";
+import TextInput from "../form-fields/TextInput";
+import { buildFormSubmissionSchema } from "./schema";
 
 const config = {
   components: {

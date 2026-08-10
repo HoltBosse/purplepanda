@@ -38,11 +38,11 @@ export async function verify(password: string, hash: string): Promise<boolean> {
   const ln = parseInt(paramMap.ln ?? "", 10);
   const r = parseInt(paramMap.r ?? "", 10);
   const p = parseInt(paramMap.p ?? "", 10);
-  if (isNaN(ln) || isNaN(r) || isNaN(p)) return false;
+  if (Number.isNaN(ln) || Number.isNaN(r) || Number.isNaN(p)) return false;
 
   const salt = Buffer.from(rawSalt, "base64url");
   const storedKey = Buffer.from(rawKey, "base64url");
-  const N = Math.pow(2, ln);
+  const N = 2 ** ln;
   // maxmem must accommodate 128 * N * r bytes
   const maxmem = 128 * N * r * 2;
 

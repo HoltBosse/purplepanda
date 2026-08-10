@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseSearchQuery } from './parser';
-import { validateSearchAst } from './validate';
 import type { SearchFieldSpec } from './types';
+import { validateSearchAst } from './validate';
 
 const fields: SearchFieldSpec[] = [
     { name: 'name', type: 'text' },

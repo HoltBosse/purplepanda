@@ -1,12 +1,12 @@
+import fs from "node:fs";
 import type { APIContext } from "astro";
-import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
-import { getDb } from "../../../db/db.js";
-import { getDocumentPath } from "../../../document/document.js";
-import { documents } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
 import * as z from "zod";
-import fs from "fs";
 import { addAction } from "../../../actions/index.js";
+import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
+import { getDb } from "../../../db/db.js";
+import { documents } from "../../../db/schema.js";
+import { getDocumentPath } from "../../../document/document.js";
 
 const toSlug = (title: string) =>
     title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");

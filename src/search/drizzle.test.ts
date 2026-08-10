@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { PgDialect } from 'drizzle-orm/pg-core';
 import { eq } from 'drizzle-orm';
-import { parseSearchQuery } from './parser';
-import { buildSearchWhere } from './drizzle';
+import { PgDialect } from 'drizzle-orm/pg-core';
+import { describe, expect, it } from 'vitest';
+import { documents, userActions, users } from '../db/schema';
 import type { DrizzleSearchConfig } from './drizzle';
-import { documents, users, userActions } from '../db/schema';
+import { buildSearchWhere } from './drizzle';
+import { parseSearchQuery } from './parser';
 
 const dialect = new PgDialect();
 

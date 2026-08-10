@@ -73,7 +73,7 @@ function SelectField({
       cancelled = true;
       instance?.destroy();
     };
-  }, [editing, placeholder, multiple, options]);
+  }, [editing, placeholder]);
 
   return (
     <div className="w-full">

@@ -1,10 +1,10 @@
 import type { APIContext } from "astro";
-import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
-import { getDb } from "../../../db/db.js";
-import { mediafolders, media as mediaschema } from "../../../db/schema.js";
 import { eq, inArray } from 'drizzle-orm';
 import * as z from "zod";
 import { addAction } from "../../../actions/index.js";
+import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
+import { getDb } from "../../../db/db.js";
+import { mediafolders, media as mediaschema } from "../../../db/schema.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -23,7 +23,7 @@ export async function POST(context: APIContext): Promise<Response> {
         console.log(media);
         console.log(folder);
         console.log(formData.getAll("folderid"));
-        let message = "Invalid move request. Issue with selected media or folder.";
+        const message = "Invalid move request. Issue with selected media or folder.";
         const alert = createAlert(alertType.error, message);
         await addAlertToSession(context.session, alert);
         return context.redirect("/admin/media");
@@ -33,7 +33,7 @@ export async function POST(context: APIContext): Promise<Response> {
     if(folder.data) {
         const [existingFolder] = await db.select().from(mediafolders).where(eq(mediafolders.id, folder.data));
         if(!existingFolder) {
-            let message = "Selected folder does not exist.";
+            const message = "Selected folder does not exist.";
             const alert = createAlert(alertType.error, message);
             await addAlertToSession(context.session, alert);
             return context.redirect("/admin/media");
@@ -50,14 +50,14 @@ export async function POST(context: APIContext): Promise<Response> {
 
     //update media items to have the new folder
     for(let i = 0; i < media.data.length; i++) {
-        if(media && media.success && media.data && media.data[i]) {
+        if(media?.success && media.data?.[i]) {
             //update alt and title of existing media
             const [updatedMedia] = await db.update(mediaschema).set({
                 folder: folder.data,
             }).where(eq(mediaschema.id, media.data[i]!)).returning({ id: mediaschema.id });
 
             if(!updatedMedia) {
-                let message = "Failed to update media in database.";
+                const message = "Failed to update media in database.";
                 const alert = createAlert(alertType.error, message);
                 await addAlertToSession(context.session, alert);
                 return context.redirect(folder.data ? `/admin/media/${folder.data}` : "/admin/media");
@@ -79,12 +79,10 @@ export async function POST(context: APIContext): Promise<Response> {
                     },
                 },
             );
-
-            continue;
         }
     }
 
-    let message = "Media moved successfully.";
+    const message = "Media moved successfully.";
 
     const alert = createAlert(alertType.success, message);
     await addAlertToSession(context.session, alert);

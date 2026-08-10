@@ -1,11 +1,11 @@
 ---
-import AdminLayout from '../../../../layouts/AdminLayout.astro';
-import HistoryView from '../../../../components/HistoryView';
-import type { DagNodeData } from '../../../../components/HistoryView';
-import { getDb } from '../../../../db/db.js';
-import { pages, dagNodes } from '../../../../db/schema.js';
-import { eq, and, or, gt } from 'drizzle-orm';
 import externalPuckConfig from 'virtual:purplepanda/puck-config';
+import { and, eq, gt, or } from 'drizzle-orm';
+import type { DagNodeData } from '../../../../components/HistoryView';
+import HistoryView from '../../../../components/HistoryView';
+import { getDb } from '../../../../db/db.js';
+import { dagNodes, pages } from '../../../../db/schema.js';
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
 
 const db = getDb();
 const { id } = Astro.params;
@@ -13,7 +13,7 @@ const { id } = Astro.params;
 if (!id) return Astro.redirect('/admin/content');
 
 const [page] = await db.select().from(pages).where(eq(pages.id, id)).limit(1);
-if (!page || !page.contentType) return Astro.redirect('/admin/content');
+if (!page?.contentType) return Astro.redirect('/admin/content');
 
 const contentTypes = (externalPuckConfig ? externalPuckConfig.contentTypes : []) ?? [];
 const contentType = contentTypes.find(ct => ct.id === page.contentType);

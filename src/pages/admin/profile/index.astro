@@ -1,13 +1,13 @@
 ---
-import AdminLayout from '../../../layouts/AdminLayout.astro';
-import Form from '../../../form/Form.astro';
-import { getAllFields } from '../../../form/index.js';
+import { eq } from 'drizzle-orm';
 import { getDb } from '../../../db/db.js';
 import { users } from '../../../db/schema.js';
-import { eq } from 'drizzle-orm';
+import Form from '../../../form/Form.astro';
+import { getAllFields } from '../../../form/index.js';
+import { createFormFlashSession } from '../../../form/session.js';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { capitalize } from '../../../string';
 import { getProfileForm } from './form.js';
-import { createFormFlashSession } from '../../../form/session.js';
 
 const db = getDb();
 

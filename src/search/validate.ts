@@ -58,7 +58,6 @@ function describeType(field: SearchFieldSpec): string {
       return "a time (HH:MM[:SS])";
     case "enum":
       return `one of: ${(field.enumValues ?? []).join(", ")}`;
-    case "text":
     default:
       return "text";
   }

@@ -8,7 +8,7 @@ const newDocumentItemTemplate = document.querySelector("#new-document-item-templ
 const toDefaultDocumentTitle = (filename: string) => {
     const withoutExtension = filename.replace(/\.[^/.]+$/, "");
     return withoutExtension
-        .replace(/[\-_]+/g, " ")
+        .replace(/[-_]+/g, " ")
         .replace(/\s*\(\d+\)$/g, "")
         .replace(/\s+/g, " ")
         .trim();
@@ -104,7 +104,7 @@ if (uploadInput && uploadDropzone) {
         }
 
         const transfer = new DataTransfer();
-        Array.from(droppedFiles).forEach((file) => transfer.items.add(file));
+        Array.from(droppedFiles).forEach((file) => { transfer.items.add(file); });
         uploadInput.files = transfer.files;
         uploadInput.dispatchEvent(new Event("change", { bubbles: true }));
     });

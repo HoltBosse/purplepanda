@@ -1,15 +1,15 @@
 ---
 import '../../../../styles/global.css';
-import { getDb } from '../../../../db/db.js';
-import { settings, templates, dagNodes } from '../../../../db/schema.js';
-import { eq, sql } from 'drizzle-orm';
-import type { Data } from '@puckeditor/core';
 import externalPuckConfig from 'virtual:purplepanda/puck-config';
-import { resolveDataForSSR } from '../../../../puck/server-data-wrapper.js';
-import { resolveFontSettings } from '../../../../db/fonts.js';
-import { resolveSiteName, formatPageTitle } from '../../../../db/site.js';
-import { extractFamilyFromLink } from '../../../../form/fields/font-utils.js';
+import type { Data } from '@puckeditor/core';
+import { eq, sql } from 'drizzle-orm';
 import PageRenderer from '../../../../components/PageRenderer.js';
+import { getDb } from '../../../../db/db.js';
+import { resolveFontSettings } from '../../../../db/fonts.js';
+import { dagNodes, settings, templates } from '../../../../db/schema.js';
+import { formatPageTitle, resolveSiteName } from '../../../../db/site.js';
+import { extractFamilyFromLink } from '../../../../form/fields/font-utils.js';
+import { resolveDataForSSR } from '../../../../puck/server-data-wrapper.js';
 
 const db = getDb();
 const { draftId } = Astro.params;
@@ -17,7 +17,7 @@ const { draftId } = Astro.params;
 if (!draftId) return Astro.redirect('/admin/pages');
 
 const [draft] = await db.select().from(dagNodes).where(eq(dagNodes.id, draftId)).limit(1);
-if (!draft || draft.nodeType !== 'draft' || draft.entityType !== 'page' || draft.state === -1) {
+if (draft?.nodeType !== 'draft' || draft.entityType !== 'page' || draft.state === -1) {
     return Astro.redirect('/admin/pages');
 }
 

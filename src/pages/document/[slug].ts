@@ -1,11 +1,11 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { has404Page } from 'virtual:purplepanda/has-404';
 import type { APIRoute } from "astro";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../db/db.js";
 import { documents } from "../../db/schema.js";
 import { getDocumentPath } from "../../document/document.js";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-import { has404Page } from 'virtual:purplepanda/has-404';
 
 function getMimeType(buffer: Buffer): string {
     // PDF

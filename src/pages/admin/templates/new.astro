@@ -1,10 +1,10 @@
 ---
-import AdminBareLayout from '../../../layouts/AdminBareLayout.astro';
+import type { Data } from '@puckeditor/core';
+import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
 import TemplatePuckEditor from '../../../components/TemplatePuckEditor';
 import { getDb } from '../../../db/db.js';
 import { templates } from '../../../db/schema.js';
-import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
-import type { Data } from '@puckeditor/core';
+import AdminBareLayout from '../../../layouts/AdminBareLayout.astro';
 
 const db = getDb();
 
@@ -14,7 +14,7 @@ if (id) {
 	saveUrl += `/${id}`;
 }
 
-let template;
+let template: InferSelectModel<typeof templates> | undefined;
 if(id) {
 	[template] = await db.select().from(templates).where(eq(templates.id, id)).limit(1);
 	if(!template) {

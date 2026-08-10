@@ -1,5 +1,5 @@
 import { eq, getTableColumns, getTableName, is, sql } from "drizzle-orm";
-import { PgTable, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { type AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { getDb } from "../db/db.js";
 import * as dbSchema from "../db/schema.js";
 import { actionSchemas, userActions } from "../db/schema.js";

@@ -1,15 +1,15 @@
 import type { APIContext } from "astro";
-import { createAlert, alertType, addAlertToSession } from "../../../../alert/index.js";
+import { eq, inArray } from 'drizzle-orm';
+import { addAlertToSession, alertType, createAlert } from "../../../../alert/index.js";
 import { getDb } from "../../../../db/db.js";
 import { dagNodes, pages } from "../../../../db/schema.js";
-import { eq, inArray } from 'drizzle-orm';
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
     const { draftId } = context.params;
 
     const [tip] = await db.select().from(dagNodes).where(eq(dagNodes.id, draftId!)).limit(1);
-    if (!tip || tip.nodeType !== 'draft') {
+    if (tip?.nodeType !== 'draft') {
         return new Response("Draft not found", { status: 404 });
     }
 
@@ -18,7 +18,7 @@ export async function POST(context: APIContext): Promise<Response> {
     let current = tip;
     while (current.parentId) {
         const [parent] = await db.select().from(dagNodes).where(eq(dagNodes.id, current.parentId)).limit(1);
-        if (!parent || parent.nodeType !== 'draft') break;
+        if (parent?.nodeType !== 'draft') break;
         chainIds.push(parent.id);
         current = parent;
     }
