@@ -1,5 +1,6 @@
 import type { Config, Field, Fields } from "@puckeditor/core";
 import type * as z from "zod";
+import type { Thing } from "schema-dts";
 export { ClientComponentDataWrapper, wrapConfigWithClientDataResolvers } from "./client-data-wrapper.js";
 export { wrapConfigWithDataBinding, ItemContext, useBoundItem } from "./data-binding.js";
 export type { BoundItem } from "./data-binding.js";
@@ -33,6 +34,11 @@ export type ContentType = {
   title: string,
   fields: Fields;
   baseUrl?: string;
+  // Builds this content type's structured-data (JSON-LD) representation from a page's resolved
+  // root props (i.e. its `fields` values). Returns a schema.org `Thing` minus `@context`, which
+  // page.astro adds and serializes into a `<script type="application/ld+json">` tag. Omit to skip
+  // structured data for this content type.
+  jsonLd?: (props: any) => Thing | undefined;
 };
 
 // Declares a component's own prop as eligible for data-binding when the component is nested

@@ -8,6 +8,7 @@ import { resolveFontSettings } from '../db/fonts.js';
 import { resolveSiteName, formatPageTitle } from '../db/site.js';
 import { extractFamilyFromLink } from '../form/fields/font-utils.js';
 import type { Data } from '@puckeditor/core';
+import type { BreadcrumbList } from 'schema-dts';
 import externalPuckConfig from 'virtual:purplepanda/puck-config';
 import { has404Page } from 'virtual:purplepanda/has-404';
 import { resolveDataForSSR } from '../puck/server-data-wrapper.js';
@@ -34,6 +35,8 @@ function matchContentTypeRoute(path: string) {
     return null;
 }
 
+type BreadcrumbEntry = { title: string; path: string };
+
 async function resolvePlainPage(path: string) {
     const allPages = await db.select().from(pages).where(and(eq(pages.state, 1), isNull(pages.contentType)));
     const pageById = new Map(allPages.map(p => [p.id, p]));
@@ -50,13 +53,28 @@ async function resolvePlainPage(path: string) {
         return alias;
     }
 
+    // Walks a page's parentPage chain to build its breadcrumb trail, using each ancestor's own
+    // title prop (falling back to its alias) rather than the raw slug segment.
+    function getBreadcrumbs(page: typeof allPages[0], visited = new Set<string>()): BreadcrumbEntry[] {
+        if (visited.has(page.id)) return [];
+        const content = page.content as any;
+        const alias: string = content?.root?.props?.alias ?? '';
+        const title: string = content?.root?.props?.title || alias;
+        const parentId: string = content?.root?.props?.parentPage ?? '';
+        const parent = parentId ? pageById.get(parentId) : undefined;
+        const ancestors = parent ? getBreadcrumbs(parent, new Set([...visited, page.id])) : [];
+        const parentPath = ancestors[ancestors.length - 1]?.path ?? '';
+        return [...ancestors, { title, path: parentPath ? `${parentPath}/${alias}` : alias }];
+    }
+
     const pathToPage = new Map(allPages.map(p => [getPagePath(p), p]));
-    return pathToPage.get(path);
+    const page = pathToPage.get(path);
+    return page ? { page, breadcrumbs: getBreadcrumbs(page) } : undefined;
 }
 
 const contentTypeRoute = matchContentTypeRoute(requestPath);
 
-const [matchedPage, templateSetting, fontSettings, siteName] = await Promise.all([
+const [resolved, templateSetting, fontSettings, siteName] = await Promise.all([
     contentTypeRoute
         ? db
             .select()
@@ -67,12 +85,14 @@ const [matchedPage, templateSetting, fontSettings, siteName] = await Promise.all
                 sql`(${pages.content}->'root'->'props'->>'alias') = ${contentTypeRoute.alias}`
             ))
             .limit(1)
-            .then(rows => rows[0])
+            .then(rows => rows[0] ? { page: rows[0], breadcrumbs: undefined as BreadcrumbEntry[] | undefined } : undefined)
         : resolvePlainPage(requestPath),
     resolveTemplateSetting(db, contentTypeRoute?.contentType.id),
     resolveFontSettings(db),
     resolveSiteName(db),
 ]);
+
+const matchedPage = resolved?.page;
 
 const headingFontFamily = extractFamilyFromLink(fontSettings.headingFontLink);
 const bodyFontFamily = extractFamilyFromLink(fontSettings.bodyFontLink);
@@ -102,7 +122,49 @@ const [pageData, templateData] = await Promise.all([
         : Promise.resolve(undefined),
 ]);
 
-const title: string = formatPageTitle((pageData as any)?.root?.props?.title ?? '', siteName);
+const rawTitle: string = (pageData as any)?.root?.props?.title ?? '';
+const title: string = formatPageTitle(rawTitle, siteName);
+
+const jsonLd = contentTypeRoute?.contentType.jsonLd?.((pageData as any)?.root?.props ?? {});
+
+// For a content-type page there's no real page behind its baseUrl segment (e.g. "/articles"), so
+// that crumb is labeled with the content type's own title; the leaf crumb uses the resolved page's
+// title. For a plain page, the trail comes from walking its parentPage ancestry (resolvePlainPage),
+// using each ancestor's own title prop rather than its raw slug.
+const breadcrumbEntries: BreadcrumbEntry[] = contentTypeRoute
+    ? [
+        { title: contentTypeRoute.contentType.title, path: normalizeBaseUrl(contentTypeRoute.contentType.baseUrl ?? '') },
+        { title: rawTitle || contentTypeRoute.alias, path: requestPath },
+    ]
+    : resolved?.breadcrumbs ?? [];
+
+const origin = (Astro.site ?? Astro.url).origin;
+const toAbsoluteUrl = (path: string) => (path ? `${origin}/${path}` : `${origin}/`);
+
+const breadcrumbList: BreadcrumbList | null = requestPath && breadcrumbEntries.length
+    ? {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: { '@id': toAbsoluteUrl('') } },
+            ...breadcrumbEntries.map((entry, index) => ({
+                '@type': 'ListItem' as const,
+                position: index + 2,
+                name: entry.title,
+                item: { '@id': toAbsoluteUrl(entry.path) },
+            })),
+        ],
+    }
+    : null;
+
+const jsonLdItems = [jsonLd, breadcrumbList].filter((item): item is NonNullable<typeof item> => Boolean(item));
+// Escaping `<` prevents a field value like `</script><script>...` from breaking out of the tag.
+const jsonLdScript = jsonLdItems.length
+    ? JSON.stringify(
+          jsonLdItems.length === 1
+              ? { '@context': 'https://schema.org', ...jsonLdItems[0] }
+              : { '@context': 'https://schema.org', '@graph': jsonLdItems }
+      ).replace(/</g, '\\u003c')
+    : null;
 ---
 
 <!DOCTYPE html>
@@ -111,6 +173,7 @@ const title: string = formatPageTitle((pageData as any)?.root?.props?.title ?? '
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
+    {jsonLdScript && <script type="application/ld+json" is:inline set:html={jsonLdScript} />}
     {fontSettings.bodyFontLink && <link rel="stylesheet" href={fontSettings.bodyFontLink} />}
     {fontSettings.headingFontLink && fontSettings.headingFontLink !== fontSettings.bodyFontLink && (
         <link rel="stylesheet" href={fontSettings.headingFontLink} />
