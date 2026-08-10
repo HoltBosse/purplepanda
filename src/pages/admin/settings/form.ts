@@ -1,10 +1,7 @@
 import { FormMethod, FormEncType, type FormSection } from '../../../form/types.js';
-import { type InferSelectModel } from 'drizzle-orm';
-import { users } from '../../../db/schema.js';
 import * as z from 'zod';
 import { getAllFields } from '../../../form/index.js';
 import { getDb } from '../../../db/db.js';
-import { eq } from 'drizzle-orm';
 import { templates } from '../../../db/schema.js';
 import type { ContentType } from '../../../puck/index.js';
 

@@ -13,7 +13,7 @@ const stateMap: Record<Action, number> = {
     delete: -1,
 };
 
-const idsSchema = z.array(z.string().uuid()).min(1);
+const idsSchema = z.array(z.uuid()).min(1);
 
 export async function POST(context: APIContext): Promise<Response> {
     const { action, typeId } = context.params;

@@ -15,7 +15,7 @@ import { has404Page } from 'virtual:purplepanda/has-404';
 
 //TODO: in future support image manip via get params (sharp? package)
 
-const uuidSchema = z.string().uuid();
+const uuidSchema = z.uuid();
 
 // A successful image response is fully determined by its id + transform params
 // (both baked into the URL and the ETag), so the same URL always yields the

@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import * as z from "zod";
 
 const titleSchema = z.string().min(1).max(255);
-const parentTagSchema = z.union([z.literal(""), z.string().uuid()]);
+const parentTagSchema = z.union([z.literal(""), z.uuid()]);
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();

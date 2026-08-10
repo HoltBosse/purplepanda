@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import * as z from "zod";
 import type { SelectOption } from "./Select.js";
 
-const uuidSchema = z.string().uuid();
+const uuidSchema = z.uuid();
 
 export async function getUserOptions(): Promise<SelectOption[]> {
   const db = getDb();

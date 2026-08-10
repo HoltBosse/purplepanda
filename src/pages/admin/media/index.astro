@@ -1,10 +1,7 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
-import { createHash } from 'node:crypto';
 import { getDb } from '../../../db/db.js';
-import { users } from '../../../db/schema.js';
 import { Folder, Eye, EyeOff } from '@lucide/astro';
-import { capitalize } from '../../../string';
 import Input from '../../../form/fields/Input.astro';
 import { mediafolders, media } from "../../../db/schema.js";
 import { eq, sql, isNull, and } from 'drizzle-orm';
@@ -19,22 +16,23 @@ import { parseSearchQuery } from '../../../search/parser.js';
 import { buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
 import type { SearchFieldSpec } from '../../../search/types.js';
 
-const { id } = Astro.params;
+// This entrypoint is injected under both /admin/media and /admin/media/[id] (see index.ts),
+// so Astro.params isn't statically typed with `id` here even though it's present at runtime.
+const { id } = Astro.params as { id?: string };
 
 const db = getDb();
 const folderIdSchema = z.uuid();
-const adminNotFoundPath = '/admin/__not-found';
 
 if(id) {
     // Reject invalid ids before hitting Postgres uuid comparison.
     if (!folderIdSchema.safeParse(id).success) {
-        return Astro.rewrite(adminNotFoundPath);
+        return Astro.rewrite('/admin/__not-found');
     }
 
     //check that its a valid form
     const folders_check = await db.select().from(mediafolders).where(eq(mediafolders.id, id)).limit(1);
     if(folders_check.length === 0) {
-        return Astro.rewrite(adminNotFoundPath);
+        return Astro.rewrite('/admin/__not-found');
     }
 }
 

@@ -20,7 +20,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     // logged-in admins. See ccd658a / the isAdminSession-per-image bypass check for why this
     // got worse — it slowed down the very requests piling up here.
     if (alerts.length) {
-      await clearAlertsFromSession(context.session);
+      clearAlertsFromSession(context.session);
     }
     return next();
   }
@@ -38,7 +38,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const alerts = await getAlertsFromSession(context.session);
   context.locals.alerts = alerts;
   if (alerts.length) {
-    await clearAlertsFromSession(context.session);
+    clearAlertsFromSession(context.session);
   }
 
   return next();

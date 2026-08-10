@@ -17,7 +17,7 @@ import {
   CSRF_FIELD_NAME,
 } from "../../../../puck/form/spam-guard.js";
 
-const uuidSchema = z.string().uuid();
+const uuidSchema = z.uuid();
 
 // Per IP + form: 5 submissions per minute, then blocked for 5 minutes.
 const rateLimiter = new RateLimiterMemory({

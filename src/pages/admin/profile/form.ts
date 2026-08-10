@@ -77,7 +77,7 @@ export function getProfileForm(user: User, fields: Record<string, any>, redirect
 								classList: inputClassList,
 								value: flash['email'] ?? user.email,
 								required: true,
-								validator: z.string().email("Invalid email address"),
+								validator: z.email("Invalid email address"),
 							},
 							{
 								id: 'theme',

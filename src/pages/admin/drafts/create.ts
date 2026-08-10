@@ -8,11 +8,11 @@ import { MAX_DRAFTS_PER_ENTITY } from "../../../dag/index.js";
 
 const schema = z.object({
     entityType: z.enum(["page", "template", "content"]),
-    entityId: z.string().uuid(),
+    entityId: z.uuid(),
     name: z.string().min(1).max(20),
     // When set, the draft branches off this specific dagNode (its content and
     // lineage) instead of the entity's current live content / latest publish.
-    sourceNodeId: z.string().uuid().optional(),
+    sourceNodeId: z.uuid().optional(),
 });
 
 export async function POST(context: APIContext): Promise<Response> {

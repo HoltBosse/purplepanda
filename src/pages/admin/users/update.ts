@@ -7,11 +7,10 @@ import { getAllFields } from "../../../form/index.js";
 import { getDb } from "../../../db/db.js";
 import { users, userRoles } from "../../../db/schema.js";
 import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
-import { get } from "node:http";
 import { hash } from "../../../password/index.js";
 import * as z from "zod";
 
-const roleIdsSchema = z.array(z.string().uuid());
+const roleIdsSchema = z.array(z.uuid());
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();

@@ -1,17 +1,9 @@
 import type { APIContext } from "astro";
 import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
-import { validateForm, createUserAlertMessageFromArray, getFieldByName, formDataToRecord } from "../../../form/index.js";
-import { createFormFlashSession } from "../../../form/session.js";
-import { getProfileForm } from "../profile/form.js";
-import { getAllFields } from "../../../form/index.js";
 import { getDb } from "../../../db/db.js";
-import { getMediaPath } from "../../../media/media.js";
 import { mediafolders, media as mediaschema } from "../../../db/schema.js";
-import { eq, and, getTableColumns, type InferSelectModel, inArray } from 'drizzle-orm';
-import { get } from "node:http";
-import { hash } from "../../../password/index.js";
+import { eq, inArray } from 'drizzle-orm';
 import * as z from "zod";
-import fs from "fs";
 import { addAction } from "../../../actions/index.js";
 
 export async function POST(context: APIContext): Promise<Response> {
@@ -23,8 +15,8 @@ export async function POST(context: APIContext): Promise<Response> {
     const folder = z.preprocess((value) => {
         if(value === null || value === undefined || value === "" || value === "null") return null;
         return value;
-    }, z.union([z.string().uuid(), z.null()])).safeParse(formData.get("folderid") as string | null);
-    const media = z.array(z.string().uuid()).safeParse(formData.getAll("mediaid[]") as string[] | undefined);
+    }, z.union([z.uuid(), z.null()])).safeParse(formData.get("folderid") as string | null);
+    const media = z.array(z.uuid()).safeParse(formData.getAll("mediaid[]") as string[] | undefined);
     //console.log(id);
 
     if(!media.success || !folder.success) {

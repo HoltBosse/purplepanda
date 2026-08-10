@@ -4,8 +4,6 @@ import TemplatePuckEditor from '../../../components/TemplatePuckEditor';
 import { getDb } from '../../../db/db.js';
 import { templates } from '../../../db/schema.js';
 import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
-import { getProfileForm } from '../profile/form.js';
-import { createFormFlashSession } from '../../../form/session.js';
 import type { Data } from '@puckeditor/core';
 
 const db = getDb();

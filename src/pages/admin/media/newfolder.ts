@@ -1,14 +1,8 @@
 import type { APIContext } from "astro";
 import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
-import { validateForm, createUserAlertMessageFromArray, getFieldByName, formDataToRecord } from "../../../form/index.js";
-import { createFormFlashSession } from "../../../form/session.js";
-import { getProfileForm } from "../profile/form.js";
-import { getAllFields } from "../../../form/index.js";
 import { getDb } from "../../../db/db.js";
 import { mediafolders } from "../../../db/schema.js";
-import { eq, and, getTableColumns, type InferSelectModel } from 'drizzle-orm';
-import { get } from "node:http";
-import { hash } from "../../../password/index.js";
+import { eq, and } from 'drizzle-orm';
 import * as z from "zod";
 
 export async function POST(context: APIContext): Promise<Response> {
@@ -17,7 +11,7 @@ export async function POST(context: APIContext): Promise<Response> {
     //read out posted fields name and parent
     const formData = await context.request.formData();
     const name = z.string().min(1).max(255).safeParse(formData.get("name"));
-    const parent = z.string().uuid().optional().safeParse(formData.get("parent") || undefined);
+    const parent = z.uuid().optional().safeParse(formData.get("parent") || undefined);
 
     console.log(name);
     console.log(parent);

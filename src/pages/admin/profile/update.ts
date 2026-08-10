@@ -7,7 +7,6 @@ import { getAllFields } from "../../../form/index.js";
 import { getDb } from "../../../db/db.js";
 import { users } from "../../../db/schema.js";
 import { eq } from "drizzle-orm";
-import { get } from "node:http";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();

@@ -1,15 +1,9 @@
 import type { APIContext } from "astro";
 import { createAlert, alertType, addAlertToSession } from "../../../alert/index.js";
-import { validateForm, createUserAlertMessageFromArray, getFieldByName, formDataToRecord } from "../../../form/index.js";
-import { createFormFlashSession } from "../../../form/session.js";
-import { getProfileForm } from "../profile/form.js";
-import { getAllFields } from "../../../form/index.js";
 import { getDb } from "../../../db/db.js";
 import { getMediaPath } from "../../../media/media.js";
 import { mediafolders, media } from "../../../db/schema.js";
-import { eq, and, getTableColumns, type InferSelectModel, inArray } from 'drizzle-orm';
-import { get } from "node:http";
-import { hash } from "../../../password/index.js";
+import { eq, inArray } from 'drizzle-orm';
 import * as z from "zod";
 import fs from "fs";
 import { addAction } from "../../../actions/index.js";
@@ -23,8 +17,8 @@ export async function POST(context: APIContext): Promise<Response> {
     const title = z.array(z.string().min(1).max(255)).safeParse(formData.getAll("title[]"));
     const alt = z.array(z.string().min(1).max(255)).safeParse(formData.getAll("alt[]"));
     const file = z.array(z.instanceof(File)).safeParse(formData.getAll("file[]"));
-    const folder = z.array(z.string().uuid()).optional().safeParse(formData.getAll("folder[]") as string[] | undefined);
-    const id = z.array(z.string().uuid().optional()).safeParse(formData.getAll("id[]") as string[] | undefined);
+    const folder = z.array(z.uuid()).optional().safeParse(formData.getAll("folder[]") as string[] | undefined);
+    const id = z.array(z.uuid().optional()).safeParse(formData.getAll("id[]") as string[] | undefined);
     //console.log(id);
 
     if(!title.success || !alt.success || !file.success || !folder.success) {

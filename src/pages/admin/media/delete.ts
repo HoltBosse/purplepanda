@@ -31,9 +31,9 @@ export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
     const formData = await context.request.formData();
 
-    const mediaIdsParsed = z.array(z.string().uuid()).safeParse(formData.getAll("mediaid[]"));
-    const folderIdsParsed = z.array(z.string().uuid()).safeParse(formData.getAll("folderid[]"));
-    const currentFolderIdParsed = z.string().uuid().optional().safeParse(formData.get("currentfolderid") || undefined);
+    const mediaIdsParsed = z.array(z.uuid()).safeParse(formData.getAll("mediaid[]"));
+    const folderIdsParsed = z.array(z.uuid()).safeParse(formData.getAll("folderid[]"));
+    const currentFolderIdParsed = z.uuid().optional().safeParse(formData.get("currentfolderid") || undefined);
 
     if (!mediaIdsParsed.success || !folderIdsParsed.success) {
         const alert = createAlert(alertType.error, "Invalid delete request.");

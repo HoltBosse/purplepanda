@@ -47,7 +47,8 @@
   "scripts": {
     "test": "vitest",
     "build": "tsc",
-    "dev": "tsc -w"
+    "dev": "tsc -w",
+    "check": "astro check"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.20",
@@ -60,6 +61,7 @@
     "vitest": "^4.1.8"
   },
   "dependencies": {
+    "@astrojs/check": "^0.9.10",
     "@astrojs/react": "^6.0.0",
     "@dnd-kit/dom": "0.4.0",
     "@lucide/astro": "^1.22.0",

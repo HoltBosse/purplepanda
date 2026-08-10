@@ -13,7 +13,7 @@ const stateMap: Record<Action, number> = {
     delete: -1,
 };
 
-const idsSchema = z.array(z.string().uuid()).min(1);
+const idsSchema = z.array(z.uuid()).min(1);
 
 export function createBulkHandler(table: PgTable & { id: any; state: any }, redirectTo: string) {
     return async function POST(context: APIContext): Promise<Response> {

@@ -64,7 +64,7 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
   return {
     name: "purple-panda",
     hooks: {
-      "astro:config:setup": ({ updateConfig, injectScript, addWatchFile, addMiddleware, injectRoute, logger, config }) => {
+      "astro:config:setup": ({ updateConfig, injectScript, addMiddleware, injectRoute, logger, config }) => {
         if (options.enabled === false) return;
 
         if (options.db) {

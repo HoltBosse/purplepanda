@@ -15,7 +15,7 @@ export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
 
     const formData = await context.request.formData();
-    const id = z.string().uuid().safeParse(formData.get("id"));
+    const id = z.uuid().safeParse(formData.get("id"));
     const title = z.string().min(1).max(255).safeParse(formData.get("title"));
     const file = formData.get("file");
     const hasFile = file instanceof File && file.size > 0;

@@ -8,7 +8,7 @@ interface Props extends ComponentProps<typeof BaseField> {
     fields: Record<string, any>;
 }
 
-const { id, name, type, label, classList, groupFields, fields } = Astro.props;
+const { classList, groupFields, fields } = Astro.props;
 ---
 <div class={classList}>
     {groupFields.map((field) => {
