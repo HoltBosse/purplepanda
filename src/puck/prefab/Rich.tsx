@@ -314,7 +314,7 @@ const Rich: ComponentConfig<RichProps> = {
   },
   render: ({ content, puck }) => {
     return (
-      <div className={`prose max-w-none${puck?.isEditing ? " rich-placeholder-wrap" : ""}`}>
+      <div className={`prose max-w-none ${puck?.isEditing ? "rich-placeholder-wrap" : ""}`}>
         {content}
       </div>
     );
