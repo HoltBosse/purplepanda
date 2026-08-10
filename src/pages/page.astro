@@ -5,6 +5,7 @@ import { pages, redirects } from '../db/schema.js';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { resolveTemplateSetting } from '../db/templates.js';
 import { resolveFontSettings } from '../db/fonts.js';
+import { resolveSiteName, formatPageTitle } from '../db/site.js';
 import { extractFamilyFromLink } from '../form/fields/font-utils.js';
 import type { Data } from '@puckeditor/core';
 import externalPuckConfig from 'virtual:purplepanda/puck-config';
@@ -55,7 +56,7 @@ async function resolvePlainPage(path: string) {
 
 const contentTypeRoute = matchContentTypeRoute(requestPath);
 
-const [matchedPage, templateSetting, fontSettings] = await Promise.all([
+const [matchedPage, templateSetting, fontSettings, siteName] = await Promise.all([
     contentTypeRoute
         ? db
             .select()
@@ -70,6 +71,7 @@ const [matchedPage, templateSetting, fontSettings] = await Promise.all([
         : resolvePlainPage(requestPath),
     resolveTemplateSetting(db, contentTypeRoute?.contentType.id),
     resolveFontSettings(db),
+    resolveSiteName(db),
 ]);
 
 const headingFontFamily = extractFamilyFromLink(fontSettings.headingFontLink);
@@ -100,7 +102,7 @@ const [pageData, templateData] = await Promise.all([
         : Promise.resolve(undefined),
 ]);
 
-const title: string = (pageData as any)?.root?.props?.title ?? '';
+const title: string = formatPageTitle((pageData as any)?.root?.props?.title ?? '', siteName);
 ---
 
 <!DOCTYPE html>

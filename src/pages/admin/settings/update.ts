@@ -23,11 +23,17 @@ export async function POST(context: APIContext): Promise<Response> {
         return context.redirect("/admin/settings");
     }
 
+    const siteName = getFieldByName(form, 'site-name')?.value ?? '';
     const defaultTemplateId = getFieldByName(form, 'dt-option')?.value;
     const turnstileSiteKey = getFieldByName(form, 'turnstile-site-key')?.value ?? '';
     const turnstileSecretKey = getFieldByName(form, 'turnstile-secret-key')?.value ?? '';
     const headingFontLink = getFieldByName(form, 'heading-font')?.value ?? '';
     const bodyFontLink = getFieldByName(form, 'body-font')?.value ?? '';
+
+    await db
+        .insert(settings)
+        .values({ key: 'site_name', value: siteName })
+        .onConflictDoUpdate({ target: settings.key, set: { value: siteName } });
 
     await db
         .insert(settings)

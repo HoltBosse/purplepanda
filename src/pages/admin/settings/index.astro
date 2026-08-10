@@ -14,6 +14,9 @@ const db = getDb();
 const [defaultTemplateSetting] = await db.select().from(settings).where(eq(settings.key, 'default_template')).limit(1);
 const defaultTemplateId = defaultTemplateSetting?.value as string | undefined;
 
+const [siteNameSetting] = await db.select().from(settings).where(eq(settings.key, 'site_name')).limit(1);
+const siteName = siteNameSetting?.value as string | undefined;
+
 const turnstileSettings = await db.select().from(settings).where(inArray(settings.key, ['turnstile_site_key', 'turnstile_secret_key']));
 const turnstileSiteKey = turnstileSettings.find(s => s.key === 'turnstile_site_key')?.value as string | undefined;
 const turnstileSecretKey = turnstileSettings.find(s => s.key === 'turnstile_secret_key')?.value as string | undefined;
@@ -48,6 +51,7 @@ const form = getSettingsForm(
 	headingFontLink,
 	bodyFontLink,
 	fontFamilies,
+	siteName,
 );
 ---
 

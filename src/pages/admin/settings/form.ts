@@ -24,7 +24,9 @@ export function getSettingsForm(
     headingFontLink?: string,
     bodyFontLink?: string,
     fontFamilies: string[] = [],
+    siteName?: string,
 ): FormSection {
+    const siteNameValue = flash['site-name'] ?? siteName;
     const dtOptionValue = flash['dt-option'] ?? defaultTemplateId;
     const turnstileSiteKeyValue = flash['turnstile-site-key'] ?? turnstileSiteKey;
     const turnstileSecretKeyValue = flash['turnstile-secret-key'] ?? turnstileSecretKey;
@@ -111,6 +113,44 @@ export function getSettingsForm(
         title: 'Settings',
         classList: "space-y-6",
         fields: [
+            {
+                id: 'site-group-wrapper',
+                name: 'site-group-wrapper',
+                type: "Group",
+                fields: fields,
+                classList: "p-6 bg-base-100 rounded-lg settings-search-section",
+                groupFields: [
+                    {
+                        id: 'site-group-header',
+                        name: 'site-group-header',
+                        type: 'Html',
+                        markup: '<h2 class="text-lg font-medium settings-search-label">Site</h2>',
+                    },
+                    {
+                        id: 'site-name-group',
+                        name: 'site-name-group',
+                        type: "Group",
+                        fields: fields,
+                        classList: "grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6 mt-6",
+                        groupFields: [
+                            {
+                                id: 'site-name-header',
+                                name: 'site-name-header',
+                                type: 'Html',
+                                markup: '<h2 class="text-md font-medium flex items-center settings-search-label">Site Name</h2>',
+                            },
+                            {
+                                id: 'site-name',
+                                name: 'site-name',
+                                type: 'Input',
+                                classList: inputClassList,
+                                ...(siteNameValue ? { value: siteNameValue } : {}),
+                                validator: z.string().optional(),
+                            },
+                        ],
+                    },
+                ],
+            },
             {
                 id: 'dt-group-wrapper',
                 name: 'dt-group-wrapper',
