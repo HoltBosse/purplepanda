@@ -22,6 +22,7 @@ const Margin: ComponentConfig<MarginProps> = {
     },
     content: {
       type: "slot",
+      label: "Content",
     },
   },
   defaultProps: {

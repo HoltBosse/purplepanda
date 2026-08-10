@@ -13,6 +13,7 @@ const FormEmbed: ComponentConfig<FormEmbedProps> = {
   fields: {
     form: {
       type: "external",
+      label: "Form",
       placeholder: "Select a form...",
       showSearch: true,
       fetchList: async ({ query }: { query: string }) => {

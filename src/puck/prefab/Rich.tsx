@@ -274,6 +274,7 @@ const Rich: ComponentConfig<RichProps> = {
   fields: {
     content: {
       type: "richtext",
+      label: "Text",
       options: {
         heading: { levels: [1, 2, 3, 4] },
         link: { openOnClick: false, HTMLAttributes: { target: null } },

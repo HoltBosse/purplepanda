@@ -10,15 +10,18 @@ const Grid: ComponentConfig<GridProps> = {
   fields: {
     columns: {
       type: "number",
+      label: "Columns",
       min: 1,
       max: 254,
     },
     gap: {
       type: "number",
+      label: "Gap",
       min: 0,
     },
     content: {
       type: "slot",
+      label: "Content",
     },
   },
   defaultProps: {

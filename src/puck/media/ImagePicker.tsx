@@ -772,6 +772,7 @@ function ImagePickerField({
 // template (see bindableFields below and ../data-binding.js).
 export const imageField: CustomField<ImageConfig | null> = {
   type: "custom",
+  label: "Image",
   render: ({ value, onChange }) => (
     <ImagePickerField value={value} onChange={onChange} />
   ),

@@ -319,6 +319,7 @@ const CardCollection: ComponentConfig<CardCollectionProps> = {
     } as ObjectField<OrderBy>,
     cardTemplate: {
       type: "slot",
+      label: "Card Template",
     },
   },
   defaultProps: {

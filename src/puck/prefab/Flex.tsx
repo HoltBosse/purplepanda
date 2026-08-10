@@ -13,6 +13,7 @@ const Flex: ComponentConfig<FlexProps> = {
   fields: {
     direction: {
       type: "radio",
+      label: "Direction",
       options: [
         { label: "Row", value: "row" },
         { label: "Column", value: "column" },
@@ -20,6 +21,7 @@ const Flex: ComponentConfig<FlexProps> = {
     },
     justifyContent: {
       type: "radio",
+      label: "Justify Content",
       options: [
         { label: "Start", value: "start" },
         { label: "Center", value: "center" },
@@ -28,6 +30,7 @@ const Flex: ComponentConfig<FlexProps> = {
     },
     alignItems: {
       type: "radio",
+      label: "Align Items",
       options: [
         { label: "Start", value: "start" },
         { label: "Center", value: "center" },
@@ -37,17 +40,20 @@ const Flex: ComponentConfig<FlexProps> = {
     },
     gap: {
       type: "number",
+      label: "Gap",
       min: 0,
     },
     wrap: {
       type: "radio",
+      label: "Wrap",
       options: [
-        { label: "true", value: "wrap" },
-        { label: "false", value: "nowrap" },
+        { label: "True", value: "wrap" },
+        { label: "False", value: "nowrap" },
       ],
     },
     items: {
       type: "slot",
+      label: "Items",
     },
   },
   defaultProps: {

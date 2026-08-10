@@ -9,10 +9,12 @@ const Space: ComponentConfig<SpaceProps> = {
   fields: {
     size: {
       type: "number",
+      label: "Size",
       min: 0,
     },
     direction: {
       type: "radio",
+      label: "Direction",
       options: [
         { label: "Vertical", value: "vertical" },
         { label: "Horizontal", value: "horizontal" },
