@@ -77,6 +77,63 @@ function SelectField({
 
   return (
     <div className="w-full">
+      {/*
+        SlimSelect enhances the native <select class="select select-bordered"> below, replacing
+        it with a `.ss-main` box. Without this, `.ss-main` falls back to slim-select's own default
+        geometry (less padding, no explicit font-size) instead of daisyUI's `.select` sizing, so
+        the control visibly resizes the instant JS hydrates it — reflowing whatever it's laid out
+        next to (e.g. a Flex row). Matching daisyUI's metrics here keeps the footprint identical
+        before and after hydration.
+      */}
+      <style>{`
+        .ss-main {
+          width: 100%;
+          min-height: 2.5rem;
+          padding-inline: 0.75rem 1.75rem;
+          font-size: 0.875rem;
+          line-height: 1.25rem;
+          box-shadow: none;
+          border-color: color-mix(in oklab, var(--color-base-content) 20%, transparent);
+          border-radius: var(--radius-field);
+          background-color: var(--color-base-100);
+          color: var(--color-base-content);
+        }
+        .ss-main .ss-values {
+          padding-block: 0;
+        }
+        .ss-main .ss-values .ss-single,
+        .ss-main .ss-values .ss-placeholder,
+        .ss-main .ss-values .ss-multi-string {
+          padding: 0;
+        }
+        .ss-main:focus,
+        .ss-main.ss-open {
+          border-color: var(--color-primary);
+          outline: none;
+        }
+        .ss-main .ss-values .ss-value,
+        .ss-main .ss-values .ss-max {
+          background-color: var(--color-primary);
+        }
+        .ss-main .ss-values .ss-value .ss-value-text,
+        .ss-main .ss-values .ss-max {
+          color: var(--color-primary-content);
+        }
+        .ss-main .ss-values .ss-value .ss-value-delete svg path {
+          stroke: var(--color-primary-content);
+        }
+        .ss-content {
+          border: 1px solid color-mix(in oklab, var(--color-base-content) 20%, transparent);
+          border-radius: var(--radius-field);
+          background-color: var(--color-base-100);
+        }
+        .ss-content .ss-list .ss-option:hover:not(.ss-disabled),
+        .ss-content .ss-list .ss-option.ss-highlighted,
+        .ss-content .ss-list .ss-option:not(.ss-disabled).ss-selected {
+          color: var(--color-primary-content);
+          background-color: var(--color-primary);
+        }
+      `}</style>
       {label && (
         <label className="block text-sm font-medium mb-1" htmlFor={name}>
           {label}

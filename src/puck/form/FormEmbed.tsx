@@ -36,7 +36,13 @@ const FormEmbed: ComponentConfig<FormEmbedProps> = {
   },
   render: ({ form, _html }: FormEmbedProps) => {
     if (_html) {
-      return <div dangerouslySetInnerHTML={{ __html: _html }} />;
+      // Explicit width, not left to shrink-to-fit: as a flex/grid item (e.g. inside a Flex
+      // component) this div would otherwise size itself off whatever's biggest inside the form
+      // markup. Before JS runs that's the native <select>'s own `w-full`, which happens to keep
+      // this div stretched full-width too — but once an island (e.g. the Select field's SlimSelect
+      // enhancement) clears that class on hydration, the div loses its only reason to stay wide
+      // and collapses to fit-content, visibly shrinking the whole form.
+      return <div className="w-full" dangerouslySetInnerHTML={{ __html: _html }} />;
     }
     return (
       <div

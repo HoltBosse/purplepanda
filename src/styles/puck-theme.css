@@ -76,6 +76,24 @@
   max-width: 100%;
 }
 
+/* Puck wraps every dropzone item in a [data-puck-component] drag-handle div that doesn't
+   exist in production's <Render> output. That extra box has no width of its own, so inside
+   a flex dropzone (e.g. Flex.tsx) IT becomes the actual flex item instead of the component's
+   own root element — meaning a component that fills its row via its own width:100% (e.g.
+   FormEmbed, whose root div carries the "w-full" class) sizes to content in the editor
+   instead of stretching, unlike production. Gated on ":has(> .w-full)" so this only kicks in
+   for components that actually opt into filling their row: components that want to stay
+   content-sized and centered by the dropzone's justify-content (e.g. Rich, a lone paragraph)
+   must NOT be forced wide here — stretching the wrapper leaves justify-content nothing to
+   center against, so the (still natural-width) content would end up flush against the start
+   edge instead of centered, itself a mismatch from production. Only matters when the wrapper
+   is the dropzone's sole child: with siblings, letting each stretch to 100% would force them
+   onto separate lines instead of sitting side by side, an actual behavior change from
+   production. Not scoped to .Puck: the canvas is a mirrored iframe with no .Puck ancestor. */
+[data-puck-dropzone] > [data-puck-component]:only-child:has(> .w-full) {
+  width: 100%;
+}
+
 /* @puckeditor/core's bundled CSS doesn't style the tiptap Placeholder extension
    (@tiptap/extensions), so its data-placeholder attribute/classes render invisibly
    without this rule. */

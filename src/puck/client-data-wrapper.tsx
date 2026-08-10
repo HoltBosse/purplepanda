@@ -58,10 +58,15 @@ function toSerializableObject(value: unknown): JsonObject {
 }
 
 export function ClientComponentDataWrapper({ componentName, fields, render, endpoint }: ClientComponentDataWrapperProps) {
-  const [resolvedData, setResolvedData] = useState<JsonObject>({});
-
   const requestFields = useMemo(() => toSerializableObject(fields), [fields]);
   const cacheKey = useMemo(() => `${componentName}:${JSON.stringify(requestFields)}`, [componentName, requestFields]);
+
+  // Puck rebuilds slot components on every editor render (see the identical note in
+  // PuckEditor.tsx), so this wrapper remounts constantly while editing. Seeding straight from the
+  // cache means an already-resolved component renders its real data on the very first paint
+  // instead of always starting blank and flashing back to the caller's fallback UI (e.g.
+  // FormEmbed's placeholder box) until the effect below re-populates it.
+  const [resolvedData, setResolvedData] = useState<JsonObject>(() => responseCache.get(cacheKey) ?? {});
 
   useEffect(() => {
     let isCancelled = false;
