@@ -22,6 +22,9 @@ export function getSettingsForm(
     bodyFontLink?: string,
     fontFamilies: string[] = [],
     siteName?: string,
+    emailHost?: string,
+    emailAddress?: string,
+    emailPassword?: string,
 ): FormSection {
     const siteNameValue = flash['site-name'] ?? siteName;
     const dtOptionValue = flash['dt-option'] ?? defaultTemplateId;
@@ -29,6 +32,9 @@ export function getSettingsForm(
     const turnstileSecretKeyValue = flash['turnstile-secret-key'] ?? turnstileSecretKey;
     const headingFontValue = flash['heading-font'] ?? headingFontLink;
     const bodyFontValue = flash['body-font'] ?? bodyFontLink;
+    const emailHostValue = flash['email-host'] ?? emailHost;
+    const emailAddressValue = flash['email-address'] ?? emailAddress;
+    const emailPasswordValue = flash['email-password'] ?? emailPassword;
     const contentTypeGroups = contentTypes.map((contentType) => {
         const templateFieldName = `content-default-template-${contentType.id}`;
         const defaultTemplateValue = flash[templateFieldName] ?? contentTemplateDefaults[contentType.id];
@@ -361,7 +367,105 @@ export function getSettingsForm(
                         ],
                     }
                 ]
-            }
+            },
+            {
+                id: 'email-group-wrapper',
+                name: 'email-group-wrapper',
+                type: "Group",
+                fields: fields,
+                classList: "p-6 bg-base-100 rounded-lg settings-search-section",
+                groupFields: [
+                    {
+                        id: 'email-group-header',
+                        name: 'email-group-header',
+                        type: 'Html',
+                        markup: '<h2 class="text-lg font-medium settings-search-label">Email</h2>',
+                    },
+                    {
+                        id: 'email-host-group',
+                        name: 'email-host-group',
+                        type: "Group",
+                        fields: fields,
+                        classList: "grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6 mt-6",
+                        groupFields: [
+                            {
+                                id: 'email-host-header',
+                                name: 'email-host-header',
+                                type: 'Html',
+                                markup: '<h2 class="text-md font-medium flex items-center settings-search-label">Host</h2>',
+                            },
+                            {
+                                id: 'email-host',
+                                name: 'email-host',
+                                type: 'Input',
+                                inputType: 'text',
+                                placeholder: 'smtp.example.com',
+                                classList: inputClassList,
+                                ...(emailHostValue ? { value: emailHostValue } : {}),
+                                validator: z.string().optional(),
+                            },
+                        ],
+                    },
+                    {
+                        id: 'email-address-group',
+                        name: 'email-address-group',
+                        type: "Group",
+                        fields: fields,
+                        classList: "grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6 mt-6",
+                        groupFields: [
+                            {
+                                id: 'email-address-header',
+                                name: 'email-address-header',
+                                type: 'Html',
+                                markup: '<h2 class="text-md font-medium flex items-center settings-search-label">Email</h2>',
+                            },
+                            {
+                                id: 'email-address',
+                                name: 'email-address',
+                                type: 'Input',
+                                inputType: 'email',
+                                placeholder: 'noreply@example.com',
+                                classList: inputClassList,
+                                ...(emailAddressValue ? { value: emailAddressValue } : {}),
+                                validator: z.string().optional(),
+                            },
+                        ],
+                    },
+                    {
+                        id: 'email-password-group',
+                        name: 'email-password-group',
+                        type: "Group",
+                        fields: fields,
+                        classList: "grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6 mt-6",
+                        groupFields: [
+                            {
+                                id: 'email-password-header',
+                                name: 'email-password-header',
+                                type: 'Html',
+                                markup: '<h2 class="text-md font-medium flex items-center settings-search-label">Password</h2>',
+                            },
+                            {
+                                id: 'email-password',
+                                name: 'email-password',
+                                type: 'Input',
+                                inputType: 'password',
+                                classList: inputClassList,
+                                ...(emailPasswordValue ? { value: emailPasswordValue } : {}),
+                                validator: z.string().optional(),
+                            },
+                        ],
+                    },
+                    {
+                        id: 'email-test-group',
+                        name: 'email-test-group',
+                        type: 'Html',
+                        markup: `<div class="flex items-center justify-end gap-3 mt-6">
+                            <span id="email-test-result" class="text-sm hidden"></span>
+                            <button type="button" id="email-test-credentials" class="btn btn-outline btn-sm">Test Credentials</button>
+                        </div>`,
+                    },
+                ],
+            },
         ],
         props: {
             action: "/admin/settings/update",

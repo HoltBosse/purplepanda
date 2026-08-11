@@ -537,6 +537,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/settings/api/test-email",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/settings/api/test-email.ts",
+        });
+
+        injectRoute({
           pattern: "/admin/settings/prefab/default",
           entrypoint: "@holtbosse/purplepanda/pages/admin/settings/prefab/default.astro",
         });

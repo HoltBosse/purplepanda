@@ -24,6 +24,11 @@ const turnstileSecretKey = turnstileSettings.find(s => s.key === 'turnstile_secr
 const fontSettings = await db.select().from(settings).where(inArray(settings.key, ['heading_font_link', 'body_font_link']));
 const headingFontLink = fontSettings.find(s => s.key === 'heading_font_link')?.value as string | undefined;
 const bodyFontLink = fontSettings.find(s => s.key === 'body_font_link')?.value as string | undefined;
+
+const emailSettings = await db.select().from(settings).where(inArray(settings.key, ['email_host', 'email_address', 'email_password']));
+const emailHost = emailSettings.find(s => s.key === 'email_host')?.value as string | undefined;
+const emailAddress = emailSettings.find(s => s.key === 'email_address')?.value as string | undefined;
+const emailPassword = emailSettings.find(s => s.key === 'email_password')?.value as string | undefined;
 const fontFamilies = externalPuckConfig?.fontFamilies ?? [];
 const contentTypes = (externalPuckConfig?.contentTypes ?? []);
 const contentSettingsKeys = contentTypes.map((ct) => `content_default_template_${ct.id}`);
@@ -52,6 +57,9 @@ const form = getSettingsForm(
 	bodyFontLink,
 	fontFamilies,
 	siteName,
+	emailHost,
+	emailAddress,
+	emailPassword,
 );
 ---
 
@@ -90,5 +98,43 @@ const form = getSettingsForm(
 			);
 			section.classList.toggle('hidden', !matches);
 		});
+	});
+
+	const testEmailButton = document.getElementById('email-test-credentials') as HTMLButtonElement | null;
+	const testEmailResult = document.getElementById('email-test-result') as HTMLSpanElement | null;
+	const emailHostInput = document.getElementById('email-host') as HTMLInputElement | null;
+	const emailAddressInput = document.getElementById('email-address') as HTMLInputElement | null;
+	const emailPasswordInput = document.getElementById('email-password') as HTMLInputElement | null;
+
+	testEmailButton?.addEventListener('click', async () => {
+		if (!testEmailResult) return;
+
+		const host = emailHostInput?.value.trim() ?? '';
+		const email = emailAddressInput?.value.trim() ?? '';
+		const password = emailPasswordInput?.value ?? '';
+
+		testEmailButton.disabled = true;
+		testEmailResult.classList.remove('hidden', 'text-success', 'text-error');
+		testEmailResult.classList.add('text-base-content/70');
+		testEmailResult.textContent = 'Testing…';
+
+		try {
+			const response = await fetch('/admin/settings/api/test-email', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ host, email, password }),
+			});
+			const result = await response.json() as { success: boolean; message: string };
+
+			testEmailResult.classList.remove('text-base-content/70');
+			testEmailResult.classList.add(result.success ? 'text-success' : 'text-error');
+			testEmailResult.textContent = result.message;
+		} catch {
+			testEmailResult.classList.remove('text-base-content/70');
+			testEmailResult.classList.add('text-error');
+			testEmailResult.textContent = 'Failed to reach the server.';
+		} finally {
+			testEmailButton.disabled = false;
+		}
 	});
 </script>

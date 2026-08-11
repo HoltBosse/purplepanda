@@ -29,6 +29,9 @@ export async function POST(context: APIContext): Promise<Response> {
     const turnstileSecretKey = getFieldByName(form, 'turnstile-secret-key')?.value ?? '';
     const headingFontLink = getFieldByName(form, 'heading-font')?.value ?? '';
     const bodyFontLink = getFieldByName(form, 'body-font')?.value ?? '';
+    const emailHost = getFieldByName(form, 'email-host')?.value ?? '';
+    const emailAddress = getFieldByName(form, 'email-address')?.value ?? '';
+    const emailPassword = getFieldByName(form, 'email-password')?.value ?? '';
 
     await db
         .insert(settings)
@@ -59,6 +62,21 @@ export async function POST(context: APIContext): Promise<Response> {
         .insert(settings)
         .values({ key: 'body_font_link', value: bodyFontLink })
         .onConflictDoUpdate({ target: settings.key, set: { value: bodyFontLink } });
+
+    await db
+        .insert(settings)
+        .values({ key: 'email_host', value: emailHost })
+        .onConflictDoUpdate({ target: settings.key, set: { value: emailHost } });
+
+    await db
+        .insert(settings)
+        .values({ key: 'email_address', value: emailAddress })
+        .onConflictDoUpdate({ target: settings.key, set: { value: emailAddress } });
+
+    await db
+        .insert(settings)
+        .values({ key: 'email_password', value: emailPassword })
+        .onConflictDoUpdate({ target: settings.key, set: { value: emailPassword } });
 
     for (const contentType of contentTypes) {
         const templateFormKey = `content-default-template-${contentType.id}`;
