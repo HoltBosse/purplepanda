@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseAst } from 'rollup/parseAst';
+import { parse } from 'acorn';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { generateIslandsManifest, type ResolveFn } from './islands-manifest';
 
@@ -37,6 +37,11 @@ const resolve: ResolveFn = async (source, importer) => {
     }
     return null;
 };
+
+// A real ESTree parser, deliberately not the one bundled inside whichever tool Vite happens to use
+// internally (rollup vs. rolldown) for a given version — that choice isn't part of this package's
+// dependency contract and has changed under us before.
+const parseAst = (code: string) => parse(code, { ecmaVersion: 'latest', sourceType: 'module' });
 
 const generate = (configPath: string) => generateIslandsManifest(configPath, resolve, parseAst);
 

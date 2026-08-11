@@ -58,6 +58,7 @@
     "@types/pg": "^8.20.0",
     "@vitejs/plugin-react": "^5.2.0",
     "@vitest/browser-playwright": "^4.1.10",
+    "acorn": "^8.18.0",
     "astro": "^7.0.3",
     "drizzle-kit": "^0.31.10",
     "playwright": "^1.62.1",
