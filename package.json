@@ -56,11 +56,15 @@
     "@tailwindcss/typography": "^0.5.20",
     "@types/node": "^26.0.1",
     "@types/pg": "^8.20.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "@vitest/browser-playwright": "^4.1.10",
     "astro": "^7.0.3",
     "drizzle-kit": "^0.31.10",
+    "playwright": "^1.62.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.8",
+    "vitest-browser-react": "^2.2.0"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.10",

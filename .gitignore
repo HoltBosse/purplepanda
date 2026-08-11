@@ -49,6 +49,10 @@ coverage/
 .turbo/
 .astro/
 
+# Vitest browser mode failure artifacts
+.vitest-attachments/
+**/__screenshots__/
+
 # Package manager lockfiles (keep only one)
 # Uncomment the ones you don't use:
 # package-lock.json

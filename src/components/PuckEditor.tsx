@@ -8,6 +8,7 @@ import { cloneElement, createContext, isValidElement, useCallback, useContext, u
 import { createPortal } from "react-dom";
 import { extractFamilyFromLink } from "../form/fields/font-utils.js";
 import { Save } from "../puck/icons.js";
+import { ensureTemplateSlot } from "./template-slot.js";
 
 const ROOT_SLOT_NAME = "default-zone";
 
@@ -149,35 +150,6 @@ interface PuckEditorProps {
   headingFontLink?: string;
   bodyFontLink?: string;
   dictionary?: Dictionary;
-}
-
-function hasTemplateSlot(value: unknown): boolean {
-  if (Array.isArray(value)) {
-    return value.some((item) => hasTemplateSlot(item));
-  }
-
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-
-    if (record.type === "TemplateSlot") {
-      return true;
-    }
-
-    return Object.values(record).some((item) => hasTemplateSlot(item));
-  }
-
-  return false;
-}
-
-function ensureTemplateSlot(data: Data): Data {
-  if (hasTemplateSlot(data)) {
-    return data;
-  }
-
-  return {
-    ...data,
-    content: [...(data.content ?? []), { type: "TemplateSlot", props: { id: "TemplateSlot-fallback" } }],
-  };
 }
 
 export default function PuckEditor({ config, data, templateData, onPublish, onSave, headingFontLink, bodyFontLink, dictionary }: PuckEditorProps) {

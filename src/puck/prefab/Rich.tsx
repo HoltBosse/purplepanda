@@ -224,7 +224,8 @@ function LinkMenu({
   );
 }
 
-function RichTextMenuScrollFade({ children }: { children: ReactNode }) {
+// Exported for unit testing; not part of the package's public API.
+export function RichTextMenuScrollFade({ children }: { children: ReactNode }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [showLeftFade, setShowLeftFade] = useState(false);
   const [showRightFade, setShowRightFade] = useState(false);

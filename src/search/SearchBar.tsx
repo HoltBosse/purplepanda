@@ -1,7 +1,8 @@
 import { CircleX } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { parseSearchQuery } from "./parser.js";
-import type { SearchAst, SearchFieldSpec, ValidatedSearchAst } from "./types.js";
+import { buildSuggestions, type Suggestion } from "./suggestions.js";
+import type { SearchFieldSpec, ValidatedSearchAst } from "./types.js";
 import { validateSearchAst } from "./validate.js";
 
 export interface SearchBarProps {
@@ -14,10 +15,6 @@ export interface SearchBarProps {
   placeholder?: string;
   className?: string;
 }
-
-type Suggestion =
-  | { kind: "field"; field: SearchFieldSpec }
-  | { kind: "value"; field: SearchFieldSpec; value: string };
 
 // Geometry shared VERBATIM by all three stacked layers (colored backdrop, invisible caret-measuring
 // mirror, and the real input) so their text lays out pixel-for-pixel identically. Deliberately built
@@ -318,26 +315,3 @@ function renderHighlighted(value: string, validated: ValidatedSearchAst) {
   return nodes;
 }
 
-function buildSuggestions(ast: SearchAst, fields: SearchFieldSpec[], caret: number): Suggestion[] {
-  const node = ast.find((n) => caret >= n.start && caret <= n.end);
-
-  if (!node || node.kind === "text") {
-    const prefix = (node?.value ?? "").toLowerCase();
-    return fields
-      .filter((f) => f.name.toLowerCase().startsWith(prefix))
-      .map((field) => ({ kind: "field", field }) as const);
-  }
-
-  const field = fields.find((f) => f.name === node.field);
-  if (!field) return [];
-
-  const prefix = node.value.toLowerCase();
-  return valueCandidates(field)
-    .filter((v) => v.toLowerCase().startsWith(prefix))
-    .map((v) => ({ kind: "value", field, value: v }) as const);
-}
-
-function valueCandidates(field: SearchFieldSpec): string[] {
-  const base = field.type === "boolean" ? ["true", "false"] : field.type === "enum" ? (field.enumValues ?? []) : [];
-  return field.nullable ? [...base, "null"] : base;
-}

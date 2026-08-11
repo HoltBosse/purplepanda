@@ -30,5 +30,13 @@
     "skipLibCheck": true,
     "jsxImportSource": "react"
   },
-  "exclude": ["drizzle.config.ts", "vitest.config.ts", "dist", "node_modules", "**/*.test.ts", "docs/**"]
+  "exclude": [
+    "drizzle.config.ts",
+    "vitest.config.ts",
+    "vitest.virtual-modules.ts",
+    "dist",
+    "node_modules",
+    "**/*.test.ts",
+    "docs/**"
+  ]
 }

@@ -52,7 +52,8 @@ function toSerializable(value: unknown, seen: WeakSet<object>): unknown {
   return undefined;
 }
 
-function toSerializableObject(value: unknown): JsonObject {
+// Exported for unit testing; not part of the package's public API.
+export function toSerializableObject(value: unknown): JsonObject {
   const safeValue = toSerializable(value, new WeakSet<object>());
   return isObject(safeValue) ? safeValue : {};
 }
