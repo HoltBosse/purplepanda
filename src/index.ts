@@ -292,6 +292,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/pages/api/lookup",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/pages/api/lookup.ts",
+        });
+
+        injectRoute({
           pattern: "/admin/pages",
           entrypoint: "@holtbosse/purplepanda/pages/admin/pages/index.astro",
         });
@@ -409,6 +414,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         injectRoute({
           pattern: "/admin/profile/update",
           entrypoint: "@holtbosse/purplepanda/pages/admin/profile/update.ts",
+        });
+
+        injectRoute({
+          pattern: "/admin/users/api/lookup",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/users/api/lookup.ts",
         });
 
         injectRoute({

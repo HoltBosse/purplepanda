@@ -6,6 +6,12 @@ import LocalDateTime from '../../../../components/LocalDateTime.astro';
 import { getDb } from '../../../../db/db.js';
 import { formSubmissions, forms } from '../../../../db/schema.js';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import {
+    collectSubmissionFieldMeta,
+    formatSubmissionValue,
+    resolveFieldLabel,
+    visibleSubmissionFields,
+} from '../../../../puck/form/submission-display.js';
 import { filterConfigByLocation } from '../../../../puck/index.js';
 import { resolveDataForSSR } from '../../../../puck/server-data-wrapper.js';
 
@@ -30,16 +36,6 @@ if (!submission) return Astro.redirect('/admin/forms/submissions');
 
 const formName = (submission.formContent as any)?.root?.props?.name || 'Untitled';
 
-function formatBytes(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function isFileValue(value: unknown): value is { name: string; size: number; type: string } {
-    return !!value && typeof value === 'object' && 'name' in value && 'size' in value && 'type' in value;
-}
-
 // Run each field's own `data` resolver (e.g. Select's content/users option lookup) before reading
 // props, the same way FormEmbed.server.ts does for rendering a live form — so a field whose
 // `options` prop is just a stale manual-mode leftover (see Select.tsx's `data` resolver comment)
@@ -48,84 +44,18 @@ function isFileValue(value: unknown): value is { name: string; size: number; typ
 const formConfig = filterConfigByLocation((externalPuckConfig as Config) ?? ({} as Config), 'form');
 const resolvedFormContent = await resolveDataForSSR(formConfig, submission.formContent as Data);
 
-// Walk the form's Puck content tree to find each field's display label and its choice options
-// (Select, RadioGroup) or checkbox label, so the submissions table can show the label the form
-// editor set rather than the raw `field-<id>` key, and so submitted codes (e.g. "option-1") can
-// be resolved back to the human-readable label the visitor actually saw. Also collects which
-// field keys opt out of display entirely via `submissionDisplay: false` on their component config
-// (e.g. Turnstile, whose stored value is a verification token rather than a meaningful answer).
-type FieldOption = { label: string; value: string };
-const labelByFieldName: Record<string, string> = {};
-const optionsByFieldName: Record<string, FieldOption[]> = {};
-const checkboxLabelByFieldName: Record<string, string> = {};
-const hiddenFieldNames = new Set<string>();
-// Which component owns each field (and its stored props), so a component that implements
-// `renderSubmissionValue` (see puck/index.ts) can be looked up and run per field below — kept
-// generic so any future field type can opt into custom rendering the same way, not just Image.
-const typeByFieldName: Record<string, string> = {};
-const propsByFieldName: Record<string, Record<string, unknown>> = {};
-
-function collectFieldMeta(node: unknown): void {
-    if (Array.isArray(node)) {
-        node.forEach(collectFieldMeta);
-        return;
-    }
-    if (!node || typeof node !== 'object') return;
-
-    const type = (node as any).type;
-    const props = (node as any).props;
-    if (props && typeof props.id === 'string') {
-        const fieldName = `field-${props.id}`;
-        if (typeof props.label === 'string' && props.label) {
-            labelByFieldName[fieldName] = props.label;
-        }
-        if (Array.isArray(props.options)) {
-            optionsByFieldName[fieldName] = props.options;
-        } else if (typeof props.checkboxLabel === 'string') {
-            checkboxLabelByFieldName[fieldName] = props.checkboxLabel;
-        }
-        if (typeof type === 'string') {
-            typeByFieldName[fieldName] = type;
-            propsByFieldName[fieldName] = props;
-            if (formConfig.components?.[type]?.submissionDisplay === false) {
-                hiddenFieldNames.add(fieldName);
-            }
-        }
-    }
-
-    Object.values(node).forEach(collectFieldMeta);
-}
-
-collectFieldMeta(resolvedFormContent);
-
-function resolveFieldLabel(key: string): string {
-    return labelByFieldName[key] ?? key;
-}
-
-function resolveDisplayValue(key: string, raw: unknown): string {
-    if (checkboxLabelByFieldName[key] !== undefined) return checkboxLabelByFieldName[key];
-    const options = optionsByFieldName[key];
-    if (options) return options.find((opt) => opt.value === raw)?.label ?? String(raw ?? '');
-    return String(raw ?? '');
-}
-
-function formatValue(key: string, value: unknown): string {
-    if (Array.isArray(value)) return value.map((v) => formatValue(key, v)).join(', ');
-    if (isFileValue(value)) return `${value.name} (${value.type || 'unknown type'}, ${formatBytes(value.size)})`;
-    return resolveDisplayValue(key, value);
-}
-
-const fields = Object.entries(submission.data as Record<string, unknown>).filter(([key]) => !hiddenFieldNames.has(key));
+const meta = collectSubmissionFieldMeta(formConfig, resolvedFormContent);
+const fields = visibleSubmissionFields(meta, submission.data as Record<string, unknown>);
 
 // Pre-render any field whose component opts into custom submission rendering (e.g. Image.tsx
 // showing its stored media reference as a thumbnail instead of a printed object) — computed
 // ahead of time since Astro template expressions below can't themselves be async.
 const renderedByFieldName: Record<string, string> = {};
 for (const [key, value] of fields) {
-    const type = typeByFieldName[key];
+    const type = meta.typeByFieldName[key];
     const renderSubmissionValue = type ? (formConfig.components as any)?.[type]?.renderSubmissionValue : undefined;
     if (typeof renderSubmissionValue === 'function') {
-        renderedByFieldName[key] = await renderSubmissionValue(value, propsByFieldName[key]);
+        renderedByFieldName[key] = await renderSubmissionValue(value, meta.propsByFieldName[key]);
     }
 }
 ---
@@ -152,11 +82,11 @@ for (const [key, value] of fields) {
         <tbody>
             {fields.map(([key, value]) => (
                 <tr>
-                    <td class="w-px whitespace-nowrap font-medium">{resolveFieldLabel(key)}</td>
+                    <td class="w-px whitespace-nowrap font-medium">{resolveFieldLabel(meta, key)}</td>
                     <td class="whitespace-pre-wrap break-words">
                         {renderedByFieldName[key] !== undefined
                             ? <Fragment set:html={renderedByFieldName[key]} />
-                            : formatValue(key, value)}
+                            : formatSubmissionValue(meta, key, value)}
                     </td>
                 </tr>
             ))}

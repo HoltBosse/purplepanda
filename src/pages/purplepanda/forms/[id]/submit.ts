@@ -2,12 +2,14 @@ import { has404Page } from "virtual:purplepanda/has-404";
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Config, Data } from "@puckeditor/core";
 import type { APIContext, APIRoute } from "astro";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import * as z from "zod";
 import { addAlertToSession, alertType, createAlert } from "../../../../alert/index.js";
 import { getDb } from "../../../../db/db.js";
-import { formSubmissions, forms } from "../../../../db/schema.js";
+import { sendMail } from "../../../../db/mail.js";
+import { resolvePagePathById } from "../../../../db/page-path.js";
+import { formSubmissions, forms, users } from "../../../../db/schema.js";
 import { buildFormSubmissionSchema, collectSubmissionFieldProcessors } from "../../../../puck/form/schema.js";
 import {
   CSRF_FIELD_NAME,
@@ -16,6 +18,14 @@ import {
   stripSpamGuardFields,
   verifyCsrfToken,
 } from "../../../../puck/form/spam-guard.js";
+import {
+  collectSubmissionFieldMeta,
+  formatSubmissionValue,
+  resolveFieldLabel,
+  visibleSubmissionFields,
+} from "../../../../puck/form/submission-display.js";
+import { filterConfigByLocation } from "../../../../puck/index.js";
+import { resolveDataForSSR } from "../../../../puck/server-data-wrapper.js";
 
 const uuidSchema = z.uuid();
 
@@ -72,10 +82,66 @@ function redirectBack(request: Request, fallbackMessage: string): Response {
 }
 
 // Also used to give bots caught by the honeypot an indistinguishable "success" so they don't
-// learn to iterate around it.
-async function successResponse(session: APIContext["session"], request: Request): Promise<Response> {
+// learn to iterate around it — including the redirect below, since a bot getting a different
+// response shape than a real submitter would be its own tell.
+async function successResponse(
+  session: APIContext["session"],
+  request: Request,
+  form: { content: unknown },
+): Promise<Response> {
   await addAlertToSession(session, createAlert(alertType.success, "Thanks for your submission!"));
+
+  const redirectPageId = (form.content as any)?.root?.props?.redirectPage as string | undefined;
+  if (redirectPageId) {
+    const path = await resolvePagePathById(getDb(), redirectPageId);
+    if (path !== null) {
+      return new Response(null, { status: 303, headers: { Location: `/${path}` } });
+    }
+  }
+
   return redirectBack(request, "Thanks for your submission!");
+}
+
+// Best-effort side effect of a genuine submission (unlike successResponse, this is never invoked
+// for the honeypot/spam-timing bypasses) — a failure here shouldn't fail the visitor's submission,
+// so callers are expected to catch and log rather than let this reject the request.
+async function notifyFormSubmission(
+  form: { content: unknown },
+  data: Record<string, unknown>,
+  submissionUrl: string,
+): Promise<void> {
+  const notifyUserIds = (form.content as any)?.root?.props?.notifyUserIds as string[] | undefined;
+  if (!notifyUserIds || notifyUserIds.length === 0) return;
+
+  const db = getDb();
+  const recipients = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(and(eq(users.state, 1), inArray(users.id, notifyUserIds)));
+
+  const to = recipients.map((row) => row.email);
+  if (to.length === 0) return;
+
+  const formName = ((form.content as any)?.root?.props?.name as string | undefined) || "your form";
+
+  // Same display rules as the admin submissions table: hide fields whose component opts out
+  // (e.g. Turnstile's verification token), show the label the form editor set rather than the raw
+  // `field-<id>` key, and resolve submitted codes (e.g. "option-1") back to the option's label.
+  // Fields with their own custom rendering (e.g. Image, which normally shows a thumbnail) link to
+  // the submission instead — that thumbnail's /image/<id> URL only loads for an admin browsing
+  // from the submissions/media admin views (see /image/[id].ts), which an email can't be.
+  const formConfig = filterConfigByLocation((externalPuckConfig as Config) ?? ({} as Config), "form");
+  const resolvedFormContent = await resolveDataForSSR(formConfig, form.content as Data);
+  const meta = collectSubmissionFieldMeta(formConfig, resolvedFormContent);
+  const lines = visibleSubmissionFields(meta, data).map(
+    ([key, value]) => `${resolveFieldLabel(meta, key)}: ${formatSubmissionValue(meta, key, value, submissionUrl)}`,
+  );
+
+  await sendMail(db, {
+    to,
+    subject: `New submission: ${formName}`,
+    text: [...lines, "", `View full submission: ${submissionUrl}`].join("\n"),
+  });
 }
 
 function describeValidationErrors(fieldErrors: Record<string, string[] | undefined>): string {
@@ -152,13 +218,13 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress, 
   // Bots that blanket-fill every field trip the trap; respond as if it succeeded so they don't
   // learn to leave these fields alone.
   if (isHoneypotTripped(data)) {
-    return successResponse(session, request);
+    return successResponse(session, request, form);
   }
 
   // Same fake-success treatment for submissions that arrive faster than a human could plausibly
   // fill the form out.
   if (isSubmittedTooFast(parsedId.data, data[CSRF_FIELD_NAME])) {
-    return successResponse(session, request);
+    return successResponse(session, request, form);
   }
 
   if (!(await verifyCsrfToken(parsedId.data, data[CSRF_FIELD_NAME]))) {
@@ -199,7 +265,16 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress, 
     return validationFailureResponse(session, request, z.flattenError(parsed.error).fieldErrors);
   }
 
-  await db.insert(formSubmissions).values({ formId: form.id, data: parsed.data });
+  const [inserted] = await db.insert(formSubmissions).values({ formId: form.id, data: parsed.data }).returning();
 
-  return successResponse(session, request);
+  if (inserted) {
+    try {
+      const submissionUrl = new URL(`/admin/forms/submissions/${inserted.id}`, request.url).toString();
+      await notifyFormSubmission(form, parsed.data, submissionUrl);
+    } catch (err) {
+      console.error(`[purplepanda] Failed to send submission notification for form ${form.id}`, err);
+    }
+  }
+
+  return successResponse(session, request, form);
 };
