@@ -2,6 +2,7 @@ import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Config, Data, Dictionary, Fields } from "@puckeditor/core";
 import { useMemo } from "react";
 import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
+import { aliasField } from "../puck/component-fields/AliasField.js";
 import { filterConfigByLocation, wrapConfigWithDataBinding } from "../puck/index.js";
 import PuckEditor from "./PuckEditor.js";
 
@@ -120,7 +121,7 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
         ...config.root,
         fields: {
           title: { type: "text" as const, label: "Title" },
-          alias: { type: "text" as const, label: "Alias" },
+          alias: aliasField,
           parentPage: {
             type: "select" as const,
             label: "Parent Page",

@@ -1,3 +1,4 @@
+export { aliasField } from "./AliasField.js";
 export type { MediaFolderRef } from "./FolderPicker.js";
 export { folderField } from "./FolderPicker.js";
 export type { CropBox, ImageConfig, ImageSizeOverride, MediaRef } from "./ImageField.js";
