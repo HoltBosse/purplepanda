@@ -1,14 +1,13 @@
 import externalPuckConfig from "virtual:purplepanda/puck-config";
-import type { ComponentConfig, ComponentData, Config, CustomField, Field, ObjectField, Slot, SlotComponent } from "@puckeditor/core";
+import type { ComponentConfig, ComponentData, Config, Field, ObjectField, Slot, SlotComponent } from "@puckeditor/core";
 import { createUsePuck } from "@puckeditor/core";
 import type { CSSProperties, ReactNode } from "react";
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 import { ItemContext } from "../data-binding.js";
-import { Monitor, Smartphone, Tablet } from "../icons.js";
 import {
   buildGridLayout,
   DEFAULT_LAYOUT,
-  type GridLayout,
+  layoutField,
   type ResponsiveLayout,
 } from "./card-grid.js";
 
@@ -33,91 +32,6 @@ export type CardCollectionProps = {
 };
 
 const DEFAULT_ORDER_BY: OrderBy = { field: "", direction: "desc" };
-
-type Breakpoint = "desktop" | "tablet" | "mobile";
-
-const BREAKPOINT_TABS: { key: Breakpoint; label: string; icon: typeof Monitor }[] = [
-  { key: "desktop", label: "Desktop", icon: Monitor },
-  { key: "tablet", label: "Tablet", icon: Tablet },
-  { key: "mobile", label: "Mobile", icon: Smartphone },
-];
-
-// Custom field UI: desktop/tablet/mobile tabs (icons only), each showing a Columns + Gap pair
-// for that breakpoint. Desktop opens by default. Editing desktop also live-updates whichever of
-// tablet/mobile hasn't been customized yet; editing tablet or mobile directly marks it customized
-// so it stops following desktop.
-function ResponsiveLayoutField({ value, onChange }: { value: ResponsiveLayout | undefined; onChange: (value: ResponsiveLayout) => void }) {
-  const [active, setActive] = useState<Breakpoint>("desktop");
-  const resolvedValue = value ?? DEFAULT_LAYOUT;
-  const current = resolvedValue[active];
-
-  const updateBreakpoint = (grid: GridLayout) => {
-    if (active === "desktop") {
-      onChange({
-        ...resolvedValue,
-        desktop: grid,
-        tablet: resolvedValue.tabletCustomized ? resolvedValue.tablet : grid,
-        mobile: resolvedValue.mobileCustomized ? resolvedValue.mobile : grid,
-      });
-      return;
-    }
-
-    onChange({
-      ...resolvedValue,
-      [active]: grid,
-      ...(active === "tablet" ? { tabletCustomized: true } : { mobileCustomized: true }),
-    });
-  };
-
-  return (
-    <div>
-      <div className="tabs tabs-box tabs-sm mb-2" role="tablist">
-        {BREAKPOINT_TABS.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-label={label}
-            title={label}
-            className={`tab ${active === key ? "tab-active" : ""}`}
-            onClick={() => setActive(key)}
-          >
-            <Icon className="size-4" />
-          </button>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <label className="flex flex-1 flex-col gap-1">
-          <span className="text-xs text-base-content/60">Columns</span>
-          <input
-            type="number"
-            className="input input-bordered input-sm w-full"
-            min={1}
-            max={12}
-            value={current.columns}
-            onChange={(e) => updateBreakpoint({ ...current, columns: Number(e.target.value) })}
-          />
-        </label>
-        <label className="flex flex-1 flex-col gap-1">
-          <span className="text-xs text-base-content/60">Gap</span>
-          <input
-            type="number"
-            className="input input-bordered input-sm w-full"
-            min={0}
-            value={current.gap}
-            onChange={(e) => updateBreakpoint({ ...current, gap: Number(e.target.value) })}
-          />
-        </label>
-      </div>
-    </div>
-  );
-}
-
-const layoutField: CustomField<ResponsiveLayout> = {
-  type: "custom",
-  label: "Layout",
-  render: ({ value, onChange }) => <ResponsiveLayoutField value={value} onChange={onChange} />,
-};
 
 // Read lazily (inside resolveFields, below) rather than at module scope: this component is
 // itself registered inside the host's virtual:purplepanda/puck-config, so a top-level read here

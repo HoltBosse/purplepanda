@@ -67,24 +67,38 @@ describe('Space', () => {
 });
 
 describe('Grid', () => {
-    it('lays out the requested number of equal columns', async () => {
-        const style = await slotStyleOf(Grid, { columns: 3, gap: 4, content: slot });
+    const layout = {
+        desktop: { columns: 3, gap: 4 },
+        tablet: { columns: 2, gap: 4 },
+        mobile: { columns: 1, gap: 0 },
+        tabletCustomized: true,
+        mobileCustomized: true,
+    };
 
-        expect(style.display).toBe('grid');
-        expect(style.gridTemplateColumns).toBe('repeat(3, 1fr)');
+    it('exposes each breakpoint\'s column count and gap as custom properties', async () => {
+        const style = await slotStyleOf(Grid, { layout, content: slot, id: 'a' });
+
+        expect(style.getPropertyValue('--columns-desktop')).toBe('3');
+        expect(style.getPropertyValue('--gap-desktop')).toBe('1rem');
+        expect(style.getPropertyValue('--columns-tablet')).toBe('2');
+        expect(style.getPropertyValue('--gap-tablet')).toBe('1rem');
+        expect(style.getPropertyValue('--columns-mobile')).toBe('1');
+        expect(style.getPropertyValue('--gap-mobile')).toBe('0rem');
     });
 
-    it('converts gap to the 0.25rem spacing scale', async () => {
-        const style = await slotStyleOf(Grid, { columns: 2, gap: 8, content: slot });
+    it('scopes its generated stylesheet to this instance via the component id', async () => {
+        const Component = renderOf(Grid);
+        const screen = await render(<Component layout={layout} content={slot} id="abc" puck={puck} />);
 
-        expect(style.gap).toBe('2rem');
+        expect(screen.container.querySelector('[data-testid="slot"]')?.className).toBe('Grid-abc');
+        expect(screen.container.querySelector('style')?.textContent).toContain('.Grid-abc');
     });
 
-    it('handles a single column', async () => {
-        const style = await slotStyleOf(Grid, { columns: 1, gap: 0, content: slot });
+    it('falls back to a 3-column default when no layout has been configured', async () => {
+        const style = await slotStyleOf(Grid, { layout: undefined, content: slot, id: 'a' });
 
-        expect(style.gridTemplateColumns).toBe('repeat(1, 1fr)');
-        expect(style.gap).toBe('0rem');
+        expect(style.getPropertyValue('--columns-desktop')).toBe('3');
+        expect(style.getPropertyValue('--gap-desktop')).toBe('1rem');
     });
 });
 

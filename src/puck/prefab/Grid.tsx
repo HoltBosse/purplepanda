@@ -1,39 +1,31 @@
 import type { ComponentConfig, Slot } from "@puckeditor/core";
+import { buildGridLayout, DEFAULT_LAYOUT, layoutField, type ResponsiveLayout } from "./card-grid.js";
 
 type GridProps = {
-  columns: number;
-  gap: number;
+  layout: ResponsiveLayout;
   content: Slot;
 };
 
 const Grid: ComponentConfig<GridProps> = {
   fields: {
-    columns: {
-      type: "number",
-      label: "Columns",
-      min: 1,
-      max: 254,
-    },
-    gap: {
-      type: "number",
-      label: "Gap",
-      min: 0,
-    },
+    layout: layoutField,
     content: {
       type: "slot",
       label: "Content",
     },
   },
   defaultProps: {
-    columns: 3,
-    gap: 4,
+    layout: DEFAULT_LAYOUT,
     content: [],
   },
-  render: ({ columns, gap, content: Content }) => {
+  render: ({ layout, content: Content, id }) => {
+    const { className, styleTag, style } = buildGridLayout(id, layout, "Grid");
+
     return (
-      <Content
-        style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: `${gap * 0.25}rem` }}
-      />
+      <>
+        {styleTag}
+        <Content className={className} style={style} />
+      </>
     );
   },
 };
