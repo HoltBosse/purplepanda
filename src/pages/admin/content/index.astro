@@ -1,10 +1,11 @@
 ---
 import externalPuckConfig from "virtual:purplepanda/puck-config";
-import { CircleCheck, CircleX, EllipsisVertical, FilePen, GitBranch, Trash2 } from '@lucide/astro';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { CircleCheck, CircleX, EllipsisVertical, FilePen, GitBranch, SquareArrowOutUpRight, SquarePen, Trash2 } from '@lucide/astro';
+import { and, desc, eq, inArray, type InferSelectModel, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import Pagination from '../../../components/Pagination.astro';
 import { getDb } from '../../../db/db.js';
+import { resolvePagePathById } from '../../../db/page-path.js';
 import { dagNodes, pages, userActions, users } from '../../../db/schema.js';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
@@ -127,6 +128,33 @@ const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, 
     }
     return acc;
 }, {});
+
+// The "view" icon to the left of the kebab menu needs, per row, either the live URL (published)
+// or a preview link for the master branch's latest state (unpublished) — i.e. the newest
+// nodeType='publish' dagNode, which `content/update.ts` inserts on every save regardless of
+// publish state.
+const rowIds = allPages.map(page => page.id);
+const masterNodes = rowIds.length
+    ? await db
+          .select()
+          .from(dagNodes)
+          .where(and(eq(dagNodes.entityType, 'content'), eq(dagNodes.nodeType, 'publish'), eq(dagNodes.state, 1), inArray(dagNodes.entityId, rowIds)))
+          .orderBy(desc(dagNodes.createdAt))
+    : [];
+const masterNodeByPageId: Record<string, InferSelectModel<typeof dagNodes>> = {};
+for (const node of masterNodes) {
+    if (!(node.entityId in masterNodeByPageId)) masterNodeByPageId[node.entityId] = node;
+}
+
+const livePathEntries = await Promise.all(
+    allPages
+        .filter(page => page.state === 1)
+        .map(async page => [page.id, await resolvePagePathById(db, page.id)] as const),
+);
+const livePathByPageId: Record<string, string> = {};
+for (const [pageId, path] of livePathEntries) {
+    if (path !== null) livePathByPageId[pageId] = path;
+}
 ---
 
 <AdminLayout>
@@ -175,6 +203,7 @@ const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, 
         <tbody>
             {allPages.map(page => {
                 const drafts = draftsByPageId[page.id] ?? [];
+                const masterNode = masterNodeByPageId[page.id];
                 return (
                     <tr>
                         <td>
@@ -201,51 +230,78 @@ const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, 
                             </a>
                         </td>
                         <td class="w-px whitespace-nowrap">
-                            <div class="dropdown dropdown-end">
-                                <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square">
-                                    <EllipsisVertical size={16} />
-                                </div>
-                                <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow-lg border border-base-300">
-                                    {drafts.length > 0 ? (
-                                        <>
-                                            <li class="menu-title text-xs text-base-content/60 px-2 py-1">Drafts</li>
-                                            {drafts.map(draft => (
-                                                <li>
-                                                    <div class="flex items-center gap-1 pr-1">
-                                                        <a href={`/admin/content/drafts/edit/${draft.id}`} class="flex items-center gap-2 flex-1 min-w-0" title={draft.name}>
-                                                            <FilePen size={14} class="shrink-0" />
-                                                            <span class="truncate min-w-0">{draft.name}</span>
-                                                        </a>
-                                                        <form method="POST" action={`/admin/drafts/delete/${draft.id}`}>
-                                                            <button type="submit" class="btn btn-ghost btn-xs btn-square text-error shrink-0" title="Delete draft">
-                                                                <Trash2 size={12} />
-                                                            </button>
-                                                        </form>
-                                                    </div>
-                                                </li>
-                                            ))}
-                                            <li><hr class="my-1 border-base-300" /></li>
-                                        </>
-                                    ) : null}
-                                    <li>
-                                        <button
-                                            type="button"
-                                            class="gap-2"
-                                            data-create-draft
-                                            data-entity-id={page.id}
-                                            data-entity-type="content"
+                            <div class="flex items-center gap-1">
+                                {page.state === 1 ? (
+                                    livePathByPageId[page.id] !== undefined && (
+                                        <a
+                                            href={`/${livePathByPageId[page.id]}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="btn btn-ghost btn-sm btn-square"
+                                            title="View live page"
                                         >
-                                            <FilePen size={14} />
-                                            Create new draft
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <a href={`/admin/content/history/${page.id}`} class="gap-2">
-                                            <GitBranch size={12} />
-                                            History
+                                            <SquareArrowOutUpRight size={16} />
                                         </a>
-                                    </li>
-                                </ul>
+                                    )
+                                ) : (
+                                    masterNode !== undefined && (
+                                        <a
+                                            href={`/admin/content/preview/${masterNode.id}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="btn btn-ghost btn-sm btn-square"
+                                            title="Preview draft"
+                                        >
+                                            <SquarePen size={16} />
+                                        </a>
+                                    )
+                                )}
+                                <div class="dropdown dropdown-end">
+                                    <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square">
+                                        <EllipsisVertical size={16} />
+                                    </div>
+                                    <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow-lg border border-base-300">
+                                        {drafts.length > 0 ? (
+                                            <>
+                                                <li class="menu-title text-xs text-base-content/60 px-2 py-1">Drafts</li>
+                                                {drafts.map(draft => (
+                                                    <li>
+                                                        <div class="flex items-center gap-1 pr-1">
+                                                            <a href={`/admin/content/drafts/edit/${draft.id}`} class="flex items-center gap-2 flex-1 min-w-0" title={draft.name}>
+                                                                <FilePen size={14} class="shrink-0" />
+                                                                <span class="truncate min-w-0">{draft.name}</span>
+                                                            </a>
+                                                            <form method="POST" action={`/admin/drafts/delete/${draft.id}`}>
+                                                                <button type="submit" class="btn btn-ghost btn-xs btn-square text-error shrink-0" title="Delete draft">
+                                                                    <Trash2 size={12} />
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    </li>
+                                                ))}
+                                                <li><hr class="my-1 border-base-300" /></li>
+                                            </>
+                                        ) : null}
+                                        <li>
+                                            <button
+                                                type="button"
+                                                class="gap-2"
+                                                data-create-draft
+                                                data-entity-id={page.id}
+                                                data-entity-type="content"
+                                            >
+                                                <FilePen size={14} />
+                                                Create new draft
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <a href={`/admin/content/history/${page.id}`} class="gap-2">
+                                                <GitBranch size={12} />
+                                                History
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
                             </div>
                         </td>
                     </tr>
@@ -271,6 +327,7 @@ const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, 
         </div>
         {allPages.map(page => {
             const drafts = draftsByPageId[page.id] ?? [];
+            const masterNode = masterNodeByPageId[page.id];
             return (
                 <div class="card bg-base-100 rounded-lg p-4">
                     <div class="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-base-300">
@@ -290,6 +347,31 @@ const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, 
                                     {page.state === 1 ? <CircleCheck size={18} class="text-green-500" /> : <CircleX size={18} class="text-red-500" />}
                                 </button>
                             </form>
+                            {page.state === 1 ? (
+                                livePathByPageId[page.id] !== undefined && (
+                                    <a
+                                        href={`/${livePathByPageId[page.id]}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="btn btn-ghost btn-sm btn-square"
+                                        title="View live page"
+                                    >
+                                        <SquareArrowOutUpRight size={16} />
+                                    </a>
+                                )
+                            ) : (
+                                masterNode !== undefined && (
+                                    <a
+                                        href={`/admin/content/preview/${masterNode.id}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="btn btn-ghost btn-sm btn-square"
+                                        title="Preview draft"
+                                    >
+                                        <SquarePen size={16} />
+                                    </a>
+                                )
+                            )}
                             <div class="dropdown dropdown-end">
                                 <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square">
                                     <EllipsisVertical size={16} />

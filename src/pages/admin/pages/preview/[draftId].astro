@@ -17,7 +17,7 @@ const { draftId } = Astro.params;
 if (!draftId) return Astro.redirect('/admin/pages');
 
 const [draft] = await db.select().from(dagNodes).where(eq(dagNodes.id, draftId)).limit(1);
-if (draft?.nodeType !== 'draft' || draft.entityType !== 'page' || draft.state === -1) {
+if (!draft || (draft.nodeType !== 'draft' && draft.nodeType !== 'publish') || draft.entityType !== 'page' || draft.state === -1) {
     return Astro.redirect('/admin/pages');
 }
 
