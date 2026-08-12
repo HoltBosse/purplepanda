@@ -727,6 +727,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/forms/submissions/export",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/forms/submissions/export.ts",
+        });
+
+        injectRoute({
           pattern: "/admin/forms/submissions/[id]",
           entrypoint: "@holtbosse/purplepanda/pages/admin/forms/submissions/[id].astro",
         });
