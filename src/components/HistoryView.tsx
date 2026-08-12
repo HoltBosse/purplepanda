@@ -1,5 +1,8 @@
 import type { Data } from "@puckeditor/core";
 import GitBranchPlus from "lucide-react/dist/esm/icons/git-branch-plus.mjs";
+import Monitor from "lucide-react/dist/esm/icons/monitor.mjs";
+import Smartphone from "lucide-react/dist/esm/icons/smartphone.mjs";
+import Tablet from "lucide-react/dist/esm/icons/tablet.mjs";
 import React, {
   useCallback,
   useEffect,
@@ -23,6 +26,20 @@ import PageRenderer from "./PageRenderer.js";
 
 const NODE_R = 7;
 const MIN_COL_W = 56;
+const FRAME_HEIGHT = 600;
+
+// ─── Viewport presets ──────────────────────────────────────────────────────────
+
+// Simulated device widths for the preview panes, matching Puck's own editor
+// viewport presets (see @puckeditor/core's default-viewports) so switching
+// between the Puck editor and this read-only history view feels consistent.
+type ViewportKey = "mobile" | "tablet" | "desktop";
+
+const VIEWPORTS: Record<ViewportKey, { width: number; icon: typeof Smartphone; label: string }> = {
+  mobile: { width: 360, icon: Smartphone, label: "Mobile" },
+  tablet: { width: 768, icon: Tablet, label: "Tablet" },
+  desktop: { width: 1280, icon: Monitor, label: "Desktop" },
+};
 
 // ─── Colors ────────────────────────────────────────────────────────────────────
 
@@ -106,9 +123,36 @@ function useHydrated(): boolean {
 // Renders children inside an iframe (via portal) so the preview picks up the
 // site's own stylesheets and behaves like the actual page, rather than
 // inheriting styles/theme from the admin shell it's embedded in.
-function PreviewFrame({ children }: { children: React.ReactNode }) {
+//
+// `viewportWidth` simulates a device width the way Puck's own editor
+// viewport control does: the iframe is laid out at that fixed width so the
+// page reflows as it would on that device, then CSS-scaled (transform:
+// scale, width-driven only) so the simulated device always fills whatever
+// horizontal space is actually available. The preview box's height is
+// fixed, so a page taller than it is cropped at the bottom rather than
+// shrinking the whole preview to fit — the same trade a real device makes.
+function PreviewFrame({
+  children,
+  viewportWidth,
+}: {
+  children: React.ReactNode;
+  viewportWidth: number;
+}) {
+  const outerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [mountNode, setMountNode] = useState<HTMLElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) setContainerWidth(entry.contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -137,15 +181,45 @@ function PreviewFrame({ children }: { children: React.ReactNode }) {
     return () => iframe.removeEventListener("load", setup);
   }, []);
 
+  // Only scale down, never up — a preset narrower than the available space
+  // renders at its natural size.
+  const scale =
+    containerWidth > 0 ? Math.min(1, containerWidth / viewportWidth) : 1;
+
   return (
-    <>
-      <iframe
-        ref={iframeRef}
-        title="Page preview"
-        style={{ width: "100%", height: "600px", border: "none", display: "block" }}
-      />
-      {mountNode ? createPortal(children, mountNode) : null}
-    </>
+    <div
+      ref={outerRef}
+      style={{
+        width: "100%",
+        // Fixed regardless of preset/scale, so switching between
+        // mobile/tablet/desktop doesn't reflow the page around the panel.
+        height: "37.5rem",
+        overflow: "hidden",
+        display: "flex",
+        justifyContent: "center",
+      }}
+    >
+      <div
+        style={{
+          width: viewportWidth,
+          // Inflated by 1/scale so that, once the transform below shrinks
+          // it back down, the visible crop is always exactly the fixed
+          // preview height — content beyond that is clipped by the
+          // overflow:hidden above, rather than shrinking the whole preview.
+          height: FRAME_HEIGHT / scale,
+          flex: "none",
+          transform: `scale(${scale})`,
+          transformOrigin: "top center",
+        }}
+      >
+        <iframe
+          ref={iframeRef}
+          title="Page preview"
+          style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+        />
+        {mountNode ? createPortal(children, mountNode) : null}
+      </div>
+    </div>
   );
 }
 
@@ -275,12 +349,14 @@ const RenderPanel = React.memo(function RenderPanel({
   badgeClass,
   date,
   content,
+  viewportWidth,
 }: {
   label: string;
   badge?: string;
   badgeClass?: string;
   date?: React.ReactNode;
   content: Record<string, unknown>;
+  viewportWidth: number;
 }) {
   return (
     <div className="bg-base-100 border border-base-300 rounded-xl overflow-hidden flex flex-col">
@@ -295,12 +371,48 @@ const RenderPanel = React.memo(function RenderPanel({
           <span className="text-xs text-base-content/40 ml-auto">{date}</span>
         )}
       </div>
-      <PreviewFrame>
+      <PreviewFrame viewportWidth={viewportWidth}>
         <PageRenderer pageData={content as unknown as Data} />
       </PreviewFrame>
     </div>
   );
 });
+
+// ─── ViewportControls ────────────────────────────────────────────────────────
+
+// Mobile/tablet/desktop preset switcher for the preview panes, styled after
+// Puck's own editor viewport control. Shared between the two RenderPanels
+// (rather than one per panel) so "Current" and the compared revision are
+// always laid out at the same simulated width and stay comparable.
+function ViewportControls({
+  viewport,
+  onChange,
+}: {
+  viewport: ViewportKey;
+  onChange: (viewport: ViewportKey) => void;
+}) {
+  return (
+    <div className="flex items-center justify-center gap-1">
+      {(Object.keys(VIEWPORTS) as ViewportKey[]).map((key) => {
+        const { icon: Icon, label } = VIEWPORTS[key];
+        const active = key === viewport;
+        return (
+          <button
+            key={key}
+            type="button"
+            className={`btn btn-xs btn-square btn-ghost ${active ? "text-primary" : ""}`}
+            aria-label={label}
+            aria-pressed={active}
+            title={label}
+            onClick={() => onChange(key)}
+          >
+            <Icon size={14} />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 // ─── LaneLabel ───────────────────────────────────────────────────────────────
 
@@ -879,6 +991,9 @@ export default function HistoryView({
   const selectedNode =
     selectedId !== null ? (nodes.find((n) => n.id === selectedId) ?? null) : null;
 
+  const [viewport, setViewport] = useState<ViewportKey>("desktop");
+  const viewportWidth = VIEWPORTS[viewport].width;
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-4">
@@ -922,12 +1037,14 @@ export default function HistoryView({
       </div>
 
       {/* ── Side-by-side renders (below timeline) ── */}
+      <ViewportControls viewport={viewport} onChange={setViewport} />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <RenderPanel
           label="Current"
           badge="live"
           badgeClass="badge-success"
           content={currentContent}
+          viewportWidth={viewportWidth}
         />
 
         {selectedNode !== null ? (
@@ -943,6 +1060,7 @@ export default function HistoryView({
                 ? "badge-primary"
                 : "badge-warning"
             }
+            viewportWidth={viewportWidth}
             date={
               hydrated ? (
                 formatDate(selectedNode.createdAt)
