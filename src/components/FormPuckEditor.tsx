@@ -2,7 +2,7 @@ import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Config, Data } from "@puckeditor/core";
 import { useMemo } from "react";
 import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
-import { notifyUsersField } from "../puck/form/NotifyUsersField.js";
+import { notifyUsersField } from "../puck/component-fields/NotifyUsersField.js";
 import { filterConfigByLocation, wrapConfigWithDataBinding } from "../puck/index.js";
 import PuckEditor from "./PuckEditor.js";
 

@@ -1,5 +1,6 @@
 import type { ComponentConfig, Slot } from "@puckeditor/core";
-import { buildGridLayout, DEFAULT_LAYOUT, layoutField, type ResponsiveLayout } from "./card-grid.js";
+import { DEFAULT_LAYOUT, layoutField, type ResponsiveLayout } from "../component-fields/LayoutField.js";
+import { buildGridLayout } from "./card-grid.js";
 
 type GridProps = {
   layout: ResponsiveLayout;

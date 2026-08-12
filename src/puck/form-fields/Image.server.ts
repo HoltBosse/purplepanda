@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { getDb } from "../../db/db.js";
 import { media, mediafolders } from "../../db/schema.js";
 import { getMediaPath } from "../../media/media.js";
-import type { MediaRef } from "../media/ImagePicker.js";
+import type { MediaRef } from "../component-fields/ImageField.js";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
 

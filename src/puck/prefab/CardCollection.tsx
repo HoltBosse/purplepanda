@@ -3,13 +3,9 @@ import type { ComponentConfig, ComponentData, Config, Field, ObjectField, Slot, 
 import { createUsePuck } from "@puckeditor/core";
 import type { CSSProperties, ReactNode } from "react";
 import { Fragment } from "react";
+import { DEFAULT_LAYOUT, layoutField, type ResponsiveLayout } from "../component-fields/LayoutField.js";
 import { ItemContext } from "../data-binding.js";
-import {
-  buildGridLayout,
-  DEFAULT_LAYOUT,
-  layoutField,
-  type ResponsiveLayout,
-} from "./card-grid.js";
+import { buildGridLayout } from "./card-grid.js";
 
 const useTypedPuck = createUsePuck();
 

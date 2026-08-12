@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-react';
-import { imageField } from './ImagePicker';
+import { imageField } from './ImageField';
 
 type ImageValue = Parameters<NonNullable<typeof imageField.render>>[0]['value'];
 

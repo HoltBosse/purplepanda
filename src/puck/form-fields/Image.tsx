@@ -1,6 +1,6 @@
 import type { ComponentConfig } from "@puckeditor/core";
 import * as z from "zod";
-import { folderField, type MediaFolderRef } from "../media/FolderPicker.js";
+import { folderField, type MediaFolderRef } from "../component-fields/FolderPicker.js";
 
 export type ImageProps = {
   label: string;
