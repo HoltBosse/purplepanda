@@ -26,8 +26,13 @@ export default function PrefabPuckEditor({
   const rootConfig = useMemo(
     () => ({
       label: contentType?.title ?? "Prefab",
-      fields: contentType?.fields ?? {},
+      fields: {},
     }),
+    [contentType],
+  );
+
+  const dictionary = useMemo(
+    () => ({ "label-page": contentType?.title ?? "Prefab" }),
     [contentType],
   );
 
@@ -41,6 +46,7 @@ export default function PrefabPuckEditor({
     <PagePuckEditor
       saveUrl={saveUrl}
       rootConfig={rootConfig}
+      dictionary={dictionary}
       {...optionalProps}
     />
   );
