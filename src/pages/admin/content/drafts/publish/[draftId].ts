@@ -1,10 +1,12 @@
 import type { APIContext } from "astro";
+import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { eq } from 'drizzle-orm';
 import * as z from "zod";
 import { addAction } from "../../../../../actions/index.js";
 import { addAlertToSession, alertType, createAlert } from "../../../../../alert/index.js";
 import { getDb } from "../../../../../db/db.js";
 import { dagNodes, pages } from "../../../../../db/schema.js";
+import { formatValidationErrors, validateContentTree } from "../../../../../puck/validate-content.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -34,6 +36,13 @@ export async function POST(context: APIContext): Promise<Response> {
     }
 
     const parsedContent = JSON.parse(contentResult.data);
+
+    const validationErrors = validateContentTree(externalPuckConfig ?? {}, parsedContent);
+    if (validationErrors.length > 0) {
+        const alert = createAlert(alertType.error, `Fix the following before publishing: ${formatValidationErrors(validationErrors)}`);
+        await addAlertToSession(context.session, alert);
+        return context.redirect(`/admin/content/drafts/edit/${draftId}`);
+    }
 
     // Publishing a draft always makes it the new default, overwriting whatever is
     // currently live rather than attempting to merge with changes made to the main

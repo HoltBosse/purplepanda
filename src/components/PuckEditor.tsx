@@ -1,13 +1,15 @@
 import { Button, createUsePuck, Puck } from "@puckeditor/core";
 import "@puckeditor/core/puck.css";
 import "../styles/puck-theme.css";
-import type { Config, Data, Dictionary, Overrides, PuckContext } from "@puckeditor/core";
+import type { Config, Data, Dictionary, Overrides, PuckAction, PuckContext } from "@puckeditor/core";
 import { Render } from "@puckeditor/core";
 import type React from "react";
-import { cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useMemo } from "react";
+import { cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
+import type * as z from "zod";
 import { extractFamilyFromLink } from "../form/fields/font-utils.js";
 import { Save } from "../puck/icons.js";
+import { validateContentTree } from "../puck/validate-content.js";
 import { ensureTemplateSlot } from "./template-slot.js";
 
 const ROOT_SLOT_NAME = "default-zone";
@@ -55,13 +57,25 @@ interface FontLinks {
   bodyFontLink: string | undefined;
 }
 
-function createOverrides(onSave?: (data: Data) => void, fontLinks?: FontLinks): Partial<Overrides<Config>> {
+function createOverrides(
+  config: Config,
+  onSave: ((data: Data) => void) | undefined,
+  fontLinks: FontLinks | undefined,
+  // Populated from inside headerActions below (the only override here rendered unconditionally,
+  // as soon as Puck mounts) so guardedOnPublish — defined outside Puck's tree, in plain
+  // PuckEditor component scope — can still dispatch into it imperatively once a Publish attempt
+  // fails, to jump the side panel to the root fields view. Zustand's dispatch is referentially
+  // stable across renders, so caching it here is safe.
+  dispatchRef: { current: ((action: PuckAction) => void) | null },
+  rootPropsSchema: ((props: Record<string, unknown>) => z.ZodTypeAny) | undefined,
+): Partial<Overrides<Config>> {
   const headingFontFamily = extractFamilyFromLink(fontLinks?.headingFontLink);
   const bodyFontFamily = extractFamilyFromLink(fontLinks?.bodyFontLink);
 
   return {
     headerActions: ({ children }) => {
       const appStateData = useTypedPuck((state) => state.appState.data);
+      dispatchRef.current = useTypedPuck((state) => state.dispatch);
 
       const saveButton = onSave ? (
         <Button data-puck-save icon={<Save size="14px" />} onClick={() => onSave(appStateData)}>
@@ -69,9 +83,37 @@ function createOverrides(onSave?: (data: Data) => void, fontLinks?: FontLinks): 
         </Button>
       ) : null;
 
+      // Recomputed from the live appState.data on every render (same tree walk
+      // guardedOnSave/guardedOnPublish run before calling through), rather than a snapshot taken
+      // at the last Save/Publish click — so the count (and the field-by-field tooltip) drops as
+      // soon as an author actually fixes something, the same way the fieldLabel outline above
+      // now does, instead of staying stuck until the next click.
+      const liveErrors = useMemo(() => validateContentTree(config, appStateData, { rootPropsSchema }), [appStateData]);
+
+      // The full per-field messages are in the title tooltip since there's no toast/panel system
+      // to host a longer list inline in the header.
+      const validationBadge =
+        liveErrors.length > 0 ? (
+          <span
+            role="alert"
+            data-puck-validation-errors
+            title={liveErrors.map((error) => `${error.componentType} — ${error.field}: ${error.message}`).join("\n")}
+            style={{
+              alignSelf: "center",
+              marginRight: "0.5rem",
+              fontSize: "0.8rem",
+              color: "var(--color-error)",
+              cursor: "help",
+            }}
+          >
+            {liveErrors.length} field{liveErrors.length === 1 ? "" : "s"} need attention
+          </span>
+        ) : null;
+
       if (isValidElement(children)) {
         return (
           <>
+            {validationBadge}
             {saveButton}
             {cloneElement(children as any, { "data-puck-publish": "" })}
           </>
@@ -80,9 +122,94 @@ function createOverrides(onSave?: (data: Data) => void, fontLinks?: FontLinks): 
 
       return (
         <>
+          {validationBadge}
           {saveButton}
           {children}
         </>
+      );
+    },
+
+    // Puck has no per-field validation-error prop to hook into (no field name/path is passed to
+    // this override, only its display `label`), so an invalid field is matched by looking up
+    // which field on the currently selected item (or the root, when nothing's selected) has a
+    // `label` matching this one — the same label strings we already wrote into `fields`/
+    // `root.fields`. This wraps every field, not just invalid ones, since Puck calls this same
+    // component for all of them; only the offending ones get the red outline.
+    //
+    // Validity is (re)computed from the live selected item/root props on every render (same
+    // pattern as headerActions' liveErrors above), rather than only on a Save/Publish attempt —
+    // this matches custom fields like AliasField/ImagePickerField, which already flag themselves
+    // live as the author types/picks, and clears the outline the moment the field is actually
+    // fixed instead of leaving it stuck red until the next Save/Publish click.
+    fieldLabel: ({ children, icon, label, el = "label", readOnly, className }) => {
+      const selectedItem = useTypedPuck((state) => state.selectedItem);
+      const rootProps = useTypedPuck(
+        (state) => (state.appState.data.root as { props?: Record<string, unknown> } | undefined)?.props ?? {},
+      );
+
+      let isInvalid = false;
+
+      if (selectedItem) {
+        const component = (
+          config.components as
+            | Record<
+                string,
+                {
+                  propsSchema?: (props: Record<string, unknown>) => z.ZodTypeAny;
+                  fields?: Record<string, { label?: string }>;
+                }
+              >
+            | undefined
+        )?.[selectedItem.type as string];
+        const result = component?.propsSchema?.(selectedItem.props as Record<string, unknown>).safeParse(selectedItem.props);
+        if (result && !result.success) {
+          isInvalid = result.error.issues.some((issue) => {
+            const topLevelField = issue.path[0] !== undefined ? String(issue.path[0]) : "";
+            const matchedLabel = component?.fields?.[topLevelField]?.label ?? topLevelField;
+            return matchedLabel === label;
+          });
+        }
+      } else if (rootPropsSchema) {
+        const result = rootPropsSchema(rootProps).safeParse(rootProps);
+        if (!result.success) {
+          const rootFields = (config.root as { fields?: Record<string, { label?: string }> } | undefined)?.fields;
+          isInvalid = result.error.issues.some((issue) => {
+            const topLevelField = issue.path[0] !== undefined ? String(issue.path[0]) : "";
+            const matchedLabel = rootFields?.[topLevelField]?.label ?? topLevelField;
+            return matchedLabel === label;
+          });
+        }
+      }
+
+      const El = el as React.ElementType;
+
+      return (
+        <El className={className}>
+          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            {icon}
+            {label}
+            {readOnly && (
+              <span aria-hidden="true" title="Read only">
+                🔒
+              </span>
+            )}
+          </div>
+          {/* Wraps only the field's own input, not the label text above — outlines the control
+              itself, the same way AliasField/ImagePickerField color their own input/button red,
+              rather than boxing the whole label+field group. An *inset* box-shadow (not outline)
+              so it layers like a recolored border sitting inside the field's own edge, with any
+              native focus ring (drawn via outline, outside the border box) landing outside it —
+              matching how AliasField's own focus ring sits outside its red-bordered input. A
+              zero-offset inset shadow would otherwise render fully underneath the field's own
+              (opaque) background with nothing to peek out from behind, so this reserves a couple
+              px of padding for it to actually be visible in — kept unconditional, not just while
+              invalid, so the field doesn't resize by a few px each time validity flips. */}
+          <div
+            style={{ padding: "2px", borderRadius: "6px", boxShadow: isInvalid ? "inset 0 0 0 2px var(--color-error)" : undefined }}
+          >
+            {children}
+          </div>
+        </El>
       );
     },
 
@@ -147,15 +274,56 @@ interface PuckEditorProps {
   templateData?: Data;
   onPublish: (data: Data) => void;
   onSave?: (data: Data) => void;
+  // Validates data.root.props (e.g. PagePuckEditor's title/alias) alongside the component tree —
+  // see puck/page-root-schema.js for the pages case. Omit when the root has nothing that needs
+  // enforcing beyond what Puck's own field UI already does.
+  rootPropsSchema?: ((props: Record<string, unknown>) => z.ZodTypeAny) | undefined;
   headingFontLink?: string;
   bodyFontLink?: string;
   dictionary?: Dictionary;
 }
 
-export default function PuckEditor({ config, data, templateData, onPublish, onSave, headingFontLink, bodyFontLink, dictionary }: PuckEditorProps) {
+export default function PuckEditor({ config, data, templateData, onPublish, onSave, rootPropsSchema, headingFontLink, bodyFontLink, dictionary }: PuckEditorProps) {
+  // Written to by createOverrides' headerActions (see below) with Puck's own dispatch, so it can
+  // be reached imperatively from guardedOnPublish — which runs outside Puck's component tree, as
+  // a plain PuckEditorProps.onPublish callback, and so can't call useTypedPuck itself.
+  const dispatchRef = useRef<((action: PuckAction) => void) | null>(null);
+
+  // Blocks Save/Publish client-side when a component's own propsSchema (see puck/index.js), or
+  // rootPropsSchema, isn't satisfied — the same check every content-persisting API route runs
+  // server-side (see puck/validate-content.js), so an author gets immediate feedback instead of a
+  // redirect-with-alert round trip, but a bypass of this client check (or a direct POST) still
+  // gets caught there.
+  const guardedOnPublish = useCallback(
+    (nextData: Data) => {
+      const errors = validateContentTree(config, nextData, { rootPropsSchema });
+      if (errors.length === 0) {
+        onPublish(nextData);
+        return;
+      }
+      // Deselect whatever's currently selected (if anything) and make sure both side panels are
+      // open, so the fields panel falls back to showing the root's own fields (title/alias/etc.)
+      // — the most likely place a blocked Publish is coming from, and otherwise easy to miss
+      // behind whatever component was last selected.
+      dispatchRef.current?.({
+        type: "setUi",
+        ui: { itemSelector: null, leftSideBarVisible: true, rightSideBarVisible: true },
+      });
+    },
+    [config, onPublish, rootPropsSchema],
+  );
+
+  const guardedOnSave = useMemo(() => {
+    if (!onSave) return undefined;
+    return (nextData: Data) => {
+      const errors = validateContentTree(config, nextData, { rootPropsSchema });
+      if (errors.length === 0) onSave(nextData);
+    };
+  }, [config, onSave, rootPropsSchema]);
+
   const overrides = useMemo(
-    () => createOverrides(onSave, { headingFontLink, bodyFontLink }),
-    [onSave, headingFontLink, bodyFontLink],
+    () => createOverrides(config, guardedOnSave, { headingFontLink, bodyFontLink }, dispatchRef, rootPropsSchema),
+    [config, guardedOnSave, headingFontLink, bodyFontLink, rootPropsSchema],
   );
 
   // Memoized because it feeds the root render below: a fresh object each render would rebuild the
@@ -260,7 +428,7 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
       >
         <img src="/admin/assets/favicon.svg" alt="Admin" style={{ height: "28px", width: "28px" }} />
       </a>
-      <Puck config={configCopy} data={data} onPublish={onPublish} overrides={overrides} {...(dictionary ? { dictionary } : {})} />
+      <Puck config={configCopy} data={data} onPublish={guardedOnPublish} overrides={overrides} {...(dictionary ? { dictionary } : {})} />
     </div>
   );
 }

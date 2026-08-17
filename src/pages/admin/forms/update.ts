@@ -1,10 +1,12 @@
 import type { APIContext } from "astro";
+import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { and, desc, eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
 import * as z from "zod";
 import { addAction } from "../../../actions/index.js";
 import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
 import { getDb } from "../../../db/db.js";
 import { dagNodes, forms } from "../../../db/schema.js";
+import { formatValidationErrors, validateContentTree } from "../../../puck/validate-content.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -52,6 +54,13 @@ export async function POST(context: APIContext): Promise<Response> {
     }
 
     const parsedContent = JSON.parse(contentResult.data);
+
+    const validationErrors = validateContentTree(externalPuckConfig ?? {}, parsedContent);
+    if (validationErrors.length > 0) {
+        const alert = createAlert(alertType.error, `Fix the following before saving: ${formatValidationErrors(validationErrors)}`);
+        await addAlertToSession(context.session, alert);
+        return context.redirect(isNewForm ? "/admin/forms/new" : `/admin/forms/edit/${formId}`);
+    }
 
     if (isNewForm) {
         form.content = parsedContent;

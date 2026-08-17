@@ -5,6 +5,7 @@ import { createPlayer } from "@videojs/react";
 import { VimeoVideo } from "@videojs/react/media/vimeo-video";
 import { Video as Html5Video, VideoSkin, videoFeatures } from "@videojs/react/video";
 import type { CSSProperties } from "react";
+import * as z from "zod";
 
 const Player = createPlayer({ features: videoFeatures });
 
@@ -13,9 +14,16 @@ export type VideoProps = {
   autoplay: boolean;
 };
 
+// Not a strict `z.url()` — a bare embed path/id is a valid value here, not just an absolute URL —
+// but an empty block renders nothing useful on a published page, so a value is still required.
+function toPropsSchema() {
+  return z.object({ url: z.string().trim().min(1, "Video URL is required") }).loose();
+}
+
 const Video: ComponentConfig<VideoProps> = {
   label: "Video",
   island: true,
+  propsSchema: toPropsSchema,
   fields: {
     url: {
       type: "text",

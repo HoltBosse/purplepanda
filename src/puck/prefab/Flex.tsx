@@ -1,4 +1,5 @@
 import type { ComponentConfig, Slot } from "@puckeditor/core";
+import * as z from "zod";
 
 type FlexProps = {
   direction: "row" | "column";
@@ -9,7 +10,13 @@ type FlexProps = {
   items: Slot;
 };
 
+// Mirrors the `gap` field's own `min: 0` UI hint, which Puck doesn't enforce server-side.
+function toPropsSchema() {
+  return z.object({ gap: z.number().min(0) }).loose();
+}
+
 const Flex: ComponentConfig<FlexProps> = {
+  propsSchema: toPropsSchema,
   fields: {
     direction: {
       type: "radio",

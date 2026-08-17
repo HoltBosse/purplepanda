@@ -232,6 +232,24 @@ async function getContentTypeOptions() {
   }));
 }
 
+// Validates the field's own authored config, not what an end user later submits into it (see
+// toSubmissionSchema above). Only the field(s) relevant to the chosen source need a value —
+// mirrors resolveFields below, which only shows "options" for manual and "contentType" for content.
+function toPropsSchema({ source }: SelectProps) {
+  return z
+    .object({
+      label: z.string().trim().min(1, "Required"),
+      options:
+        source === "manual"
+          ? z
+              .array(z.object({ label: z.string().trim().min(1, "Required"), value: z.string().trim().min(1, "Required") }))
+              .min(1, "At least one option is required")
+          : z.unknown(),
+      contentType: source === "content" ? z.string().min(1, "Select a content type") : z.unknown(),
+    })
+    .loose();
+}
+
 const optionsField: Fields<SelectProps>["options"] = {
   type: "array",
   label: "Options",
@@ -258,6 +276,7 @@ const Select: ComponentConfig<SelectProps> = {
   island: true,
   locations: "form",
   toSubmissionSchema,
+  propsSchema: toPropsSchema,
   fields: {
     label: { type: "text", label: "Label" },
     description: { type: "text", label: "Description (optional)" },

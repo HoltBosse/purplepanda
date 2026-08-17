@@ -132,6 +132,19 @@
   opacity: 0.4;
 }
 
+/* Same emptiness detection as the placeholder text above, styled as an error rather than a
+   neutral prompt: this field is required (see Rich.tsx's propsSchema), so an empty block can't
+   actually be saved/published — flagging it directly on the canvas matches ImagePicker/
+   FormEmbed's red placeholder treatment for their own required fields. outline (not border/box-
+   shadow) so it doesn't shift the block's layout or fight the "Type something..." prompt above. */
+.rich-placeholder-wrap:has(.rich-text:empty),
+.rich-placeholder-wrap:has(.rich-text > p:only-child:empty) {
+  outline: 2px dashed var(--color-error);
+  outline-offset: 4px;
+  border-radius: 0.5rem;
+  background-color: color-mix(in srgb, var(--color-error) 8%, transparent);
+}
+
 [data-puck-save] {
   background-color: transparent;
   color: var(--puck-color-text);

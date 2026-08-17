@@ -14,10 +14,23 @@ function toSubmissionSchema({ required }: TextareaProps) {
   return z.preprocess((value) => (value === "" ? undefined : value), z.string().optional());
 }
 
+// Validates the field's own authored config, not what an end user later submits into it (see
+// toSubmissionSchema above). Mirrors the `rows` field's own min/max UI hints, which Puck doesn't
+// enforce server-side.
+function toPropsSchema() {
+  return z
+    .object({
+      label: z.string().trim().min(1, "Required"),
+      rows: z.number().int().min(2).max(20),
+    })
+    .loose();
+}
+
 const Textarea: ComponentConfig<TextareaProps> = {
   label: "Textarea",
   locations: "form",
   toSubmissionSchema,
+  propsSchema: toPropsSchema,
   fields: {
     label: { type: "text", label: "Label" },
     description: { type: "text", label: "Description (optional)" },

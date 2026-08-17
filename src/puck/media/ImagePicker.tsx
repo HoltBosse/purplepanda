@@ -1,10 +1,20 @@
 import type { ComponentConfig } from "@puckeditor/core";
 import { useEffect, useRef, useState } from "react";
+import * as z from "zod";
 import { type ImageConfig, imageField, imageSizeOverrideField, withCropParams } from "../component-fields/ImageField.js";
 
 export type ImagePickerProps = {
   image: ImageConfig | null;
 };
+
+// An unpicked image renders only a "No image selected" placeholder — meaningless once published.
+function toPropsSchema() {
+  return z
+    .object({
+      image: z.object({ id: z.uuid() }, "Select an image").loose(),
+    })
+    .loose();
+}
 
 function ImageDisplay({ image, isEditing }: { image: ImageConfig; isEditing: boolean }) {
   const [loading, setLoading] = useState(true);
@@ -53,6 +63,7 @@ function ImageDisplay({ image, isEditing }: { image: ImageConfig; isEditing: boo
 
 const ImagePicker: ComponentConfig<ImagePickerProps> = {
   label: "Image",
+  propsSchema: toPropsSchema,
   bindableFields: {
     image: {
       label: "Image",
@@ -74,9 +85,13 @@ const ImagePicker: ComponentConfig<ImagePickerProps> = {
     image: null,
   },
   render: ({ image, puck }) => {
+    // Styled as an error, not just a neutral placeholder: this prop is required (see
+    // propsSchema above), so an unset image is a block that can't actually be saved/published —
+    // the red border/text flags it directly on the canvas, not just in the (easy-to-miss)
+    // side panel field.
     if (!image?.id) {
       return (
-        <div className="rounded-lg border-2 border-dashed border-base-300 bg-base-200 p-6 text-center text-base-content/50">
+        <div className="rounded-lg border-2 border-dashed border-error bg-error/10 p-6 text-center text-error">
           No image selected
         </div>
       );

@@ -7,11 +7,27 @@ import type { Editor } from "@tiptap/react";
 import type { ReactNode, SyntheticEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import * as z from "zod";
 import { ChevronDown, Link as LinkIcon, Subscript, Superscript } from "../icons.js";
 
 type RichProps = {
   content: ReactNode;
 };
+
+// The richtext field stores its value as an HTML string (RichText = string | ReactNode; only
+// resolved to a ReactNode at render time), so this checks for real text rather than markup —
+// "<p></p>" and "<p><br></p>" are both empty-looking editor states tiptap can produce.
+function hasVisibleText(html: unknown): boolean {
+  return typeof html === "string" && html.replace(/<[^>]*>/g, "").trim().length > 0;
+}
+
+function toPropsSchema() {
+  return z
+    .object({
+      content: z.unknown().refine(hasVisibleText, "Required"),
+    })
+    .loose();
+}
 
 function SuperSubMenu({
   editor,
@@ -270,6 +286,7 @@ export function RichTextMenuScrollFade({ children }: { children: ReactNode }) {
 }
 
 const Rich: ComponentConfig<RichProps> = {
+  propsSchema: toPropsSchema,
   bindableFields: {
     content: { label: "Text", fieldTypes: ["text", "textarea", "richtext"] },
   },

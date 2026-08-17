@@ -37,10 +37,17 @@ function toSubmissionSchema({ inputType, required }: TextInputProps) {
   }
 }
 
+// Validates the field's own authored config (as set by whoever is building the form), not what an
+// end user later submits into it — see toSubmissionSchema above for that.
+function toPropsSchema() {
+  return z.object({ label: z.string().trim().min(1, "Required") }).loose();
+}
+
 const TextInput: ComponentConfig<TextInputProps> = {
   label: "Text Input",
   locations: "form",
   toSubmissionSchema,
+  propsSchema: toPropsSchema,
   fields: {
     label: { type: "text", label: "Label" },
     description: { type: "text", label: "Description (optional)" },

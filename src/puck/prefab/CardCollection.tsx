@@ -3,7 +3,8 @@ import type { ComponentConfig, ComponentData, Config, Field, ObjectField, Slot, 
 import { createUsePuck } from "@puckeditor/core";
 import type { CSSProperties, ReactNode } from "react";
 import { Fragment } from "react";
-import { DEFAULT_LAYOUT, layoutField, type ResponsiveLayout } from "../component-fields/LayoutField.js";
+import * as z from "zod";
+import { DEFAULT_LAYOUT, layoutField, type ResponsiveLayout, responsiveLayoutSchema } from "../component-fields/LayoutField.js";
 import { ItemContext } from "../data-binding.js";
 import { buildGridLayout } from "./card-grid.js";
 
@@ -131,9 +132,23 @@ function EditingView({ contentType, layout, cardTemplate: Content, items, id }: 
   );
 }
 
+// Mirrors the fields' own UI hints (contentType must be picked, limit is bounded 1-100, offset
+// can't go negative), none of which Puck enforces server-side.
+function toPropsSchema() {
+  return z
+    .object({
+      contentType: z.string().min(1, "Select a content type"),
+      limit: z.number().int().min(1).max(100),
+      offset: z.number().int().min(0),
+      layout: responsiveLayoutSchema,
+    })
+    .loose();
+}
+
 const CardCollection: ComponentConfig<CardCollectionProps> = {
   label: "Card Collection",
   locations: ["page", "template"],
+  propsSchema: toPropsSchema,
   fields: {
     contentType: {
       type: "select",

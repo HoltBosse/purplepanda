@@ -1,4 +1,5 @@
 import type { ComponentConfig, Fields, Slot } from "@puckeditor/core";
+import * as z from "zod";
 
 const MAX_ITEMS = 8;
 const DEFAULT_ITEMS = 3;
@@ -60,8 +61,16 @@ for (let i = 1; i <= MAX_ITEMS; i++) {
   baseFields[contentKey(i)] = { type: "slot", label: `Item ${i} — Content` };
 }
 
+// Mirrors the `itemCount` field's own `min`/`max` UI hints, which Puck doesn't enforce
+// server-side — an out-of-range value would otherwise be clamped silently at render time
+// (see clampItemCount) instead of being caught up front.
+function toPropsSchema() {
+  return z.object({ itemCount: z.number().int().min(1).max(MAX_ITEMS) }).loose();
+}
+
 const Accordion: ComponentConfig<AccordionProps> = {
   label: "Accordion",
+  propsSchema: toPropsSchema,
   fields: baseFields,
   defaultProps: buildDefaultProps(),
   resolveFields: (data) => {

@@ -387,7 +387,7 @@ function ImagePickerField({
         <button
           type="button"
           onClick={openDialog}
-          className="btn btn-outline join-item flex-1 min-w-0 justify-start font-normal rounded-bl-none"
+          className={`btn btn-outline join-item flex-1 min-w-0 justify-start font-normal rounded-bl-none ${!value ? "border-error text-error" : ""}`}
         >
           <span className="truncate">{value ? value.title || value.id : "Select an image..."}</span>
         </button>

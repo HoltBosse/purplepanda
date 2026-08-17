@@ -21,10 +21,24 @@ function toSubmissionSchema({ options, required }: RadioGroupProps) {
   return required ? optionSchema : optionSchema.optional();
 }
 
+// Validates the field's own authored config, not what an end user later submits into it (see
+// toSubmissionSchema above).
+function toPropsSchema() {
+  return z
+    .object({
+      label: z.string().trim().min(1, "Required"),
+      options: z
+        .array(z.object({ label: z.string().trim().min(1, "Required"), value: z.string().trim().min(1, "Required") }))
+        .min(1, "At least one option is required"),
+    })
+    .loose();
+}
+
 const RadioGroup: ComponentConfig<RadioGroupProps> = {
   label: "Radio Group",
   locations: "form",
   toSubmissionSchema,
+  propsSchema: toPropsSchema,
   fields: {
     label: { type: "text", label: "Label" },
     description: { type: "text", label: "Description (optional)" },

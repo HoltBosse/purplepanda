@@ -14,10 +14,22 @@ function toSubmissionSchema({ required }: CheckboxProps) {
   return required ? z.literal("on", "Required") : z.literal("on").optional();
 }
 
+// Validates the field's own authored config, not what an end user later submits into it (see
+// toSubmissionSchema above).
+function toPropsSchema() {
+  return z
+    .object({
+      label: z.string().trim().min(1, "Required"),
+      checkboxLabel: z.string().trim().min(1, "Required"),
+    })
+    .loose();
+}
+
 const Checkbox: ComponentConfig<CheckboxProps> = {
   label: "Checkbox",
   locations: "form",
   toSubmissionSchema,
+  propsSchema: toPropsSchema,
   fields: {
     label: { type: "text", label: "Label" },
     description: { type: "text", label: "Description (optional)" },

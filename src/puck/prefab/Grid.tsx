@@ -1,5 +1,6 @@
 import type { ComponentConfig, Slot } from "@puckeditor/core";
-import { DEFAULT_LAYOUT, layoutField, type ResponsiveLayout } from "../component-fields/LayoutField.js";
+import * as z from "zod";
+import { DEFAULT_LAYOUT, layoutField, type ResponsiveLayout, responsiveLayoutSchema } from "../component-fields/LayoutField.js";
 import { buildGridLayout } from "./card-grid.js";
 
 type GridProps = {
@@ -7,7 +8,12 @@ type GridProps = {
   content: Slot;
 };
 
+function toPropsSchema() {
+  return z.object({ layout: responsiveLayoutSchema }).loose();
+}
+
 const Grid: ComponentConfig<GridProps> = {
+  propsSchema: toPropsSchema,
   fields: {
     layout: layoutField,
     content: {

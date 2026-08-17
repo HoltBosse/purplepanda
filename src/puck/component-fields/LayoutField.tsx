@@ -1,5 +1,6 @@
 import type { CustomField } from "@puckeditor/core";
 import { useState } from "react";
+import * as z from "zod";
 import { Monitor, Smartphone, Tablet } from "../icons.js";
 
 export type GridLayout = { columns: number; gap: number };
@@ -107,3 +108,19 @@ export const layoutField: CustomField<ResponsiveLayout> = {
   label: "Layout",
   render: ({ value, onChange }) => <ResponsiveLayoutField value={value} onChange={onChange} />,
 };
+
+// Mirrors the columns (1-12) / gap (>= 0) bounds the sliders in ResponsiveLayoutField enforce in
+// the UI — Puck's own field `min`/`max` are display hints only, not enforced server-side, so a
+// direct POST could otherwise smuggle an out-of-range or negative value straight into the DB.
+const gridLayoutSchema = z.object({
+  columns: z.number().int().min(1).max(12),
+  gap: z.number().min(0),
+});
+
+export const responsiveLayoutSchema = z.object({
+  desktop: gridLayoutSchema,
+  tablet: gridLayoutSchema,
+  mobile: gridLayoutSchema,
+  tabletCustomized: z.boolean(),
+  mobileCustomized: z.boolean(),
+});

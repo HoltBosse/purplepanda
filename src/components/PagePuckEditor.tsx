@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
 import { aliasField } from "../puck/component-fields/AliasField.js";
 import { filterConfigByLocation, wrapConfigWithDataBinding } from "../puck/index.js";
+import { pageRootPropsSchema } from "../puck/page-root-schema.js";
 import PuckEditor from "./PuckEditor.js";
 
 const baseConfig: Config = {
@@ -143,6 +144,10 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
   const optionalProps = {
     ...(templateData ? { templateData } : {}),
     ...(resolvedOnSave ? { onSave: resolvedOnSave } : {}),
+    // Title/alias are only required for plain pages — a content type's rootConfig replaces these
+    // fields entirely with its own, so this schema (which expects exactly title/alias) wouldn't
+    // apply there.
+    ...(rootConfig ? {} : { rootPropsSchema: pageRootPropsSchema }),
     ...(headingFontLink ? { headingFontLink } : {}),
     ...(bodyFontLink ? { bodyFontLink } : {}),
     ...(dictionary ? { dictionary } : {}),

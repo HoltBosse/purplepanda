@@ -1,5 +1,6 @@
 import type { ComponentConfig, Slot } from "@puckeditor/core";
 import type { CSSProperties } from "react";
+import * as z from "zod";
 
 type MarginProps = {
   desktopWidth: number;
@@ -7,8 +8,19 @@ type MarginProps = {
   content: Slot;
 };
 
+// Mirrors the fields' own `min: 0` UI hints, which Puck doesn't enforce server-side.
+function toPropsSchema() {
+  return z
+    .object({
+      desktopWidth: z.number().min(0),
+      mobileMargin: z.number().min(0),
+    })
+    .loose();
+}
+
 const Margin: ComponentConfig<MarginProps> = {
   label: "Margin",
+  propsSchema: toPropsSchema,
   fields: {
     desktopWidth: {
       type: "number",

@@ -7,6 +7,9 @@ export { ClientComponentDataWrapper, wrapConfigWithClientDataResolvers } from ".
 export type { BoundItem } from "./data-binding.js";
 export { ItemContext, useBoundItem, wrapConfigWithDataBinding } from "./data-binding.js";
 export { ISLAND_NAME_ATTR, ISLAND_PROPS_ATTR, wrapConfigWithIslands } from "./islands.js";
+export { pageRootPropsSchema } from "./page-root-schema.js";
+export type { ContentValidationError, ValidateContentTreeOptions } from "./validate-content.js";
+export { formatValidationErrors, validateContentTree } from "./validate-content.js";
 
 type Awaitable<TValue> = TValue | Promise<TValue>;
 
@@ -82,6 +85,18 @@ declare module "@puckeditor/core" {
     // rest of the page stays static HTML. Its props must be JSON-serializable — no `slot` fields
     // or `ReactNode` props (those can't cross the server→client boundary). See ./islands.tsx.
     island?: boolean;
+    // Validates this component's own authored props (the values an editor set in the Puck side
+    // panel — label text, URLs, selected options, etc.), as opposed to toSubmissionSchema below
+    // (which validates what an end user *posts* into a rendered form). Given this component's
+    // stored props, returns the Zod schema they must satisfy; run against the whole props object
+    // via validateContentTree (./validate-content.js), which both the editor (before Save/
+    // Publish — see PuckEditor.tsx) and every content-persisting API route call so a component
+    // can't be saved half-configured from either surface. Puck's own Field config has no
+    // required/format validation of its own (no `required` flag, no pattern/min-length), so this
+    // is the only place "is this field required" and "does it pass this Zod rule" are enforced.
+    // Components without it are left unvalidated. Return a `.loose()` object
+    // schema so fields you don't care about (id, unrelated props) don't fail validation.
+    propsSchema?: (props: any) => z.ZodTypeAny;
     // Server-side submission validation for form fields. Given this component's stored props,
     // returns the Zod schema its posted value must satisfy — keyed by `field-${id}` and combined
     // across a form's components by buildFormSubmissionSchema (./form-fields/schema.js). Only

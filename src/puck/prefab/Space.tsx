@@ -1,11 +1,18 @@
 import type { ComponentConfig } from "@puckeditor/core";
+import * as z from "zod";
 
 type SpaceProps = {
   direction?: "" | "vertical" | "horizontal";
   size: number;
 };
 
+// Mirrors the `size` field's own `min: 0` UI hint, which Puck doesn't enforce server-side.
+function toPropsSchema() {
+  return z.object({ size: z.number().min(0) }).loose();
+}
+
 const Space: ComponentConfig<SpaceProps> = {
+  propsSchema: toPropsSchema,
   fields: {
     size: {
       type: "number",

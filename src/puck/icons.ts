@@ -22,3 +22,4 @@ export { default as Subscript } from "lucide-react/dist/esm/icons/subscript.mjs"
 export { default as Superscript } from "lucide-react/dist/esm/icons/superscript.mjs";
 export { default as Tablet } from "lucide-react/dist/esm/icons/tablet.mjs";
 export { default as TriangleAlert } from "lucide-react/dist/esm/icons/triangle-alert.mjs";
+export { default as Type } from "lucide-react/dist/esm/icons/type.mjs";

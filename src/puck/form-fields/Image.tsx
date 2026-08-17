@@ -22,6 +22,19 @@ function toSubmissionSchema({ required }: ImageProps) {
   return required ? mediaRefSchema : mediaRefSchema.optional();
 }
 
+// Validates the field's own authored config, not what an end user later submits into it (see
+// toSubmissionSchema above). `folder` has no default that renders usably (see folderField's own
+// comment in ../component-fields/FolderPicker.js) so it's always required, regardless of whether
+// the field itself is marked required for submission purposes.
+function toPropsSchema() {
+  return z
+    .object({
+      label: z.string().trim().min(1, "Required"),
+      folder: z.object({ id: z.string(), name: z.string(), visibility: z.number() }, "A destination folder is required"),
+    })
+    .loose();
+}
+
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
@@ -30,6 +43,7 @@ const Image: ComponentConfig<ImageProps> = {
   label: "Image Upload",
   locations: "form",
   toSubmissionSchema,
+  propsSchema: toPropsSchema,
   processSubmission: async (raw, props) => {
     // Dynamically imported so the server-only sharp/fs/db code in Image.server.js never gets
     // pulled into the client editor bundle that also imports this component (see Turnstile.tsx
