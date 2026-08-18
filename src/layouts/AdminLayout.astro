@@ -1,12 +1,15 @@
 ---
 import '../styles/global.css';
 import externalPuckConfig from "virtual:purplepanda/puck-config";
+import type { AstroComponent } from '@lucide/astro';
 import { ClipboardList, FileText, House, Images, LayoutTemplate, LogOut, PenLine, Settings, Users } from '@lucide/astro';
 import { eq } from 'drizzle-orm';
+import * as z from 'zod';
 import { AlertList } from '../alert/AlertList.js';
 import Container from '../components/Container.astro';
 import { getDb } from '../db/db.js';
 import { users } from '../db/schema.js';
+import { runOverride } from '../hooks/index.js';
 
 const db = getDb();
 
@@ -22,6 +25,111 @@ const alerts = Astro.locals.alerts ?? [];
 const contentTypes = (externalPuckConfig ? externalPuckConfig.contentTypes : []) ?? [];
 
 const theme = user.theme !== 'system' ? user.theme : undefined;
+
+interface NavSubItem {
+	label: string;
+	href: string;
+}
+
+interface NavItem {
+	// Stable key. Drives the drawer panel's DOM id (`panel-${id}`) and the nav button's
+	// `data-panel` attribute for items with subItems; otherwise just an identifier a plugin can
+	// match on.
+	id: string;
+	label: string;
+	icon: AstroComponent;
+	// A plain link (e.g. Home) has `href` and no `subItems`. A drawer item (e.g. Users) has
+	// `subItems` and no `href` -- clicking it toggles its panel instead of navigating.
+	href?: string;
+	subItems?: NavSubItem[];
+}
+
+const navSubItemSchema = z.object({
+	label: z.string(),
+	href: z.string(),
+});
+
+const navItemSchema = z.object({
+	id: z.string(),
+	label: z.string(),
+	icon: z.custom<AstroComponent>((val) => typeof val === 'function', { message: 'icon must be a component' }),
+	href: z.string().optional(),
+	subItems: z.array(navSubItemSchema).optional(),
+});
+
+const navItemsSchema = z.array(navItemSchema);
+
+const defaultNavItems: NavItem[] = [
+	{ id: 'home', label: 'Home', icon: House, href: '/admin' },
+	{
+		id: 'users',
+		label: 'Users',
+		icon: Users,
+		subItems: [
+			{ label: 'All Users', href: '/admin/users' },
+			{ label: 'Add User', href: '/admin/users/new' },
+			{ label: 'Roles & Permissions', href: '/admin/users/roles' },
+		],
+	},
+	{
+		id: 'templates',
+		label: 'Templates',
+		icon: LayoutTemplate,
+		subItems: [
+			{ label: 'All Templates', href: '/admin/templates' },
+			{ label: 'New Template', href: '/admin/templates/new' },
+		],
+	},
+	{
+		id: 'pages',
+		label: 'Pages',
+		icon: FileText,
+		subItems: [
+			{ label: 'All Pages', href: '/admin/pages' },
+			{ label: 'New Page', href: '/admin/pages/new' },
+		],
+	},
+	{
+		id: 'content',
+		label: 'Content',
+		icon: PenLine,
+		subItems: contentTypes.map((ct) => ({ label: ct.title, href: `/admin/content/${ct.id}` })),
+	},
+	{
+		id: 'forms',
+		label: 'Forms',
+		icon: ClipboardList,
+		subItems: [
+			{ label: 'All Forms', href: '/admin/forms' },
+			{ label: 'New Form', href: '/admin/forms/new' },
+			{ label: 'Submissions', href: '/admin/forms/submissions' },
+		],
+	},
+	{
+		id: 'media',
+		label: 'Media',
+		icon: Images,
+		subItems: [
+			{ label: 'Images', href: '/admin/media' },
+			{ label: 'Documents', href: '/admin/documents' },
+		],
+	},
+	{
+		id: 'settings',
+		label: 'Settings',
+		icon: Settings,
+		subItems: [
+			{ label: 'Configurations', href: '/admin/settings' },
+			{ label: 'Redirects', href: '/admin/redirects' },
+			{ label: 'Tags', href: '/admin/tags' },
+			{ label: 'Audit', href: '/admin/audit' },
+		],
+	},
+];
+
+// Plugins can reorder, relabel, re-icon, add, or remove nav items/subitems by returning a modified
+// copy of `defaultNavItems` (or an entirely custom array) -- see the admin:nav hook in the docs.
+const navItems = (await runOverride('admin:nav', { user, defaultNavItems }, navItemsSchema)) ?? defaultNavItems;
 ---
 <!DOCTYPE html>
 <html lang="en" data-theme={theme}>
@@ -38,45 +146,19 @@ const theme = user.theme !== 'system' ? user.theme : undefined;
 		<!-- Vertical Icon Nav -->
 		<nav class="flex flex-col w-16 bg-base-100 border-r border-base-300 items-center py-3 gap-1 shrink-0 z-50">
 
-			<a href="/admin" class="flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
-				<House size={20} />
-				<span class="text-[10px] font-medium leading-tight">Home</span>
-			</a>
-
-			<button data-panel="users" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content cursor-pointer">
-				<Users size={20} />
-				<span class="text-[10px] font-medium leading-tight">Users</span>
-			</button>
-
-			<button data-panel="templates" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content cursor-pointer">
-				<LayoutTemplate size={20} />
-				<span class="text-[10px] font-medium leading-tight">Templates</span>
-			</button>
-
-			<button data-panel="pages" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content cursor-pointer">
-				<FileText size={20} />
-				<span class="text-[10px] font-medium leading-tight">Pages</span>
-			</button>
-
-			<button data-panel="content" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content cursor-pointer">
-				<PenLine size={20} />
-				<span class="text-[10px] font-medium leading-tight">Content</span>
-			</button>
-
-			<button data-panel="forms" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content cursor-pointer">
-				<ClipboardList size={20} />
-				<span class="text-[10px] font-medium leading-tight">Forms</span>
-			</button>
-
-			<a data-panel="media" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content cursor-pointer">
-				<Images size={20} />
-				<span class="text-[10px] font-medium leading-tight">Media</span>
-			</a>
-
-			<a data-panel="settings" class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content cursor-pointer">
-				<Settings size={20} />
-				<span class="text-[10px] font-medium leading-tight">Settings</span>
-			</a>
+			{navItems.map(({ id, label, icon: Icon, href, subItems }) => (
+				subItems ? (
+					<button data-panel={id} class="nav-drawer-btn flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content cursor-pointer">
+						<Icon size={20} />
+						<span class="text-[10px] font-medium leading-tight">{label}</span>
+					</button>
+				) : (
+					<a href={href} class="flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
+						<Icon size={20} />
+						<span class="text-[10px] font-medium leading-tight">{label}</span>
+					</a>
+				)
+			))}
 
 			<!-- User Avatar -->
 			<div class="mt-auto dropdown dropdown-right dropdown-end">
@@ -117,66 +199,16 @@ const theme = user.theme !== 'system' ? user.theme : undefined;
 				<label for="drawer-toggle" aria-label="close sidebar" class="drawer-overlay"></label>
 				<aside class="bg-base-200 min-h-full w-60 border-r border-base-300">
 
-					<div id="panel-users" class="drawer-panel hidden">
-						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Users</h2>
-						<ul class="menu w-full px-2 py-1 gap-0.5">
-							<li><a href="/admin/users">All Users</a></li>
-							<li><a href="/admin/users/new">Add User</a></li>
-							<li><a href="/admin/users/roles">Roles &amp; Permissions</a></li>
-						</ul>
-					</div>
-
-					<div id="panel-templates" class="drawer-panel hidden">
-						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Templates</h2>
-						<ul class="menu w-full px-2 py-1 gap-0.5">
-							<li><a href="/admin/templates">All Templates</a></li>
-							<li><a href="/admin/templates/new">New Template</a></li>
-						</ul>
-					</div>
-
-					<div id="panel-pages" class="drawer-panel hidden">
-						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Pages</h2>
-						<ul class="menu w-full px-2 py-1 gap-0.5">
-							<li><a href="/admin/pages">All Pages</a></li>
-							<li><a href="/admin/pages/new">New Page</a></li>
-						</ul>
-					</div>
-
-					<div id="panel-content" class="drawer-panel hidden">
-						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Content</h2>
-						<ul class="menu w-full px-2 py-1 gap-0.5">
-							{contentTypes.map(ct => (
-								<li><a href={`/admin/content/${ct.id}`}>{ct.title}</a></li>
-							))}
-						</ul>
-					</div>
-
-					<div id="panel-forms" class="drawer-panel hidden">
-						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Forms</h2>
-						<ul class="menu w-full px-2 py-1 gap-0.5">
-							<li><a href="/admin/forms">All Forms</a></li>
-							<li><a href="/admin/forms/new">New Form</a></li>
-							<li><a href="/admin/forms/submissions">Submissions</a></li>
-						</ul>
-					</div>
-
-					<div id="panel-media" class="drawer-panel hidden">
-						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Media</h2>
-						<ul class="menu w-full px-2 py-1 gap-0.5">
-							<li><a href="/admin/media">Images</a></li>
-							<li><a href="/admin/documents">Documents</a></li>
-						</ul>
-					</div>
-
-					<div id="panel-settings" class="drawer-panel hidden">
-						<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">Settings</h2>
-						<ul class="menu w-full px-2 py-1 gap-0.5">
-							<li><a href="/admin/settings">Configurations</a></li>
-							<li><a href="/admin/redirects">Redirects</a></li>
-							<li><a href="/admin/tags">Tags</a></li>
-							<li><a href="/admin/audit">Audit</a></li>
-						</ul>
-					</div>
+					{navItems.filter((item) => item.subItems).map((item) => (
+						<div id={`panel-${item.id}`} class="drawer-panel hidden">
+							<h2 class="text-sm font-semibold uppercase tracking-wider text-base-content/60 px-5 pt-4 pb-2">{item.label}</h2>
+							<ul class="menu w-full px-2 py-1 gap-0.5">
+								{item.subItems?.map((sub) => (
+									<li><a href={sub.href}>{sub.label}</a></li>
+								))}
+							</ul>
+						</div>
+					))}
 				</aside>
 			</div>
 		</div>

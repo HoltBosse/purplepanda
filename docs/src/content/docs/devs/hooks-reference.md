@@ -50,5 +50,6 @@ Registered via `hooks.override`. A returned value must pass the listed schema or
 | --- | --- | --- | --- |
 | `auth:isAdmin` | `{ userId: string, defaultIsAdmin: boolean }` | `boolean` | Replaces PurplePanda's built-in admin role check. Runs on every `/admin/*` request via the auth middleware. |
 | `content:validate` | `{ entity: "page" \| "content" \| "form" \| "template" \| "prefab", contentType?: string, content: unknown }` | `ContentValidationError[]` (`{ componentId, componentType, field, message }[]`) | Additive - returned errors are appended to PurplePanda's own Puck content validation on every save/publish. Can only make validation stricter, never bypass it. |
+| `admin:nav` | `{ user: User, defaultNavItems: NavItem[] }` | `NavItem[]` (`{ id, label, icon, href?, subItems?: { label, href }[] }[]`) | Replaces the admin nav rail + drawer panels entirely. Return a modified copy of `defaultNavItems` to reorder/relabel/add/remove items rather than rebuilding the whole nav from scratch. `icon` must be a Lucide Astro component (e.g. `import { Settings } from "@lucide/astro"`) - any value that isn't a function fails the schema. Runs on every `/admin/*` page render (`AdminLayout.astro`); the user avatar dropdown isn't part of this hook. |
 
 See [Hooks](/devs/hooks) for wiring and example plugins.
