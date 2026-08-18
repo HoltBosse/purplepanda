@@ -1,7 +1,9 @@
 import type { AstroSession } from "astro";
 import { and, eq, gte } from "drizzle-orm";
+import * as z from "zod";
 import { getDb } from "../db/db.js";
 import { roles, userRoles, users } from "../db/schema.js";
+import { runOverride } from "../hooks/index.js";
 
 // Same check the /admin middleware gates on: a live user with an active role
 // that carries adminAccess. Shared here so other routes (e.g. /image) can grant
@@ -31,5 +33,10 @@ export async function isAdminSession(session: AstroSession | undefined): Promise
     .where(and(eq(userRoles.userId, userId), eq(roles.adminAccess, true), gte(roles.state, 1)))
     .limit(1);
 
-  return !!adminRole;
+  const defaultIsAdmin = !!adminRole;
+  // Plugins can replace this decision entirely (e.g. custom SSO/role logic) by returning
+  // true/false; returning undefined falls through to the built-in role check above. A
+  // non-boolean return is rejected by the schema and treated the same as undefined.
+  const override = await runOverride("auth:isAdmin", { userId, defaultIsAdmin }, z.boolean());
+  return override ?? defaultIsAdmin;
 }

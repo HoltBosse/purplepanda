@@ -1,5 +1,5 @@
 import type { Config, Data } from "@puckeditor/core";
-import type * as z from "zod";
+import * as z from "zod";
 import { collectComponentNodes } from "./content-tree.js";
 
 export type ContentValidationError = {
@@ -8,6 +8,18 @@ export type ContentValidationError = {
   field: string;
   message: string;
 };
+
+// Shape-checks a plugin's content:validate override return value (see ../hooks/index.js) against
+// this same type, since that hook's result crosses a plugin/host boundary with no compiler
+// enforcement on the plugin's side.
+export const contentValidationErrorsSchema = z.array(
+  z.object({
+    componentId: z.string(),
+    componentType: z.string(),
+    field: z.string(),
+    message: z.string(),
+  }),
+);
 
 export type ValidateContentTreeOptions = {
   // Root fields (data.root.props) aren't declared by a purplepanda component — they're set per

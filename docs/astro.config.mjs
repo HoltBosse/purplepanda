@@ -28,6 +28,8 @@ export default defineConfig({
 						{ label: 'Fonts', slug: 'devs/fonts' },
 						{ label: 'Image REST API', slug: 'devs/image-rest-api' },
 						{ label: 'Actions API', slug: 'devs/actions-api' },
+						{ label: 'Hooks', slug: 'devs/hooks' },
+						{ label: 'Hook Reference', slug: 'devs/hooks-reference' },
 					],
 				},
 			],

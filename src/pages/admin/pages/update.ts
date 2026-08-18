@@ -6,8 +6,9 @@ import { addAction } from "../../../actions/index.js";
 import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
 import { getDb } from "../../../db/db.js";
 import { dagNodes, pages } from "../../../db/schema.js";
+import { runOverride } from "../../../hooks/index.js";
 import { pageRootPropsSchema } from "../../../puck/page-root-schema.js";
-import { formatValidationErrors, validateContentTree } from "../../../puck/validate-content.js";
+import { contentValidationErrorsSchema, formatValidationErrors, validateContentTree } from "../../../puck/validate-content.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -58,6 +59,8 @@ export async function POST(context: APIContext): Promise<Response> {
     const parsedContent = JSON.parse(contentResult.data);
 
     const validationErrors = validateContentTree(externalPuckConfig ?? {}, parsedContent, { rootPropsSchema: pageRootPropsSchema });
+    const overrideErrors = await runOverride("content:validate", { entity: "page", content: parsedContent }, contentValidationErrorsSchema);
+    if (overrideErrors) validationErrors.push(...overrideErrors);
     if (validationErrors.length > 0) {
         const alert = createAlert(alertType.error, `Fix the following before saving: ${formatValidationErrors(validationErrors)}`);
         await addAlertToSession(context.session, alert);
@@ -94,7 +97,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const userId = await context.session?.get("userId");
     await addAction(
-        isNewPage ? "pagecreate" : "pageupdate",
+        isNewPage ? "page:create" : "page:update",
         { id: page.id, version: publishNode?.id ?? null },
         userId,
         {

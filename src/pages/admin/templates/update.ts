@@ -6,7 +6,8 @@ import { addAction } from "../../../actions/index.js";
 import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
 import { getDb } from "../../../db/db.js";
 import { dagNodes, templates } from "../../../db/schema.js";
-import { formatValidationErrors, validateContentTree } from "../../../puck/validate-content.js";
+import { runOverride } from "../../../hooks/index.js";
+import { contentValidationErrorsSchema, formatValidationErrors, validateContentTree } from "../../../puck/validate-content.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     console.log("POST request received for template update");
@@ -67,6 +68,8 @@ export async function POST(context: APIContext): Promise<Response> {
     const parsedContent = JSON.parse(contentResult.data);
 
     const validationErrors = validateContentTree(externalPuckConfig ?? {}, parsedContent);
+    const overrideErrors = await runOverride("content:validate", { entity: "template", content: parsedContent }, contentValidationErrorsSchema);
+    if (overrideErrors) validationErrors.push(...overrideErrors);
     if (validationErrors.length > 0) {
         const alert = createAlert(alertType.error, `Fix the following before saving: ${formatValidationErrors(validationErrors)}`);
         await addAlertToSession(context.session, alert);
@@ -103,7 +106,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const userId = await context.session?.get("userId");
     await addAction(
-        isNewTemplate ? "templatecreate" : "templateupdate",
+        isNewTemplate ? "template:create" : "template:update",
         { id: template.id, version: publishNode?.id ?? null },
         userId,
         {

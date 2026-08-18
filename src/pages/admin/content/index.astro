@@ -47,8 +47,8 @@ const searchFields: SearchFieldSpec[] = [
 ];
 
 // Server-side counterpart. `pages` has no author or created-at column, so both ride on the
-// `contentcreate` row that `content/update.ts` logs to `userActions`
-// (`{ type: "contentcreate", data: { id: <pageId> } }`) whenever content is created.
+// `content:create` row that `content/update.ts` logs to `userActions`
+// (`{ type: "content:create", data: { id: <pageId> } }`) whenever content is created.
 const searchConfig: DrizzleSearchConfig = {
     fields: [
         {
@@ -69,7 +69,7 @@ const searchConfig: DrizzleSearchConfig = {
     joins: [
         {
             table: userActions,
-            on: sql`${userActions.type} = 'contentcreate' and ${userActions.data} ->> 'id' = ${pages.id}::text`,
+            on: sql`${userActions.type} = 'content:create' and ${userActions.data} ->> 'id' = ${pages.id}::text`,
             type: 'left',
         },
         { table: users, on: eq(userActions.userId, users.id), type: 'left' },
@@ -94,7 +94,7 @@ const listFilter = and(eq(pages.contentType, id), searchWhere);
 
 //order by id desc
 // DISTINCT (here and in the count below) because the userActions/users joins are one-to-many:
-// content with more than one `contentcreate` action would otherwise be listed — and counted —
+// content with more than one `content:create` action would otherwise be listed — and counted —
 // once per matching action row.
 const [allPages, allDrafts, totalContent] = await Promise.all([
     applySearchJoins(

@@ -3,7 +3,7 @@ title: Actions API
 description: Logging user actions for the audit trail.
 ---
 
-The actions API (`src/actions/index.ts`) records user activity for the audit log (`/admin/audit`). Each entry is a `type` (e.g. `pagecreate`) plus a `payload`, rendered into a human-readable message using a template stored per-type.
+The actions API (`src/actions/index.ts`) records user activity for the audit log (`/admin/audit`). Each entry is a `type` (e.g. `page:create`) plus a `payload`, rendered into a human-readable message using a template stored per-type. Every action is also automatically observable by a plugin — see [Hooks](/devs/hooks) and the full list in the [Hook Reference](/devs/hooks-reference).
 
 ## addAction
 
@@ -11,7 +11,7 @@ The actions API (`src/actions/index.ts`) records user activity for the audit log
 import { addAction } from "../../../actions/index.js";
 
 await addAction(
-  "pageupdate",
+  "page:update",
   { id: page.id, version: publishNode?.id ?? null },
   userId,
   {
@@ -23,7 +23,7 @@ await addAction(
 );
 ```
 
-* `type`: string identifying the kind of action, e.g. `"pagecreate"`, `"mediamove"`.
+* `type`: string identifying the kind of action, e.g. `"page:create"`, `"media:move"`. By convention this is `domain:event`.
 * `payload`: an object of data to store with the action. Keys referenced by `message` placeholders (`{key}`) should exist here.
 * `userId`: the id of the user who performed the action.
 * `options.message`: a template string with `{key}` placeholders filled in from `payload` (or resolved via `placeholders`, see below).

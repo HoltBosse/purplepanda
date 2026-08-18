@@ -101,7 +101,7 @@ export async function POST(context: APIContext): Promise<Response> {
     const userId = await context.session?.get("userId");
     if(uploadedIds.length > 0) {
         await addAction(
-            "mediaupload",
+            "media:upload",
             { ids: uploadedIds },
             userId,
             {
@@ -111,7 +111,7 @@ export async function POST(context: APIContext): Promise<Response> {
     }
     if(updatedIds.length > 0) {
         await addAction(
-            "mediaupdate",
+            "media:update",
             { ids: updatedIds },
             userId,
             {

@@ -34,7 +34,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
         if (inserted) {
             await addAction(
-                "redirectcreate",
+                "redirect:create",
                 { id: inserted.id },
                 userId,
                 {
@@ -54,7 +54,7 @@ export async function POST(context: APIContext): Promise<Response> {
         }
         await db.update(redirects).set({ from: fromResult.data, to: toResult.data }).where(eq(redirects.id, id));
         await addAction(
-            "redirectupdate",
+            "redirect:update",
             { id },
             userId,
             {

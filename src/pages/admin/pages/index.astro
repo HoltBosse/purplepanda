@@ -50,8 +50,8 @@ const searchFields: SearchFieldSpec[] = [
     { name: 'created', type: 'date', label: 'Created', description: 'Date created (YYYY-MM-DD)' },
 ];
 
-// `pages` has no author or created-at column, so both ride on the `pagecreate` row that
-// `pages/update.ts` logs to `userActions` (`{ type: "pagecreate", data: { id: <pageId> } }`).
+// `pages` has no author or created-at column, so both ride on the `page:create` row that
+// `pages/update.ts` logs to `userActions` (`{ type: "page:create", data: { id: <pageId> } }`).
 const searchConfig: DrizzleSearchConfig = {
     fields: [
         {
@@ -75,7 +75,7 @@ const searchConfig: DrizzleSearchConfig = {
         },
         {
             table: userActions,
-            on: sql`${userActions.type} = 'pagecreate' and ${userActions.data} ->> 'id' = ${pages.id}::text`,
+            on: sql`${userActions.type} = 'page:create' and ${userActions.data} ->> 'id' = ${pages.id}::text`,
             type: 'left',
         },
         { table: users, on: eq(userActions.userId, users.id), type: 'left' },

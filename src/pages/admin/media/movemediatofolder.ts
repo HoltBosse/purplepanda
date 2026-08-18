@@ -64,7 +64,7 @@ export async function POST(context: APIContext): Promise<Response> {
             }
 
             await addAction(
-                "mediamove",
+                "media:move",
                 {
                     id: updatedMedia.id,
                     oldFolderId: oldFolderById.get(media.data[i]!) ?? null,

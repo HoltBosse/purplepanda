@@ -10,6 +10,7 @@ import { getDb } from "../../../../db/db.js";
 import { sendMail } from "../../../../db/mail.js";
 import { resolvePagePathById } from "../../../../db/page-path.js";
 import { formSubmissions, forms, users } from "../../../../db/schema.js";
+import { emit } from "../../../../hooks/index.js";
 import { buildFormSubmissionSchema, collectSubmissionFieldProcessors } from "../../../../puck/form/schema.js";
 import {
   CSRF_FIELD_NAME,
@@ -268,6 +269,8 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress, 
   const [inserted] = await db.insert(formSubmissions).values({ formId: form.id, data: parsed.data }).returning();
 
   if (inserted) {
+    await emit("form:submitted", { formId: form.id, data: parsed.data });
+
     try {
       const submissionUrl = new URL(`/admin/forms/submissions/${inserted.id}`, request.url).toString();
       await notifyFormSubmission(form, parsed.data, submissionUrl);

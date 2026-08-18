@@ -3,6 +3,7 @@ import { type AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { getDb } from "../db/db.js";
 import * as dbSchema from "../db/schema.js";
 import { actionSchemas, userActions } from "../db/schema.js";
+import { emit } from "../hooks/index.js";
 
 type PlaceholderSpec = {
   lookupColumn: AnyPgColumn;
@@ -95,6 +96,8 @@ export async function addAction<TPayload extends Record<string, unknown>>(
     data: payload,
     userId,
   });
+
+  await emit(type, payload);
 }
 
 export async function describeAction(action: { type: string; data: unknown }): Promise<string> {

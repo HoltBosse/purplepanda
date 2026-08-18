@@ -36,8 +36,8 @@ const searchFields: SearchFieldSpec[] = [
 ];
 
 // Server-side counterpart. `forms` has no author or created-at column, so both ride on the
-// `formcreate` row that `forms/update.ts` logs to `userActions`
-// (`{ type: "formcreate", data: { id: <formId> } }`) whenever a form is created.
+// `form:create` row that `forms/update.ts` logs to `userActions`
+// (`{ type: "form:create", data: { id: <formId> } }`) whenever a form is created.
 const searchConfig: DrizzleSearchConfig = {
     fields: [
         {
@@ -56,7 +56,7 @@ const searchConfig: DrizzleSearchConfig = {
     joins: [
         {
             table: userActions,
-            on: sql`${userActions.type} = 'formcreate' and ${userActions.data} ->> 'id' = ${forms.id}::text`,
+            on: sql`${userActions.type} = 'form:create' and ${userActions.data} ->> 'id' = ${forms.id}::text`,
             type: 'left',
         },
         { table: users, on: eq(userActions.userId, users.id), type: 'left' },
@@ -78,7 +78,7 @@ const offset = (page - 1) * itemsPerPage;
 const listFilter = and(gt(forms.state, -1), searchWhere);
 
 // DISTINCT (here and in the count below) because the userActions/users joins are one-to-many: a
-// form with more than one `formcreate` action would otherwise be listed — and counted — once per
+// form with more than one `form:create` action would otherwise be listed — and counted — once per
 // matching action row.
 const [allForms, totalForms] = await Promise.all([
     applySearchJoins(

@@ -7,7 +7,8 @@ import { addAlertToSession, alertType, createAlert } from "../../../../alert/ind
 import { getDb } from "../../../../db/db.js";
 import { prefabSettingKey } from "../../../../db/prefabs.js";
 import { dagNodes, settings } from "../../../../db/schema.js";
-import { formatValidationErrors, validateContentTree } from "../../../../puck/validate-content.js";
+import { runOverride } from "../../../../hooks/index.js";
+import { contentValidationErrorsSchema, formatValidationErrors, validateContentTree } from "../../../../puck/validate-content.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -36,6 +37,8 @@ export async function POST(context: APIContext): Promise<Response> {
     const parsedContent = JSON.parse(contentResult.data);
 
     const validationErrors = validateContentTree(externalPuckConfig ?? {}, parsedContent);
+    const overrideErrors = await runOverride("content:validate", { entity: "prefab", content: parsedContent }, contentValidationErrorsSchema);
+    if (overrideErrors) validationErrors.push(...overrideErrors);
     if (validationErrors.length > 0) {
         const alert = createAlert(alertType.error, `Fix the following before saving: ${formatValidationErrors(validationErrors)}`);
         await addAlertToSession(context.session, alert);
@@ -72,7 +75,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const userId = await context.session?.get("userId");
     await addAction(
-        isNewPrefab ? "prefabcreate" : "prefabupdate",
+        isNewPrefab ? "prefab:create" : "prefab:update",
         { id: settingRow.id, version: publishNode?.id ?? null },
         userId,
         {

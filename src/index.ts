@@ -6,6 +6,7 @@ import type { AstroIntegration } from "astro";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { setDb } from "./db/db.js";
 import { setDocumentPath } from "./document/document.js";
+import { type PurplePandaPlugin, registerPlugins } from "./hooks/index.js";
 import { generateIslandsManifest } from "./islands-manifest.js";
 import { setMediaPath } from "./media/media.js";
 
@@ -26,6 +27,7 @@ export interface PurplePandaIntegrationOptions {
   mediaPath?: string;
   documentPath?: string;
   puckConfigModule?: string;
+  plugins?: PurplePandaPlugin[];
 }
 
 const MIME_TYPES: Record<string, string> = {
@@ -91,6 +93,8 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
           }
           setDocumentPath(options.documentPath);
         }
+
+        registerPlugins(options.plugins ?? []);
 
         const srcDir = fileURLToPath(config.srcDir);
         const has404Page = ['404.astro', '404.md', '404.mdx'].some(f =>

@@ -29,8 +29,8 @@ const searchFields: SearchFieldSpec[] = [
 ];
 
 // Server-side counterpart: resolves each field to a (possibly joined) column. `documents` has no
-// author or created-at column of its own, so both ride on the `documentcreate` row that
-// `upload.ts` already logs to `userActions` (`{ type: "documentcreate", data: { id: <docId> } }`)
+// author or created-at column of its own, so both ride on the `document:create` row that
+// `upload.ts` already logs to `userActions` (`{ type: "document:create", data: { id: <docId> } }`)
 // whenever a document is created.
 const searchConfig: DrizzleSearchConfig = {
     fields: [
@@ -50,7 +50,7 @@ const searchConfig: DrizzleSearchConfig = {
     joins: [
         {
             table: userActions,
-            on: sql`${userActions.type} = 'documentcreate' and ${userActions.data} ->> 'id' = ${documents.id}::text`,
+            on: sql`${userActions.type} = 'document:create' and ${userActions.data} ->> 'id' = ${documents.id}::text`,
             type: 'left',
         },
         { table: users, on: eq(userActions.userId, users.id), type: 'left' },
@@ -69,7 +69,7 @@ if (pageData.success) {
 const offset = (page - 1) * itemsPerPage;
 
 // DISTINCT (here and in the count below) because the userActions/users joins are one-to-many: a
-// document with more than one `documentcreate` action would otherwise be listed — and counted —
+// document with more than one `document:create` action would otherwise be listed — and counted —
 // once per matching action row.
 const allDocuments = await applySearchJoins(
     db

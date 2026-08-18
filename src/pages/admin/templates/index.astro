@@ -35,8 +35,8 @@ const searchFields: SearchFieldSpec[] = [
 ];
 
 // Server-side counterpart. `templates` has no author or created-at column, so both ride on the
-// `templatecreate` row that `templates/update.ts` logs to `userActions`
-// (`{ type: "templatecreate", data: { id: <templateId> } }`) whenever a template is created.
+// `template:create` row that `templates/update.ts` logs to `userActions`
+// (`{ type: "template:create", data: { id: <templateId> } }`) whenever a template is created.
 const searchConfig: DrizzleSearchConfig = {
     fields: [
         {
@@ -55,7 +55,7 @@ const searchConfig: DrizzleSearchConfig = {
     joins: [
         {
             table: userActions,
-            on: sql`${userActions.type} = 'templatecreate' and ${userActions.data} ->> 'id' = ${templates.id}::text`,
+            on: sql`${userActions.type} = 'template:create' and ${userActions.data} ->> 'id' = ${templates.id}::text`,
             type: 'left',
         },
         { table: users, on: eq(userActions.userId, users.id), type: 'left' },
@@ -77,7 +77,7 @@ const offset = (page - 1) * itemsPerPage;
 const listFilter = and(ne(templates.state, -1), searchWhere);
 
 // DISTINCT (here and in the count below) because the userActions/users joins are one-to-many: a
-// template with more than one `templatecreate` action would otherwise be listed — and counted —
+// template with more than one `template:create` action would otherwise be listed — and counted —
 // once per matching action row.
 const [allTemplates, totalTemplates] = await Promise.all([
     applySearchJoins(

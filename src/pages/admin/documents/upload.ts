@@ -39,7 +39,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
         const docId = inserted.id;
         await addAction(
-            "documentcreate",
+            "document:create",
             { id: docId },
             userId,
             {

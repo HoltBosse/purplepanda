@@ -45,7 +45,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const userId = await context.session?.get("userId");
     await addAction(
-        "documentupdate",
+        "document:update",
         { id: id.data },
         userId,
         {

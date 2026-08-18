@@ -46,6 +46,10 @@
       "types": "./dist/actions/index.d.ts",
       "default": "./dist/actions/index.js"
     },
+    "./hooks": {
+      "types": "./dist/hooks/index.d.ts",
+      "default": "./dist/hooks/index.js"
+    },
     "./form/*": "./src/form/*"
   },
   "scripts": {

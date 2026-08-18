@@ -30,8 +30,8 @@ const searchFields: SearchFieldSpec[] = [
 ];
 
 // Server-side counterpart: resolves each field to a (possibly joined) column. `redirects` has no
-// author or created-at column of its own, so both ride on the `redirectcreate` row that
-// `update.ts` logs to `userActions` (`{ type: "redirectcreate", data: { id: <redirectId> } }`)
+// author or created-at column of its own, so both ride on the `redirect:create` row that
+// `update.ts` logs to `userActions` (`{ type: "redirect:create", data: { id: <redirectId> } }`)
 // whenever a redirect is created.
 const searchConfig: DrizzleSearchConfig = {
     fields: [
@@ -54,7 +54,7 @@ const searchConfig: DrizzleSearchConfig = {
     joins: [
         {
             table: userActions,
-            on: sql`${userActions.type} = 'redirectcreate' and ${userActions.data} ->> 'id' = ${redirects.id}::text`,
+            on: sql`${userActions.type} = 'redirect:create' and ${userActions.data} ->> 'id' = ${redirects.id}::text`,
             type: 'left',
         },
         { table: users, on: eq(userActions.userId, users.id), type: 'left' },
@@ -73,7 +73,7 @@ if (pageData.success) {
 const offset = (page - 1) * itemsPerPage;
 
 // DISTINCT (here and in the count below) because the userActions/users joins are one-to-many: a
-// redirect with more than one `redirectcreate` action would otherwise be listed — and counted —
+// redirect with more than one `redirect:create` action would otherwise be listed — and counted —
 // once per matching action row.
 const allRedirects = await applySearchJoins(
     db
