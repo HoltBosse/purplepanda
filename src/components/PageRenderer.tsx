@@ -1,7 +1,13 @@
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Config, Data } from "@puckeditor/core";
 import { Render, walkTree } from "@puckeditor/core";
-import { wrapConfigWithClientDataResolvers, wrapConfigWithDataBinding, wrapConfigWithIslands } from "../puck/index.js";
+import type { ReactElement } from "react";
+import {
+  IslandRenderContext,
+  wrapConfigWithClientDataResolvers,
+  wrapConfigWithDataBinding,
+  wrapConfigWithIslands,
+} from "../puck/index.js";
 
 // Island wrapping is applied first (innermost) so the props captured in each island marker are the
 // values a component actually renders with — including per-item values resolved by data binding
@@ -31,11 +37,23 @@ const renderConfig: Config = {
 interface PageRendererProps {
   pageData: Data;
   templateData?: Data | undefined;
+  // A synchronous static-markup renderer (i.e. `renderToStaticMarkup`), supplied by the
+  // publish/preview routes that render this page as static HTML for later independent island
+  // hydration — so each island's SSR output matches the isolated tree shape the client will
+  // hydrate against (see IslandRenderContext in ../puck/islands.tsx). Left unset by callers that
+  // render PageRenderer as a live, already-interactive client tree (e.g. HistoryView), where
+  // islands should render inline instead. Not imported directly here: `react-dom/server` is
+  // server-only, and this component is also bundled client-side via that live-tree path.
+  renderIsolatedIsland?: (element: ReactElement) => string;
 }
 
-export default function PageRenderer({ pageData, templateData }: PageRendererProps) {
+export default function PageRenderer({ pageData, templateData, renderIsolatedIsland }: PageRendererProps) {
   if (!templateData) {
-    return <Render config={renderConfig} data={pageData} />;
+    return (
+      <IslandRenderContext.Provider value={renderIsolatedIsland}>
+        <Render config={renderConfig} data={pageData} />
+      </IslandRenderContext.Provider>
+    );
   }
 
   // TemplateSlot marks where page content is injected. It can be nested inside another
@@ -52,12 +70,16 @@ export default function PageRenderer({ pageData, templateData }: PageRendererPro
 
   if (!injected) {
     return (
-      <>
+      <IslandRenderContext.Provider value={renderIsolatedIsland}>
         <Render config={renderConfig} data={templateData} />
         <Render config={renderConfig} data={pageData} />
-      </>
+      </IslandRenderContext.Provider>
     );
   }
 
-  return <Render config={renderConfig} data={mergedData} />;
+  return (
+    <IslandRenderContext.Provider value={renderIsolatedIsland}>
+      <Render config={renderConfig} data={mergedData} />
+    </IslandRenderContext.Provider>
+  );
 }

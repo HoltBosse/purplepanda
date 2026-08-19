@@ -11,6 +11,10 @@ import { formatPageTitle, resolveSiteName } from '../../../../db/site.js';
 import { extractFamilyFromLink } from '../../../../form/fields/font-utils.js';
 import { resolveDataForSSR } from '../../../../puck/server-data-wrapper.js';
 
+// Dynamically imported (not a static top-level import) so it's only pulled into the SSR
+// dependency graph on an actual page request — see the same comment in page.astro.
+const { renderToStaticMarkup } = await import('react-dom/server');
+
 const db = getDb();
 const { draftId } = Astro.params;
 
@@ -65,6 +69,6 @@ const bodyFontFamily = extractFamilyFromLink(fontSettings.bodyFontLink);
     </style>
 </head>
 <body data-purplepanda-islands>
-    <PageRenderer pageData={pageData} templateData={templateData} />
+    <PageRenderer pageData={pageData} templateData={templateData} renderIsolatedIsland={renderToStaticMarkup} />
 </body>
 </html>

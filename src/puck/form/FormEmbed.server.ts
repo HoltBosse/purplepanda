@@ -6,7 +6,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getDb } from "../../db/db.js";
 import { forms } from "../../db/schema.js";
-import { filterConfigByLocation, wrapConfigWithIslands } from "../index.js";
+import { filterConfigByLocation, IslandRenderContext, wrapConfigWithIslands } from "../index.js";
 import { resolveDataForSSR } from "../server-data-wrapper.js";
 import { createCsrfToken, renderSpamGuardFieldsHtml } from "./spam-guard.js";
 
@@ -37,8 +37,14 @@ export async function getFormHtml(id: string): Promise<string | null> {
     },
   };
 
+  // Nested field islands (e.g. Select) render isolated too, matching hydrateIslands' per-marker
+  // hydrateRoot calls against this same _html string — see IslandRenderContext for why.
   const html = renderToStaticMarkup(
-    createElement(Render, { config: formRenderConfig, data: resolvedData }),
+    createElement(
+      IslandRenderContext.Provider,
+      { value: renderToStaticMarkup },
+      createElement(Render, { config: formRenderConfig, data: resolvedData }),
+    ),
   );
 
   const hasFileInput = /type=(["'])file\1/i.test(html);

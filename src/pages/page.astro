@@ -14,6 +14,12 @@ import { resolveTemplateSetting } from '../db/templates.js';
 import { extractFamilyFromLink } from '../form/fields/font-utils.js';
 import { resolveDataForSSR } from '../puck/server-data-wrapper.js';
 
+// Dynamically imported (not a static top-level import) so it's only pulled into the SSR
+// dependency graph on an actual page request, not discovered as a new dependency requiring
+// re-optimization on every dev-server cold start — matches FormEmbed.server.ts's own lazy
+// import of the same module for the same reason.
+const { renderToStaticMarkup } = await import('react-dom/server');
+
 const db = getDb();
 const requestPath = Astro.params.path ?? '';
 const config = externalPuckConfig ?? {};
@@ -187,6 +193,6 @@ const jsonLdScript = jsonLdItems.length
     </style>
 </head>
 <body data-purplepanda-islands>
-    <PageRenderer pageData={pageData} templateData={templateData} />
+    <PageRenderer pageData={pageData} templateData={templateData} renderIsolatedIsland={renderToStaticMarkup} />
 </body>
 </html>
