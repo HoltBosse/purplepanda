@@ -1,5 +1,7 @@
 import type { ComponentConfig } from "@puckeditor/core";
+import { useEffect, useRef } from "react";
 import * as z from "zod";
+import { hydrateIslands } from "../hydrate-islands.js";
 
 export type FormRef = { id: string; name: string };
 
@@ -15,6 +17,25 @@ function toPropsSchema() {
       form: z.object({ id: z.string(), name: z.string() }, "Select a form"),
     })
     .loose();
+}
+
+// `_html` is a static markup string (see the comment on its dangerouslySetInnerHTML use below), so
+// any island markers it contains (e.g. a Select field's SlimSelect enhancement) are inert unless
+// something hydrates them explicitly. On a real page load the site-wide hydration runtime finds
+// them; contexts that instead run PageRenderer as a live React tree (e.g. HistoryView's revision
+// preview) skip that runtime, so this component hydrates its own markers itself once the HTML is
+// in the DOM.
+function FormHtml({ html }: { html: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+    hydrateIslands(root);
+  }, [html]);
+
+  // biome-ignore lint/security/noDangerouslySetInnerHtml: html is server-rendered by FormEmbed.server.ts from the CMS's own admin-authored Puck form config via renderToStaticMarkup, not raw user input — this is the only way to embed that pre-rendered markup into the React tree
+  return <div ref={containerRef} className="w-full" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 const FormEmbed: ComponentConfig<FormEmbedProps> = {
@@ -54,8 +75,7 @@ const FormEmbed: ComponentConfig<FormEmbedProps> = {
       // this div stretched full-width too — but once an island (e.g. the Select field's SlimSelect
       // enhancement) clears that class on hydration, the div loses its only reason to stay wide
       // and collapses to fit-content, visibly shrinking the whole form.
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: _html is server-rendered by FormEmbed.server.ts from the CMS's own admin-authored Puck form config via renderToStaticMarkup, not raw user input — this is the only way to embed that pre-rendered markup into the React tree
-      return <div className="w-full" dangerouslySetInnerHTML={{ __html: _html }} />;
+      return <FormHtml html={_html} />;
     }
     // Styled as an error, not just a neutral placeholder, when no form is selected at all: this
     // prop is required (see propsSchema above), so that state can't actually be saved/published —

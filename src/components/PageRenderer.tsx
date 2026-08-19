@@ -1,13 +1,19 @@
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Config, Data } from "@puckeditor/core";
 import { Render, walkTree } from "@puckeditor/core";
-import { wrapConfigWithDataBinding, wrapConfigWithIslands } from "../puck/index.js";
+import { wrapConfigWithClientDataResolvers, wrapConfigWithDataBinding, wrapConfigWithIslands } from "../puck/index.js";
 
 // Island wrapping is applied first (innermost) so the props captured in each island marker are the
 // values a component actually renders with — including per-item values resolved by data binding
-// when the island sits inside a CardCollection card.
-const hostConfig: Partial<Config> = wrapConfigWithDataBinding(
-  wrapConfigWithIslands((externalPuckConfig ?? {}) as Config),
+// when the island sits inside a CardCollection card. Client data resolvers go outermost: when
+// PageRenderer runs as SSR (the published page, the admin preview routes), pageData already
+// arrives pre-resolved via resolveDataForSSR, so the wrapper's fetch effect never fires (effects
+// don't run during server rendering) and it's a pass-through. When PageRenderer instead runs live
+// in the browser with unresolved DAG content (e.g. HistoryView's revision-comparison panes), this
+// is what lets components like FormEmbed fetch their server-only data (`/admin/components/data`)
+// instead of falling back to their SSR-only placeholder.
+const hostConfig: Partial<Config> = wrapConfigWithClientDataResolvers(
+  wrapConfigWithDataBinding(wrapConfigWithIslands((externalPuckConfig ?? {}) as Config)),
 );
 
 const renderConfig: Config = {
