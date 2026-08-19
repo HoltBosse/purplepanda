@@ -164,6 +164,10 @@ function PreviewFrame({
 
       doc.documentElement.setAttribute("data-theme", "false");
       doc.body.style.margin = "0";
+      // This is a read-only comparison, not a live page — clicking a link, submitting a form, or
+      // opening a Select's dropdown here would be surprising (and, for a form, would fire a real
+      // submission) rather than doing anything useful for a diff view.
+      doc.body.style.pointerEvents = "none";
 
       document
         .querySelectorAll('link[rel="stylesheet"], style')
