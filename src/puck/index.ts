@@ -6,7 +6,7 @@ export type { ComponentConfig, Slot } from "@puckeditor/core";
 export { ClientComponentDataWrapper, wrapConfigWithClientDataResolvers } from "./client-data-wrapper.js";
 export type { BoundItem } from "./data-binding.js";
 export { ItemContext, useBoundItem, wrapConfigWithDataBinding } from "./data-binding.js";
-export { ISLAND_NAME_ATTR, IslandRenderContext, ISLAND_PROPS_ATTR, wrapConfigWithIslands } from "./islands.js";
+export { ISLAND_NAME_ATTR, ISLAND_PROPS_ATTR, IslandRenderContext, wrapConfigWithIslands } from "./islands.js";
 export { pageRootPropsSchema } from "./page-root-schema.js";
 export type { ContentValidationError, ValidateContentTreeOptions } from "./validate-content.js";
 export { formatValidationErrors, validateContentTree } from "./validate-content.js";

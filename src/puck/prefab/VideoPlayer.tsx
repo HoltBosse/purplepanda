@@ -13,7 +13,7 @@ import { TwitchVideo } from "@videojs/react/media/twitch-video";
 import { VimeoVideo } from "@videojs/react/media/vimeo-video";
 import { YouTubeVideo } from "@videojs/react/media/youtube-video";
 import { Video as Html5Video, VideoSkin, videoFeatures } from "@videojs/react/video";
-import { useEffect, useRef, type CSSProperties } from "react";
+import { type CSSProperties, useEffect, useRef } from "react";
 
 const { Player } = createPlayer({ features: videoFeatures });
 

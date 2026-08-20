@@ -28,6 +28,7 @@ function toPropsSchema() {
 function FormHtml({ html }: { html: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: html isn't read in the effect body, but it's the prop that drives the dangerouslySetInnerHTML content below — the effect must rerun to re-hydrate whenever that markup changes.
   useEffect(() => {
     const root = containerRef.current;
     if (!root) return;
