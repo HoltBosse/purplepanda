@@ -252,6 +252,13 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
               // re-optimization ("new dependencies optimized, reloading") of this entire
               // list, which forces a full page reload mid-load. Listing them here makes
               // Vite pre-bundle them at server startup instead.
+              //
+              // The @videojs/* entries guard the same failure mode for a different reason:
+              // VideoPlayer.tsx is only reachable through the editor's Video palette
+              // component, so the mid-session re-optimization it triggers on first editor
+              // load broadcasts a dev-server-wide reload to every connected tab — including
+              // tabs sitting on an already-hydrated published page — which is what stops
+              // that page's autoplaying video until a manual refresh.
               include: [
                 "@puckeditor/core",
                 "@dnd-kit/dom",
@@ -265,6 +272,10 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
                 "@tiptap/extension-subscript",
                 "@tiptap/extension-superscript",
                 "@tiptap/extensions",
+                "@videojs/react",
+                "@videojs/react/video",
+                "@videojs/react/media/vimeo-video",
+                "@videojs/core/dom/media/vimeo",
               ],
             },
           },
