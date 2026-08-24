@@ -232,20 +232,39 @@ async function getContentTypeOptions() {
   }));
 }
 
+// Single source of truth for which config field a given source needs an author-provided value
+// for — driving both which field is shown in the editor (resolveFields below) and which is
+// required for a valid config (toPropsSchema below), so the two can't drift out of sync (e.g. a
+// field left required after it's been hidden, or shown without ever being enforced).
+function sourceField(source: OptionsSource): "options" | "contentType" | null {
+  switch (source) {
+    case "manual":
+      return "options";
+    case "content":
+      return "contentType";
+    default:
+      return null;
+  }
+}
+
 // Validates the field's own authored config, not what an end user later submits into it (see
-// toSubmissionSchema above). Only the field(s) relevant to the chosen source need a value —
-// mirrors resolveFields below, which only shows "options" for manual and "contentType" for content.
+// toSubmissionSchema above). Only the field relevant to the chosen source (per sourceField above)
+// need a value; the other is left unvalidated since it's hidden from the editor entirely — and
+// must be `.optional()`, not just `z.unknown()`: in zod v4, unknown()/any() no longer implicitly
+// tolerates a *missing* key (unlike v3), so older stored records saved before this prop existed
+// (genuinely absent from the JSON, not just empty) would otherwise fail validation forever.
 function toPropsSchema({ source }: SelectProps) {
+  const field = sourceField(source);
   return z
     .object({
       label: z.string().trim().min(1, "Required"),
       options:
-        source === "manual"
+        field === "options"
           ? z
               .array(z.object({ label: z.string().trim().min(1, "Required"), value: z.string().trim().min(1, "Required") }))
               .min(1, "At least one option is required")
-          : z.unknown(),
-      contentType: source === "content" ? z.string().min(1, "Select a content type") : z.unknown(),
+          : z.unknown().optional(),
+      contentType: field === "contentType" ? z.string().min(1, "Select a content type") : z.unknown().optional(),
     })
     .loose();
 }
@@ -323,9 +342,9 @@ const Select: ComponentConfig<SelectProps> = {
     required: false,
     multiple: false,
   },
-  // Only the field(s) relevant to the chosen source are shown: "options" (manual entry) for
-  // manual, "contentType" for content — users and tags need no further picker, since there's
-  // only one users/tags list to draw from.
+  // Only the field relevant to the chosen source (per sourceField above) is shown: "options"
+  // (manual entry) for manual, "contentType" for content — users and tags need no further picker,
+  // since there's only one users/tags list to draw from.
   resolveFields: async (data, { fields }) => {
     const { source } = data.props;
     const resolved: Partial<Fields<SelectProps>> = {
@@ -335,12 +354,13 @@ const Select: ComponentConfig<SelectProps> = {
       source: fields.source,
     };
 
-    if (source === "content") {
+    const field = sourceField(source);
+    if (field === "contentType") {
       resolved.contentType = {
         ...contentTypeField,
         options: [{ label: "— select a content type —", value: "" }, ...(await getContentTypeOptions())],
       };
-    } else if (source !== "users" && source !== "tags") {
+    } else if (field === "options") {
       resolved.options = optionsField;
     }
 
