@@ -23,6 +23,7 @@ import {
   collectSubmissionFieldMeta,
   formatSubmissionValue,
   resolveFieldLabel,
+  type SubmissionFieldMeta,
   visibleSubmissionFields,
 } from "../../../../puck/form/submission-display.js";
 import { filterConfigByLocation } from "../../../../puck/index.js";
@@ -103,6 +104,15 @@ async function successResponse(
   return redirectBack(request, "Thanks for your submission!");
 }
 
+// Same display rules as the admin submissions table: hide fields whose component opts out (e.g.
+// Turnstile's verification token), show the label the form editor set rather than the raw
+// `field-<id>` key, and resolve submitted codes (e.g. "option-1") back to the option's label.
+async function buildSubmissionFieldMeta(form: { content: unknown }): Promise<SubmissionFieldMeta> {
+  const formConfig = filterConfigByLocation((externalPuckConfig as Config) ?? ({} as Config), "form");
+  const resolvedFormContent = await resolveDataForSSR(formConfig, form.content as Data);
+  return collectSubmissionFieldMeta(formConfig, resolvedFormContent);
+}
+
 // Best-effort side effect of a genuine submission (unlike successResponse, this is never invoked
 // for the honeypot/spam-timing bypasses) — a failure here shouldn't fail the visitor's submission,
 // so callers are expected to catch and log rather than let this reject the request.
@@ -110,6 +120,7 @@ async function notifyFormSubmission(
   form: { content: unknown },
   data: Record<string, unknown>,
   submissionUrl: string,
+  meta: SubmissionFieldMeta,
 ): Promise<void> {
   const notifyUserIds = (form.content as any)?.root?.props?.notifyUserIds as string[] | undefined;
   if (!notifyUserIds || notifyUserIds.length === 0) return;
@@ -135,15 +146,9 @@ async function notifyFormSubmission(
 
   const formName = ((form.content as any)?.root?.props?.name as string | undefined) || "your form";
 
-  // Same display rules as the admin submissions table: hide fields whose component opts out
-  // (e.g. Turnstile's verification token), show the label the form editor set rather than the raw
-  // `field-<id>` key, and resolve submitted codes (e.g. "option-1") back to the option's label.
   // Fields with their own custom rendering (e.g. Image, which normally shows a thumbnail) link to
   // the submission instead — that thumbnail's /image/<id> URL only loads for an admin browsing
   // from the submissions/media admin views (see /image/[id].ts), which an email can't be.
-  const formConfig = filterConfigByLocation((externalPuckConfig as Config) ?? ({} as Config), "form");
-  const resolvedFormContent = await resolveDataForSSR(formConfig, form.content as Data);
-  const meta = collectSubmissionFieldMeta(formConfig, resolvedFormContent);
   const lines = visibleSubmissionFields(meta, data).map(
     ([key, value]) => `${resolveFieldLabel(meta, key)}: ${formatSubmissionValue(meta, key, value, submissionUrl)}`,
   );
@@ -156,10 +161,13 @@ async function notifyFormSubmission(
   });
 }
 
-function describeValidationErrors(fieldErrors: Record<string, string[] | undefined>): string {
+function describeValidationErrors(
+  fieldErrors: Record<string, string[] | undefined>,
+  meta: SubmissionFieldMeta,
+): string {
   const parts = Object.entries(fieldErrors)
     .filter((entry): entry is [string, string[]] => Array.isArray(entry[1]) && entry[1].length > 0)
-    .map(([field, messages]) => `${field}: ${messages.join(", ")}`);
+    .map(([field, messages]) => `${resolveFieldLabel(meta, field)}: ${messages.join(", ")}`);
 
   return parts.length > 0
     ? `Please fix the following and resubmit: ${parts.join("; ")}`
@@ -170,8 +178,9 @@ async function validationFailureResponse(
   session: APIContext["session"],
   request: Request,
   fieldErrors: Record<string, string[] | undefined>,
+  meta: SubmissionFieldMeta,
 ): Promise<Response> {
-  await addAlertToSession(session, createAlert(alertType.error, describeValidationErrors(fieldErrors)));
+  await addAlertToSession(session, createAlert(alertType.error, describeValidationErrors(fieldErrors, meta)));
   return redirectBack(request, "There was a problem with your submission.");
 }
 
@@ -245,6 +254,10 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress, 
 
   stripSpamGuardFields(data);
 
+  // Resolved once up front: needed to translate `field-<id>` keys back to their form-editor
+  // labels for both validation error messages below and the admin notification email.
+  const meta = await buildSubmissionFieldMeta(form);
+
   // Fields backed by a component that needs a server-side side effect (e.g. Image.tsx writing an
   // uploaded file to disk and inserting a media row) run against the *raw* FormData value here —
   // formDataToJson above already collapsed any File to bare {name,size,type} metadata, discarding
@@ -264,7 +277,7 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress, 
       }
     }
     if (Object.keys(processorErrors).length > 0) {
-      return validationFailureResponse(session, request, processorErrors);
+      return validationFailureResponse(session, request, processorErrors, meta);
     }
   }
 
@@ -274,7 +287,7 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress, 
   const schema = buildFormSubmissionSchema(externalPuckConfig as Config, form.content as Data);
   const parsed = await schema.safeParseAsync(data);
   if (!parsed.success) {
-    return validationFailureResponse(session, request, z.flattenError(parsed.error).fieldErrors);
+    return validationFailureResponse(session, request, z.flattenError(parsed.error).fieldErrors, meta);
   }
 
   const [inserted] = await db.insert(formSubmissions).values({ formId: form.id, data: parsed.data }).returning();
@@ -284,7 +297,7 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress, 
 
     try {
       const submissionUrl = new URL(`/admin/forms/submissions/${inserted.id}`, request.url).toString();
-      await notifyFormSubmission(form, parsed.data, submissionUrl);
+      await notifyFormSubmission(form, parsed.data, submissionUrl, meta);
     } catch (err) {
       console.error(`[purplepanda] Failed to send submission notification for form ${form.id}`, err);
     }
