@@ -3,6 +3,8 @@ import type { Config, Data } from "@puckeditor/core";
 import { useMemo } from "react";
 import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
 import { notifyUsersField } from "../puck/component-fields/NotifyUsersField.js";
+import { replyToField } from "../puck/component-fields/ReplyToField.js";
+import { formRootPropsSchema } from "../puck/form-root-schema.js";
 import { filterConfigByLocation, wrapConfigWithDataBinding } from "../puck/index.js";
 import PuckEditor from "./PuckEditor.js";
 
@@ -88,6 +90,7 @@ export default function FormPuckEditor({ initialData, saveUrl = "/admin/forms/up
       fields: {
         name: { type: "text" as const, label: "Form Name" },
         notifyUserIds: notifyUsersField,
+        replyTo: replyToField,
         redirectPage: {
           type: "select" as const,
           label: "Redirect to page on submit",
@@ -97,6 +100,7 @@ export default function FormPuckEditor({ initialData, saveUrl = "/admin/forms/up
       defaultProps: {
         name: "",
         notifyUserIds: [],
+        replyTo: "",
         redirectPage: "",
       },
       resolveFields: async (_data: unknown, { fields }: { fields: Record<string, unknown> }) => {
@@ -121,6 +125,7 @@ export default function FormPuckEditor({ initialData, saveUrl = "/admin/forms/up
       data={initialData ?? defaultInitialData}
       onPublish={onPublish ?? defaultSave}
       dictionary={{ "label-page": "Form" }}
+      rootPropsSchema={formRootPropsSchema}
       {...optionalProps}
     />
   );

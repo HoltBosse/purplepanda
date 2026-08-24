@@ -123,6 +123,16 @@ async function notifyFormSubmission(
   const to = recipients.map((row) => row.email);
   if (to.length === 0) return;
 
+  const replyToUserId = (form.content as any)?.root?.props?.replyTo as string | undefined;
+  const replyTo = replyToUserId
+    ? await db
+        .select({ email: users.email })
+        .from(users)
+        .where(and(eq(users.state, 1), eq(users.id, replyToUserId)))
+        .limit(1)
+        .then((rows) => rows[0]?.email)
+    : undefined;
+
   const formName = ((form.content as any)?.root?.props?.name as string | undefined) || "your form";
 
   // Same display rules as the admin submissions table: hide fields whose component opts out
@@ -142,6 +152,7 @@ async function notifyFormSubmission(
     to,
     subject: `New submission: ${formName}`,
     text: [...lines, "", `View full submission: ${submissionUrl}`].join("\n"),
+    replyTo,
   });
 }
 

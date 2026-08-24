@@ -27,6 +27,7 @@ export interface SendMailOptions {
   to: string[];
   subject: string;
   text: string;
+  replyTo?: string | undefined;
 }
 
 // Silently no-ops when SMTP hasn't been configured in Settings — notification email is a
@@ -51,5 +52,6 @@ export async function sendMail(db: NodePgDatabase<Record<string, unknown>>, opti
     to: options.to,
     subject: options.subject,
     text: options.text,
+    replyTo: options.replyTo,
   });
 }
