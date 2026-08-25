@@ -268,3 +268,44 @@ describe('buildSearchWhere', () => {
         expect(sql.toLowerCase()).toContain('left join');
     });
 });
+
+describe('buildSearchWhere defaultExclude', () => {
+    const configWithDefaultExclude: DrizzleSearchConfig = {
+        fields: [
+            {
+                name: 'state',
+                type: 'enum',
+                enumValues: ['enabled', 'disabled', 'deleted'],
+                column: documents.state,
+                valueMap: { enabled: 1, disabled: 0, deleted: -1 },
+                defaultExclude: ['deleted'],
+            },
+            { name: 'title', type: 'text', column: documents.title, matchMode: 'contains' },
+        ],
+        fulltext: { columns: [documents.title] },
+    };
+
+    it('excludes the default value when the query never mentions the field', () => {
+        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery(''), configWithDefaultExclude)!);
+        expect(sql.toLowerCase()).toContain('not in');
+        expect(params).toContain(-1);
+    });
+
+    it('still excludes the default value when other fields are searched', () => {
+        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('title:foo'), configWithDefaultExclude)!);
+        expect(sql.toLowerCase()).toContain('not in');
+        expect(params).toContain(-1);
+    });
+
+    it('drops the default exclusion once the field itself is searched, even for the excluded value', () => {
+        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('state:deleted'), configWithDefaultExclude)!);
+        expect(sql.toLowerCase()).not.toContain('not in');
+        expect(params).toEqual([-1]);
+    });
+
+    it('drops the default exclusion when the field is searched for a different value', () => {
+        const { sql, params } = toQuery(buildSearchWhere(parseSearchQuery('state:enabled'), configWithDefaultExclude)!);
+        expect(sql.toLowerCase()).not.toContain('not in');
+        expect(params).toEqual([1]);
+    });
+});

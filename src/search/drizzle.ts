@@ -1,7 +1,7 @@
 // Server-only: converts a validated search AST into a Drizzle Postgres `where` condition. Pulls
 // in `drizzle-orm`, so this must never be imported from a client-side React island — import
 // `./index.js` (or the individual grammar/validate modules) there instead.
-import { and, eq, ilike, isNull, like, or, type SQL, sql } from "drizzle-orm";
+import { and, eq, ilike, isNull, like, notInArray, or, type SQL, sql } from "drizzle-orm";
 import type { AnyPgColumn, PgSelect, PgTable } from "drizzle-orm/pg-core";
 import type { FieldTermNode, SearchAst, SearchFieldSpec, SearchOperator, TextTermNode } from "./types.js";
 import { validateSearchAst } from "./validate.js";
@@ -36,6 +36,14 @@ export interface DrizzleSearchField extends SearchFieldSpec {
   matchMode?: TextMatchMode;
   /** Maps a grammar token to the value actually stored in the column, e.g. `{ enabled: 1 }`. */
   valueMap?: Record<string, unknown>;
+  /**
+   * Enum tokens hidden from results unless this field itself appears in the query, e.g.
+   * `defaultExclude: ['deleted']` on a `state` field keeps soft-deleted rows out of the plain,
+   * unfiltered listing while still letting `state:deleted` (or `state:enabled`, `state:published`,
+   * ...) find them — any explicit `field:value` term for this field name disables the default
+   * exclusion entirely and leaves that term to narrow the results by itself.
+   */
+  defaultExclude?: readonly string[];
   /** `regconfig` used for `matchMode: "fulltext"`. Defaults to "simple" (no stemming/stopwords — see DEFAULT_LANGUAGE above). */
   language?: string;
   /**
@@ -132,6 +140,18 @@ export function buildSearchWhere(ast: SearchAst, config: DrizzleSearchConfig): S
     if (!term.field) continue;
     const condition = buildFieldCondition(term.node, term.field);
     if (condition) conditions.push(condition);
+  }
+
+  // A `field:value` term for a `defaultExclude` field narrows the results by itself (including to
+  // the excluded value itself, e.g. `state:deleted`), so the default exclusion only applies when
+  // the query never mentions that field at all.
+  const queriedFields = new Set(ast.filter((node) => node.kind === "field").map((node) => node.field));
+  for (const field of config.fields) {
+    if (!field.defaultExclude?.length || queriedFields.has(field.name)) continue;
+    const excludedValues = field.defaultExclude
+      .map((token) => (field.valueMap ? field.valueMap[token] : token))
+      .filter((value) => value !== undefined);
+    if (excludedValues.length > 0) conditions.push(notInArray(field.column as SQL, excludedValues));
   }
 
   return and(...conditions);

@@ -1,6 +1,6 @@
 ---
 import { CircleCheck, CircleX, CornerDownRight, EllipsisVertical, FilePen, GitBranch, SquareArrowOutUpRight, SquarePen, Trash2 } from '@lucide/astro';
-import { and, desc, eq, gt, type InferSelectModel, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, type InferSelectModel, inArray, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 import Pagination from '../../../components/Pagination.astro';
@@ -23,9 +23,9 @@ const db = getDb();
 const titleExpr = sql`${pages.content} -> 'root' -> 'props' ->> 'title'`;
 const parentPageExpr = sql`${pages.content} -> 'root' -> 'props' ->> 'parentPage'`;
 
-// This listing is only the plain pages (content-typed rows live under /admin/content) and hides
-// soft-deleted ones.
-const visibleScope = and(isNull(pages.contentType), gt(pages.state, -1));
+// This listing is only the plain pages (content-typed rows live under /admin/content) — the
+// state exclusion (soft-deleted, unless searched for explicitly) lives on `searchConfig` below.
+const pagesScope = isNull(pages.contentType);
 
 // Self-join so a page can be filtered by its parent's title, and so `parent:null` finds top-level
 // pages. Scoped to visible parents so a page whose parent was deleted reads as top level — which is
@@ -40,7 +40,7 @@ const searchFields: SearchFieldSpec[] = [
     {
         name: 'state',
         type: 'enum',
-        enumValues: ['published', 'unpublished'],
+        enumValues: ['published', 'unpublished', 'deleted'],
         label: 'State',
         description: 'Publish state',
     },
@@ -57,9 +57,13 @@ const searchConfig: DrizzleSearchConfig = {
         {
             name: 'state',
             type: 'enum',
-            enumValues: ['published', 'unpublished'],
+            enumValues: ['published', 'unpublished', 'deleted'],
             column: pages.state,
-            valueMap: { published: 1, unpublished: 0 },
+            // "deleted" has no matching rows today (toggle only flips between 1 and 0) — -1 is
+            // reserved so a future soft-delete can slot in without a grammar change.
+            valueMap: { published: 1, unpublished: 0, deleted: -1 },
+            // Hidden from the plain listing until searched for explicitly (`state:deleted`).
+            defaultExclude: ['deleted'],
         },
         { name: 'title', type: 'text', column: titleExpr, matchMode: 'contains' },
         { name: 'parent', type: 'text', nullable: true, column: parentTitleExpr, matchMode: 'contains' },
@@ -118,7 +122,7 @@ if (isSearching) {
     // DISTINCT because the userActions join is one-to-many.
     const [rows, total, drafts] = await Promise.all([
         applySearchJoins(db.selectDistinct({ ...pageColumns() }).from(pages).$dynamic(), searchConfig.joins)
-            .where(and(visibleScope, searchWhere))
+            .where(and(pagesScope, searchWhere))
             .orderBy(desc(pages.id))
             .limit(itemsPerPage)
             .offset(offset),
@@ -126,7 +130,7 @@ if (isSearching) {
             db.select({ count: sql<number>`COUNT(DISTINCT ${pages.id})` }).from(pages).$dynamic(),
             searchConfig.joins,
         )
-            .where(and(visibleScope, searchWhere))
+            .where(and(pagesScope, searchWhere))
             .then(result => result[0]?.count ?? 0),
         draftsQuery(),
     ]);
@@ -138,9 +142,9 @@ if (isSearching) {
     // as if they were top level. Paginating by ROOT instead keeps every subtree whole, so a page
     // may render more rows than `itemsPerPage` — the page size counts roots, not pages.
     const [rootPage, totalRoots, everyPage, drafts] = await Promise.all([
-        db.select().from(pages).where(and(visibleScope, isRootPage)).orderBy(desc(pages.id)).limit(itemsPerPage).offset(offset),
-        db.select({ count: sql<number>`COUNT(*)` }).from(pages).where(and(visibleScope, isRootPage)).then(r => r[0]?.count ?? 0),
-        db.select().from(pages).where(visibleScope).orderBy(desc(pages.id)),
+        db.select().from(pages).where(and(pagesScope, searchWhere, isRootPage)).orderBy(desc(pages.id)).limit(itemsPerPage).offset(offset),
+        db.select({ count: sql<number>`COUNT(*)` }).from(pages).where(and(pagesScope, searchWhere, isRootPage)).then(r => r[0]?.count ?? 0),
+        db.select().from(pages).where(and(pagesScope, searchWhere)).orderBy(desc(pages.id)),
         draftsQuery(),
     ]);
 

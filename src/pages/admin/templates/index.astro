@@ -1,6 +1,6 @@
 ---
 import { CircleCheck, CircleX, GitBranch } from '@lucide/astro';
-import { and, desc, eq, ne, sql } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import Pagination from '../../../components/Pagination.astro';
 import { getDb } from '../../../db/db.js';
@@ -20,12 +20,11 @@ const titleExpr = sql`${templates.content} -> 'root' -> 'props' ->> 'title'`;
 
 // Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
 // valid/invalid highlighting, and the qualifier/value autocomplete dropdown.
-// No `deleted` state: this listing hard-filters state != -1, so it could never match anything.
 const searchFields: SearchFieldSpec[] = [
     {
         name: 'state',
         type: 'enum',
-        enumValues: ['published', 'unpublished'],
+        enumValues: ['published', 'unpublished', 'deleted'],
         label: 'State',
         description: 'Publish state',
     },
@@ -42,9 +41,13 @@ const searchConfig: DrizzleSearchConfig = {
         {
             name: 'state',
             type: 'enum',
-            enumValues: ['published', 'unpublished'],
+            enumValues: ['published', 'unpublished', 'deleted'],
             column: templates.state,
-            valueMap: { published: 1, unpublished: 0 },
+            // "deleted" has no matching rows today (toggle only flips between 1 and 0) — -1 is
+            // reserved so a future soft-delete can slot in without a grammar change.
+            valueMap: { published: 1, unpublished: 0, deleted: -1 },
+            // Hidden from the plain listing until searched for explicitly (`state:deleted`).
+            defaultExclude: ['deleted'],
         },
         { name: 'title', type: 'text', column: titleExpr, matchMode: 'contains' },
         { name: 'author', type: 'text', nullable: true, column: users.email, matchMode: 'exact' },
@@ -73,9 +76,6 @@ if (pageData.success) {
 }
 const offset = (page - 1) * itemsPerPage;
 
-// state != -1 hides soft-deleted templates, on top of whatever the search matched.
-const listFilter = and(ne(templates.state, -1), searchWhere);
-
 // DISTINCT (here and in the count below) because the userActions/users joins are one-to-many: a
 // template with more than one `template:create` action would otherwise be listed — and counted —
 // once per matching action row.
@@ -84,7 +84,7 @@ const [allTemplates, totalTemplates] = await Promise.all([
         db.selectDistinct({ id: templates.id, state: templates.state, content: templates.content }).from(templates).$dynamic(),
         searchConfig.joins,
     )
-        .where(listFilter)
+        .where(searchWhere)
         .orderBy(desc(templates.id))
         .limit(itemsPerPage)
         .offset(offset),
@@ -92,7 +92,7 @@ const [allTemplates, totalTemplates] = await Promise.all([
         db.select({ count: sql<number>`COUNT(DISTINCT ${templates.id})` }).from(templates).$dynamic(),
         searchConfig.joins,
     )
-        .where(listFilter)
+        .where(searchWhere)
         .then(result => result[0]?.count ?? 0),
 ]);
 

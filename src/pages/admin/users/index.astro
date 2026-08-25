@@ -1,7 +1,7 @@
 ---
 import { createHash } from 'node:crypto';
 import { CircleCheck, CircleX } from '@lucide/astro';
-import { and, desc, eq, gt, sql } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import Pagination from '../../../components/Pagination.astro';
 import { getDb } from '../../../db/db.js';
@@ -21,13 +21,12 @@ const fullNameExpr = sql`${users.fname} || ' ' || ${users.lname}`;
 // Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
 // valid/invalid highlighting, and the qualifier/value autocomplete dropdown.
 // "enabled"/"disabled" rather than published/unpublished: for an account this is about whether it
-// can sign in (the middleware gates login on state >= 1). No `deleted` — soft-deleted users are
-// hard-filtered out of this listing, so it could never match.
+// can sign in (the middleware gates login on state >= 1).
 const searchFields: SearchFieldSpec[] = [
     {
         name: 'state',
         type: 'enum',
-        enumValues: ['enabled', 'disabled'],
+        enumValues: ['enabled', 'disabled', 'deleted'],
         label: 'State',
         description: 'Account state',
     },
@@ -42,9 +41,13 @@ const searchConfig: DrizzleSearchConfig = {
         {
             name: 'state',
             type: 'enum',
-            enumValues: ['enabled', 'disabled'],
+            enumValues: ['enabled', 'disabled', 'deleted'],
             column: users.state,
-            valueMap: { enabled: 1, disabled: 0 },
+            // "deleted" has no matching rows today (toggle only flips between 1 and 0) — -1 is
+            // reserved so a future soft-delete can slot in without a grammar change.
+            valueMap: { enabled: 1, disabled: 0, deleted: -1 },
+            // Hidden from the plain listing until searched for explicitly (`state:deleted`).
+            defaultExclude: ['deleted'],
         },
         { name: 'name', type: 'text', column: fullNameExpr, matchMode: 'contains' },
         { name: 'email', type: 'text', column: users.email, matchMode: 'exact' },
@@ -72,9 +75,6 @@ if (pageData.success) {
 }
 const offset = (page - 1) * itemsPerPage;
 
-// state > -1 hides soft-deleted users, on top of whatever the search matched.
-const listFilter = and(gt(users.state, -1), searchWhere);
-
 const [allUsers, totalUsers] = await Promise.all([
     applySearchJoins(
         // Explicit columns rather than `select()`: the password hash is never needed to render this
@@ -91,7 +91,7 @@ const [allUsers, totalUsers] = await Promise.all([
             .$dynamic(),
         searchConfig.joins,
     )
-        .where(listFilter)
+        .where(searchWhere)
         .orderBy(desc(users.id))
         .limit(itemsPerPage)
         .offset(offset),
@@ -99,7 +99,7 @@ const [allUsers, totalUsers] = await Promise.all([
         db.select({ count: sql<number>`COUNT(DISTINCT ${users.id})` }).from(users).$dynamic(),
         searchConfig.joins,
     )
-        .where(listFilter)
+        .where(searchWhere)
         .then(result => result[0]?.count ?? 0),
 ]);
 

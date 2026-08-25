@@ -59,6 +59,8 @@ const searchConfig: DrizzleSearchConfig = {
             // "deleted" has no matching rows today (toggle only flips between 1 and 0) — -1 is
             // reserved so a future soft-delete can slot in without a grammar change.
             valueMap: { published: 1, unpublished: 0, deleted: -1 },
+            // Hidden from the plain listing until searched for explicitly (`state:deleted`).
+            defaultExclude: ['deleted'],
         },
         { name: 'title', type: 'text', column: titleExpr, matchMode: 'contains' },
         { name: 'author', type: 'text', nullable: true, column: users.email, matchMode: 'exact' },

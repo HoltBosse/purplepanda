@@ -42,6 +42,8 @@ const searchConfig: DrizzleSearchConfig = {
             // "deleted" has no matching rows today (toggle.ts only ever flips state between 1 and
             // 0) — -1 is reserved here so a future soft-delete can slot in without a grammar change.
             valueMap: { enabled: 1, disabled: 0, deleted: -1 },
+            // Hidden from the plain listing until searched for explicitly (`state:deleted`).
+            defaultExclude: ['deleted'],
         },
         { name: 'author', type: 'text', nullable: true, column: users.email, matchMode: 'exact' },
         { name: 'created', type: 'date', column: userActions.date },
