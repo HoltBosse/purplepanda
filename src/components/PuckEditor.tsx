@@ -4,11 +4,11 @@ import "../styles/puck-theme.css";
 import type { Config, Data, Dictionary, Overrides, PuckAction, PuckContext } from "@puckeditor/core";
 import { Render } from "@puckeditor/core";
 import type React from "react";
-import { cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useMemo, useRef } from "react";
+import { cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type * as z from "zod";
 import { extractFamilyFromLink } from "../form/fields/font-utils.js";
-import { Save } from "../puck/icons.js";
+import { ChevronDown, Save } from "../puck/icons.js";
 import { validateContentTree } from "../puck/validate-content.js";
 import { ensureTemplateSlot } from "./template-slot.js";
 
@@ -68,6 +68,10 @@ function createOverrides(
   // stable across renders, so caching it here is safe.
   dispatchRef: { current: ((action: PuckAction) => void) | null },
   rootPropsSchema: ((props: Record<string, unknown>) => z.ZodTypeAny) | undefined,
+  // Commit is an alternate publish action offered only while authoring a brand-new page/content
+  // item (see PuckEditor's isNew prop) — it POSTs to the same endpoint as Publish but persists the
+  // row as state -1 instead of going live. Undefined onCommit (editing an existing item) hides it.
+  commit: { isNew: boolean | undefined; onCommit: ((data: Data) => void) | undefined } | undefined,
 ): Partial<Overrides<Config>> {
   const headingFontFamily = extractFamilyFromLink(fontLinks?.headingFontLink);
   const bodyFontFamily = extractFamilyFromLink(fontLinks?.bodyFontLink);
@@ -76,6 +80,91 @@ function createOverrides(
     headerActions: ({ children }) => {
       const appStateData = useTypedPuck((state) => state.appState.data);
       dispatchRef.current = useTypedPuck((state) => state.dispatch);
+
+      const showCommitMenu = Boolean(commit?.isNew && commit.onCommit);
+
+      const [commitMenuOpen, setCommitMenuOpen] = useState(false);
+      const commitTriggerRef = useRef<HTMLButtonElement | null>(null);
+      const commitMenuRef = useRef<HTMLDivElement | null>(null);
+      const [commitMenuPosition, setCommitMenuPosition] = useState<{ top: number; right: number } | null>(null);
+
+      // The header sits inside Puck's own scroll/clip container (._PuckLayout-header has
+      // overflow:auto/hidden), so an absolutely-positioned dropdown-content nested in the normal
+      // DOM tree gets clipped to the header's bounds and painted behind the side panels. Portaling
+      // a `position: fixed` menu straight to document.body — positioned from the trigger's own
+      // getBoundingClientRect — escapes both the clipping ancestor and the stacking order entirely.
+      useEffect(() => {
+        if (!commitMenuOpen) return;
+
+        const updatePosition = () => {
+          const rect = commitTriggerRef.current?.getBoundingClientRect();
+          if (!rect) return;
+          setCommitMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+        };
+        updatePosition();
+
+        const handlePointerDown = (event: PointerEvent) => {
+          const target = event.target as Node;
+          if (commitTriggerRef.current?.contains(target) || commitMenuRef.current?.contains(target)) return;
+          setCommitMenuOpen(false);
+        };
+        const handleKeyDown = (event: KeyboardEvent) => {
+          if (event.key === "Escape") setCommitMenuOpen(false);
+        };
+
+        window.addEventListener("resize", updatePosition);
+        window.addEventListener("scroll", updatePosition, true);
+        document.addEventListener("pointerdown", handlePointerDown, true);
+        document.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+          window.removeEventListener("resize", updatePosition);
+          window.removeEventListener("scroll", updatePosition, true);
+          document.removeEventListener("pointerdown", handlePointerDown, true);
+          document.removeEventListener("keydown", handleKeyDown);
+        };
+      }, [commitMenuOpen]);
+
+      const commitTrigger = showCommitMenu ? (
+        <button
+          key="commit-trigger"
+          type="button"
+          ref={commitTriggerRef}
+          data-puck-commit-trigger
+          aria-haspopup="menu"
+          aria-expanded={commitMenuOpen}
+          aria-label="More publish options"
+          onClick={() => setCommitMenuOpen((open) => !open)}
+        >
+          <ChevronDown size={14} />
+        </button>
+      ) : null;
+
+      const commitPortal =
+        showCommitMenu && commitMenuOpen && commitMenuPosition
+          ? createPortal(
+              <div
+                ref={commitMenuRef}
+                role="menu"
+                className="w-40 rounded-box border border-base-300 bg-base-200 p-2 shadow-lg menu"
+                style={{ position: "fixed", zIndex: 1000, top: commitMenuPosition.top, right: commitMenuPosition.right }}
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-puck-commit
+                  className="w-full text-left"
+                  onClick={() => {
+                    setCommitMenuOpen(false);
+                    commit?.onCommit?.(appStateData);
+                  }}
+                >
+                  Commit
+                </button>
+              </div>,
+              document.body,
+            )
+          : null;
 
       const saveButton = onSave ? (
         <Button data-puck-save icon={<Save size="14px" />} onClick={() => onSave(appStateData)}>
@@ -111,11 +200,21 @@ function createOverrides(
         ) : null;
 
       if (isValidElement(children)) {
+        const publishButton = showCommitMenu ? (
+          <div key="publish-group" className="inline-flex items-stretch">
+            {cloneElement(children as any, { "data-puck-publish": "", "data-puck-publish-grouped": "" })}
+            {commitTrigger}
+          </div>
+        ) : (
+          cloneElement(children as any, { "data-puck-publish": "" })
+        );
+
         return (
           <>
             {validationBadge}
             {saveButton}
-            {cloneElement(children as any, { "data-puck-publish": "" })}
+            {publishButton}
+            {commitPortal}
           </>
         );
       }
@@ -125,6 +224,12 @@ function createOverrides(
           {validationBadge}
           {saveButton}
           {children}
+          {showCommitMenu ? (
+            <div key="publish-group" className="inline-flex items-stretch">
+              {commitTrigger}
+            </div>
+          ) : null}
+          {commitPortal}
         </>
       );
     },
@@ -278,12 +383,16 @@ interface PuckEditorProps {
   // see puck/page-root-schema.js for the pages case. Omit when the root has nothing that needs
   // enforcing beyond what Puck's own field UI already does.
   rootPropsSchema?: ((props: Record<string, unknown>) => z.ZodTypeAny) | undefined;
+  // Gates the Commit option in the Publish dropdown — only a brand-new, not-yet-created
+  // page/content item can be committed (state -1) instead of published live.
+  isNew?: boolean;
+  onCommit?: (data: Data) => void;
   headingFontLink?: string;
   bodyFontLink?: string;
   dictionary?: Dictionary;
 }
 
-export default function PuckEditor({ config, data, templateData, onPublish, onSave, rootPropsSchema, headingFontLink, bodyFontLink, dictionary }: PuckEditorProps) {
+export default function PuckEditor({ config, data, templateData, onPublish, onSave, rootPropsSchema, isNew, onCommit, headingFontLink, bodyFontLink, dictionary }: PuckEditorProps) {
   // Written to by createOverrides' headerActions (see below) with Puck's own dispatch, so it can
   // be reached imperatively from guardedOnPublish — which runs outside Puck's component tree, as
   // a plain PuckEditorProps.onPublish callback, and so can't call useTypedPuck itself.
@@ -321,9 +430,29 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
     };
   }, [config, onSave, rootPropsSchema]);
 
+  // Same client-side guard as guardedOnPublish above, applied to the Commit action.
+  const guardedOnCommit = useMemo(() => {
+    if (!onCommit) return undefined;
+    return (nextData: Data) => {
+      const errors = validateContentTree(config, nextData, { rootPropsSchema });
+      if (errors.length === 0) {
+        onCommit(nextData);
+        return;
+      }
+      dispatchRef.current?.({
+        type: "setUi",
+        ui: { itemSelector: null, leftSideBarVisible: true, rightSideBarVisible: true },
+      });
+    };
+  }, [config, onCommit, rootPropsSchema]);
+
   const overrides = useMemo(
-    () => createOverrides(config, guardedOnSave, { headingFontLink, bodyFontLink }, dispatchRef, rootPropsSchema),
-    [config, guardedOnSave, headingFontLink, bodyFontLink, rootPropsSchema],
+    () =>
+      createOverrides(config, guardedOnSave, { headingFontLink, bodyFontLink }, dispatchRef, rootPropsSchema, {
+        isNew,
+        onCommit: guardedOnCommit,
+      }),
+    [config, guardedOnSave, headingFontLink, bodyFontLink, rootPropsSchema, isNew, guardedOnCommit],
   );
 
   // Memoized because it feeds the root render below: a fresh object each render would rebuild the

@@ -10,7 +10,9 @@ interface ContentPuckEditorProps {
   saveUrl?: string;
   draftPublishUrl?: string;
   onPublish?: (data: Data) => void;
+  onCommit?: (data: Data) => void;
   isDraft?: boolean;
+  isNew?: boolean;
   headingFontLink?: string;
   bodyFontLink?: string;
 }
@@ -22,7 +24,9 @@ export default function ContentPuckEditor({
   saveUrl = "/admin/content/update",
   draftPublishUrl,
   onPublish,
+  onCommit,
   isDraft,
+  isNew,
   headingFontLink,
   bodyFontLink,
 }: ContentPuckEditorProps) {
@@ -45,9 +49,11 @@ export default function ContentPuckEditor({
     ...(initialData !== undefined ? { initialData } : {}),
     ...(templateData !== undefined ? { templateData } : {}),
     ...(onPublish !== undefined ? { onPublish } : {}),
+    ...(onCommit !== undefined ? { onCommit } : {}),
     ...(rootConfig !== undefined ? { rootConfig } : {}),
     ...(dictionary !== undefined ? { dictionary } : {}),
     ...(isDraft !== undefined ? { isDraft } : {}),
+    ...(isNew !== undefined ? { isNew } : {}),
     ...(draftPublishUrl !== undefined ? { draftPublishUrl } : {}),
     ...(headingFontLink !== undefined ? { headingFontLink } : {}),
     ...(bodyFontLink !== undefined ? { bodyFontLink } : {}),

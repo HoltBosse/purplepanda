@@ -68,8 +68,11 @@ export async function POST(context: APIContext): Promise<Response> {
     }
 
     if (isNewPage) {
+        // Commit (see PagePuckEditor's onCommit) submits the same form with an extra `state`
+        // field so a brand-new page can be persisted without going live.
+        const committed = formData.get("state") === "-1";
         page.content = parsedContent;
-        page.state = 1;
+        page.state = committed ? 0 : 1;
         // `page` is synthesized from the table's column defaults above, so `page.id` is drizzle's
         // `gen_random_uuid()` SQL expression rather than a real id. Adopt the row Postgres actually
         // inserted — otherwise that expression gets re-evaluated into an unrelated uuid for the

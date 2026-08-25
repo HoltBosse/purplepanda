@@ -154,3 +154,34 @@
     background-color: rgba(0, 0, 0, 0.1);
   }
 }
+
+/* Commit dropdown trigger (PuckEditor.tsx): rendered as a plain button glued to the right edge
+   of the Publish button so the pair reads as a single split button, with the trigger reusing
+   Puck's own button sizing/color tokens to match [data-puck-publish] exactly. */
+[data-puck-publish-grouped] {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+[data-puck-commit-trigger] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding-inline: calc(var(--puck-space-2) - var(--puck-border-width-regular));
+  background: var(--puck-color-interactive);
+  color: var(--color-base-100);
+  border: var(--puck-border-width-regular) solid transparent;
+  border-inline-start: var(--puck-border-width-regular) solid color-mix(in srgb, var(--color-base-100) 30%, transparent);
+  border-start-end-radius: var(--puck-button-radius, var(--puck-radius-m));
+  border-end-end-radius: var(--puck-button-radius, var(--puck-radius-m));
+  cursor: pointer;
+}
+
+[data-puck-commit-trigger]:hover {
+  background-color: var(--puck-color-interactive-hover);
+}
+
+[data-puck-commit-trigger]:active {
+  background-color: var(--puck-color-interactive-active);
+}

@@ -51,7 +51,9 @@ interface PagePuckEditorProps {
   draftPublishUrl?: string;
   onPublish?: (data: Data) => void;
   onSave?: (data: Data) => void;
+  onCommit?: (data: Data) => void;
   isDraft?: boolean;
+  isNew?: boolean;
   pages?: PageOption[];
   rootConfig?: { label?: string; fields?: Fields; defaultProps?: Record<string, unknown> };
   headingFontLink?: string;
@@ -59,7 +61,7 @@ interface PagePuckEditorProps {
   dictionary?: Dictionary;
 }
 
-export default function PagePuckEditor({ initialData, templateData, saveUrl = "/admin/pages/update", draftPublishUrl, onPublish, onSave, isDraft = false, pages = [], rootConfig, headingFontLink, bodyFontLink, dictionary }: PagePuckEditorProps = {}) {
+export default function PagePuckEditor({ initialData, templateData, saveUrl = "/admin/pages/update", draftPublishUrl, onPublish, onSave, onCommit, isDraft = false, isNew = false, pages = [], rootConfig, headingFontLink, bodyFontLink, dictionary }: PagePuckEditorProps = {}) {
   const defaultSave = (data: Data) => {
     const form = document.createElement("form");
     form.method = "POST";
@@ -71,6 +73,32 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
     input.name = "content";
     input.value = JSON.stringify(data);
     form.appendChild(input);
+
+    document.body.appendChild(form);
+    form.submit();
+  };
+
+  // Commit posts to the same endpoint as a normal Save/Publish, but with an extra `state` field
+  // the create branch of that endpoint reads to persist the new row as state -1 instead of 1
+  // (live) — see puck/validate-content.js's server counterparts in pages/admin/pages/update.ts
+  // and pages/admin/content/update.ts.
+  const defaultCommit = (data: Data) => {
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = saveUrl;
+    form.style.display = "none";
+
+    const contentInput = document.createElement("input");
+    contentInput.type = "hidden";
+    contentInput.name = "content";
+    contentInput.value = JSON.stringify(data);
+    form.appendChild(contentInput);
+
+    const stateInput = document.createElement("input");
+    stateInput.type = "hidden";
+    stateInput.name = "state";
+    stateInput.value = "-1";
+    form.appendChild(stateInput);
 
     document.body.appendChild(form);
     form.submit();
@@ -104,6 +132,7 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
   // default save action belongs on the Save button, not Puck's Publish button.
   const resolvedOnPublish = isDraft ? (onPublish ?? defaultDraftPublish) : (onPublish ?? defaultSave);
   const resolvedOnSave = isDraft ? (onSave ?? defaultSave) : onSave;
+  const resolvedOnCommit = isNew ? (onCommit ?? defaultCommit) : undefined;
   const configWithRootFields = useMemo(() => {
     if (rootConfig) {
       return {
@@ -144,6 +173,7 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
   const optionalProps = {
     ...(templateData ? { templateData } : {}),
     ...(resolvedOnSave ? { onSave: resolvedOnSave } : {}),
+    ...(resolvedOnCommit ? { onCommit: resolvedOnCommit, isNew } : {}),
     // Title/alias are only required for plain pages — a content type's rootConfig replaces these
     // fields entirely with its own, so this schema (which expects exactly title/alias) wouldn't
     // apply there.
