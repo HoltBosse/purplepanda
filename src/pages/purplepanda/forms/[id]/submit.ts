@@ -134,15 +134,12 @@ async function notifyFormSubmission(
   const to = recipients.map((row) => row.email);
   if (to.length === 0) return;
 
-  const replyToUserId = (form.content as any)?.root?.props?.replyTo as string | undefined;
-  const replyTo = replyToUserId
-    ? await db
-        .select({ email: users.email })
-        .from(users)
-        .where(and(eq(users.state, 1), eq(users.id, replyToUserId)))
-        .limit(1)
-        .then((rows) => rows[0]?.email)
-    : undefined;
+  // The form editor's Reply-to picker (FormPuckEditor.tsx) points at one of the form's own
+  // email-type fields, keyed the same way the submission itself is (`field-<id>`) — so this reads
+  // straight out of what the submitter just typed in, rather than a stored recipient.
+  const replyToFieldKey = (form.content as any)?.root?.props?.replyTo as string | undefined;
+  const replyToValue = replyToFieldKey ? data[replyToFieldKey] : undefined;
+  const replyTo = typeof replyToValue === "string" && replyToValue ? replyToValue : undefined;
 
   const formName = ((form.content as any)?.root?.props?.name as string | undefined) || "your form";
 
