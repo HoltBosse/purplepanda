@@ -97,6 +97,39 @@ const [allForms, totalForms] = await Promise.all([
 ]);
 
 const totalPages = Math.ceil(totalForms / itemsPerPage);
+
+// Surface where each form is actually embedded (via the "FormEmbed" Puck component — see
+// puck/form/FormEmbed.tsx) so the listing can badge-link straight to the page/template that uses
+// it. FormEmbed stores its reference as `props.form.id`, nested at an arbitrary depth (it can sit
+// inside another component's slot, e.g. a Grid/Flex column). Rather than pulling every page's and
+// template's full content tree over the wire and walking it in JS, `jsonb_path_query`'s recursive
+// `**` wildcard does that walk inside Postgres and hands back only the (small) matches.
+const formIdList = allForms.map(f => f.id);
+const formIdsArray = formIdList.length > 0
+    ? sql`ARRAY[${sql.join(formIdList.map(id => sql`${id}`), sql`, `)}]::text[]`
+    : sql`ARRAY[]::text[]`;
+const embedRows = (await db.execute<{ href_base: string; entity_id: string; title: string; form_id: string }>(sql`
+    SELECT '/admin/pages/edit' AS href_base, p.id AS entity_id, (p.content -> 'root' -> 'props' ->> 'title') AS title, (jpq.form_id #>> '{}') AS form_id
+    FROM pages p,
+         jsonb_path_query(p.content, '$.** ? (@.type == "FormEmbed").props.form.id') AS jpq(form_id)
+    WHERE (jpq.form_id #>> '{}') = ANY(${formIdsArray})
+    UNION ALL
+    SELECT '/admin/templates/edit' AS href_base, t.id AS entity_id, (t.content -> 'root' -> 'props' ->> 'title') AS title, (jpq.form_id #>> '{}') AS form_id
+    FROM templates t,
+         jsonb_path_query(t.content, '$.** ? (@.type == "FormEmbed").props.form.id') AS jpq(form_id)
+    WHERE (jpq.form_id #>> '{}') = ANY(${formIdsArray})
+`)).rows;
+
+const formUsage = new Map<string, { title: string; href: string }[]>();
+const seen = new Set<string>();
+for (const row of embedRows) {
+    const dedupeKey = `${row.form_id}:${row.href_base}/${row.entity_id}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    const list = formUsage.get(row.form_id) ?? [];
+    list.push({ title: row.title || 'Untitled', href: `${row.href_base}/${row.entity_id}` });
+    formUsage.set(row.form_id, list);
+}
 ---
 
 <AdminLayout>
@@ -143,7 +176,9 @@ const totalPages = Math.ceil(totalForms / itemsPerPage);
             </tr>
         </thead>
         <tbody>
-            {allForms.map(form => (
+            {allForms.map(form => {
+                const usage = formUsage.get(form.id);
+                return (
                 <tr>
                     <td>
                         <label>
@@ -164,9 +199,18 @@ const totalPages = Math.ceil(totalForms / itemsPerPage);
                         </form>
                     </td>
                     <td>
-                        <a href={`/admin/forms/edit/${form.id}`}>
-                            <div class="font-bold link link-info link-hover">{(form.content as any)?.root?.props?.name || 'Untitled'}</div>
-                        </a>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <a href={`/admin/forms/edit/${form.id}`}>
+                                <span class="font-bold link link-info link-hover">{(form.content as any)?.root?.props?.name || 'Untitled'}</span>
+                            </a>
+                            {usage && usage.length > 0 && (
+                                <span class="text-xs text-base-content/40 whitespace-nowrap">
+                                    (on: {usage.map((u, i) => (
+                                        <>{i > 0 && ', '}<a href={u.href} class="hover:text-base-content/70">{u.title}</a></>
+                                    ))})
+                                </span>
+                            )}
+                        </div>
                     </td>
                     <td class="w-px whitespace-nowrap">
                         <a href={`/admin/forms/history/${form.id}`} class="btn btn-ghost btn-sm btn-square" title="History">
@@ -174,7 +218,8 @@ const totalPages = Math.ceil(totalForms / itemsPerPage);
                         </a>
                     </td>
                 </tr>
-            ))}
+                );
+            })}
         </tbody>
     </table>
 
@@ -193,7 +238,9 @@ const totalPages = Math.ceil(totalForms / itemsPerPage);
                 <span class="text-sm text-base-content/60">Select all</span>
             </label>
         </div>
-        {allForms.map(form => (
+        {allForms.map(form => {
+            const usage = formUsage.get(form.id);
+            return (
             <div class="card bg-base-100 rounded-lg p-4">
                 <div class="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-base-300">
                     <label class="flex items-center gap-2">
@@ -224,11 +271,21 @@ const totalPages = Math.ceil(totalForms / itemsPerPage);
                             <a href={`/admin/forms/edit/${form.id}`}>
                                 <span class="font-bold link link-info link-hover">{(form.content as any)?.root?.props?.name || 'Untitled'}</span>
                             </a>
+                            {usage && usage.length > 0 && (
+                                <div class="text-xs text-base-content/40">
+                                    <span class="whitespace-nowrap">
+                                        (on: {usage.map((u, i) => (
+                                            <>{i > 0 && ', '}<a href={u.href} class="hover:text-base-content/70">{u.title}</a></>
+                                        ))})
+                                    </span>
+                                </div>
+                            )}
                         </dd>
                     </div>
                 </dl>
             </div>
-        ))}
+            );
+        })}
     </div>
         </>
     )}
