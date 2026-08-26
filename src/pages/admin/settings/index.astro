@@ -81,6 +81,16 @@ const form = getSettingsForm(
 	</Form>
 </AdminLayout>
 
+<style is:global>
+	@keyframes settings-anchor-flash {
+		0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6); border-radius: 0.5rem; }
+		100% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); border-radius: 0.5rem; }
+	}
+	.settings-anchor-flash {
+		animation: settings-anchor-flash 1.4s ease-out;
+	}
+</style>
+
 <script>
 	const searchInput = document.getElementById('settings-search') as HTMLInputElement | null;
 	const sections = document.querySelectorAll<HTMLElement>('.settings-search-section');
@@ -88,6 +98,38 @@ const form = getSettingsForm(
 	searchInput?.addEventListener('keydown', (e) => {
 		if (e.key === 'Enter') e.preventDefault();
 	});
+
+	async function flashAnchorTarget() {
+		const hash = window.location.hash.slice(1);
+		if (!hash) return;
+		const target = document.getElementById(hash);
+		if (!target) return;
+
+		// The Heading/Body Font fields preview their selection via a real webfont <link>, loaded
+		// after first paint. Once that font arrives the sample text reflows and shifts everything
+		// below it — scrolling too early gets silently undone by that shift a moment later. Wait
+		// for fonts to settle (and bail out after a beat if that promise never resolves) before
+		// scrolling, so the shift happens before we position the target rather than after.
+		await Promise.race([
+			document.fonts?.ready ?? Promise.resolve(),
+			new Promise((resolve) => setTimeout(resolve, 1000)),
+		]);
+
+		// The page body scrolls inside a nested `.drawer-content` (not the document itself), which
+		// native fragment-navigation scrolling doesn't reliably reach — so drive it explicitly
+		// instead of assuming the browser already brought the target into view.
+		target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		target.classList.remove('settings-anchor-flash');
+		// Force reflow so re-triggering the flash (e.g. clicking the same anchor link twice) restarts the animation.
+		void target.offsetWidth;
+		target.classList.add('settings-anchor-flash');
+		target.addEventListener('animationend', () => {
+			target.classList.remove('settings-anchor-flash');
+		}, { once: true });
+	}
+
+	flashAnchorTarget();
+	window.addEventListener('hashchange', flashAnchorTarget);
 
 	searchInput?.addEventListener('input', () => {
 		const query = searchInput.value.trim().toLowerCase();

@@ -111,7 +111,7 @@ for (const templateId of allTemplates.map(t => t.id)) {
     const isPagesDefault = defaultSettings.some(s => s.key === 'default_template' && s.value === templateId);
     const contentTypeMatches = contentTypes
         .filter(ct => defaultSettings.some(s => s.key === `content_default_template_${ct.id}` && s.value === templateId))
-        .map(ct => ({ title: ct.title, href: `/admin/settings#content-default-template-${ct.id}` }));
+        .map(ct => ({ title: ct.title, href: `/admin/settings#content-template-group-${ct.id}` }));
     if (isPagesDefault || contentTypeMatches.length > 0) {
         defaultTemplateInfo.set(templateId, { isPagesDefault, contentTypeMatches });
     }
@@ -190,7 +190,7 @@ for (const templateId of allTemplates.map(t => t.id)) {
                                 <span class="font-bold link link-info link-hover">{(template.content as any)?.root?.props?.title || 'Untitled'}</span>
                             </a>
                             {info?.isPagesDefault && (
-                                <span class="text-xs text-base-content/40 whitespace-nowrap">(<a href="/admin/settings#dt-option" class="hover:text-base-content/70">default</a>)</span>
+                                <span class="text-xs text-base-content/40 whitespace-nowrap">(<a href="/admin/settings#dt-group" class="hover:text-base-content/70">default</a>)</span>
                             )}
                             {info && info.contentTypeMatches.length > 0 && (
                                 <span class="text-xs text-base-content/40 whitespace-nowrap">
@@ -263,7 +263,7 @@ for (const templateId of allTemplates.map(t => t.id)) {
                             {info && (
                                 <div class="text-xs text-base-content/40">
                                     {info.isPagesDefault && (
-                                        <span class="whitespace-nowrap">(<a href="/admin/settings#dt-option" class="hover:text-base-content/70">default</a>)</span>
+                                        <span class="whitespace-nowrap">(<a href="/admin/settings#dt-group" class="hover:text-base-content/70">default</a>)</span>
                                     )}
                                     {info.contentTypeMatches.length > 0 && (
                                         <span class="whitespace-nowrap">
