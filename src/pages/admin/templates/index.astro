@@ -1,10 +1,11 @@
 ---
+import externalPuckConfig from 'virtual:purplepanda/puck-config';
 import { CircleCheck, CircleX, GitBranch } from '@lucide/astro';
-import { desc, eq, sql } from 'drizzle-orm';
+import { desc, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import Pagination from '../../../components/Pagination.astro';
 import { getDb } from '../../../db/db.js';
-import { templates, userActions, users } from '../../../db/schema.js';
+import { settings, templates, userActions, users } from '../../../db/schema.js';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
 import { parseSearchQuery } from '../../../search/parser.js';
@@ -12,6 +13,8 @@ import SearchBar from '../../../search/SearchBar';
 import type { SearchFieldSpec } from '../../../search/types.js';
 
 const db = getDb();
+
+const contentTypes = externalPuckConfig?.contentTypes ?? [];
 
 // A template's title isn't a column — Puck stores it in the content document, which is why the
 // table below reads `content.root.props.title`. The search builder accepts an arbitrary SQL
@@ -97,6 +100,22 @@ const [allTemplates, totalTemplates] = await Promise.all([
 ]);
 
 const totalPages = Math.ceil(totalTemplates / itemsPerPage);
+
+// Surface which templates are currently wired up as a default (site-wide "Pages" default, or a
+// content type's default) so the listing can badge-link straight back to the setting that
+// controls it. Keyed off the same `settings` rows the settings page itself writes/reads.
+const defaultSettingKeys = ['default_template', ...contentTypes.map(ct => `content_default_template_${ct.id}`)];
+const defaultSettings = await db.select().from(settings).where(inArray(settings.key, defaultSettingKeys));
+const defaultTemplateInfo = new Map<string, { isPagesDefault: boolean; contentTypeMatches: { title: string; href: string }[] }>();
+for (const templateId of allTemplates.map(t => t.id)) {
+    const isPagesDefault = defaultSettings.some(s => s.key === 'default_template' && s.value === templateId);
+    const contentTypeMatches = contentTypes
+        .filter(ct => defaultSettings.some(s => s.key === `content_default_template_${ct.id}` && s.value === templateId))
+        .map(ct => ({ title: ct.title, href: `/admin/settings#content-default-template-${ct.id}` }));
+    if (isPagesDefault || contentTypeMatches.length > 0) {
+        defaultTemplateInfo.set(templateId, { isPagesDefault, contentTypeMatches });
+    }
+}
 ---
 
 <AdminLayout>
@@ -143,7 +162,9 @@ const totalPages = Math.ceil(totalTemplates / itemsPerPage);
             </tr>
         </thead>
         <tbody>
-            {allTemplates.map(template => (
+            {allTemplates.map(template => {
+                const info = defaultTemplateInfo.get(template.id);
+                return (
                 <tr>
                     <td>
                         <label>
@@ -164,9 +185,21 @@ const totalPages = Math.ceil(totalTemplates / itemsPerPage);
                         </form>
                     </td>
                     <td>
-                        <a href={`/admin/templates/edit/${template.id}`}>
-                            <div class="font-bold link link-info link-hover">{(template.content as any)?.root?.props?.title || 'Untitled'}</div>
-                        </a>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <a href={`/admin/templates/edit/${template.id}`}>
+                                <span class="font-bold link link-info link-hover">{(template.content as any)?.root?.props?.title || 'Untitled'}</span>
+                            </a>
+                            {info?.isPagesDefault && (
+                                <span class="text-xs text-base-content/40 whitespace-nowrap">(<a href="/admin/settings#dt-option" class="hover:text-base-content/70">default</a>)</span>
+                            )}
+                            {info && info.contentTypeMatches.length > 0 && (
+                                <span class="text-xs text-base-content/40 whitespace-nowrap">
+                                    (default: {info.contentTypeMatches.map((ct, i) => (
+                                        <>{i > 0 && ', '}<a href={ct.href} class="hover:text-base-content/70">{ct.title}</a></>
+                                    ))})
+                                </span>
+                            )}
+                        </div>
                     </td>
                     <td class="w-px whitespace-nowrap">
                         <a href={`/admin/templates/history/${template.id}`} class="btn btn-ghost btn-sm btn-square" title="History">
@@ -174,7 +207,8 @@ const totalPages = Math.ceil(totalTemplates / itemsPerPage);
                         </a>
                     </td>
                 </tr>
-            ))}
+                );
+            })}
         </tbody>
     </table>
 
@@ -193,7 +227,9 @@ const totalPages = Math.ceil(totalTemplates / itemsPerPage);
                 <span class="text-sm text-base-content/60">Select all</span>
             </label>
         </div>
-        {allTemplates.map(template => (
+        {allTemplates.map(template => {
+            const info = defaultTemplateInfo.get(template.id);
+            return (
             <div class="card bg-base-100 rounded-lg p-4">
                 <div class="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-base-300">
                     <label class="flex items-center gap-2">
@@ -224,11 +260,26 @@ const totalPages = Math.ceil(totalTemplates / itemsPerPage);
                             <a href={`/admin/templates/edit/${template.id}`}>
                                 <span class="font-bold link link-info link-hover">{(template.content as any)?.root?.props?.title || 'Untitled'}</span>
                             </a>
+                            {info && (
+                                <div class="text-xs text-base-content/40">
+                                    {info.isPagesDefault && (
+                                        <span class="whitespace-nowrap">(<a href="/admin/settings#dt-option" class="hover:text-base-content/70">default</a>)</span>
+                                    )}
+                                    {info.contentTypeMatches.length > 0 && (
+                                        <span class="whitespace-nowrap">
+                                            (default: {info.contentTypeMatches.map((ct, i) => (
+                                                <>{i > 0 && ', '}<a href={ct.href} class="hover:text-base-content/70">{ct.title}</a></>
+                                            ))})
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                         </dd>
                     </div>
                 </dl>
             </div>
-        ))}
+            );
+        })}
     </div>
         </>
     )}
