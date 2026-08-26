@@ -6,6 +6,7 @@ import Pagination from '../../../components/Pagination.astro';
 import { getDb } from '../../../db/db.js';
 import { forms, userActions, users } from '../../../db/schema.js';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { findFormEmbedUsage } from '../../../puck/form/embed-usage.js';
 import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
 import { parseSearchQuery } from '../../../search/parser.js';
 import SearchBar from '../../../search/SearchBar';
@@ -98,37 +99,19 @@ const [allForms, totalForms] = await Promise.all([
 
 const totalPages = Math.ceil(totalForms / itemsPerPage);
 
-// Surface where each form is actually embedded (via the "FormEmbed" Puck component — see
-// puck/form/FormEmbed.tsx) so the listing can badge-link straight to the page/template that uses
-// it. FormEmbed stores its reference as `props.form.id`, nested at an arbitrary depth (it can sit
-// inside another component's slot, e.g. a Grid/Flex column). Rather than pulling every page's and
-// template's full content tree over the wire and walking it in JS, `jsonb_path_query`'s recursive
-// `**` wildcard does that walk inside Postgres and hands back only the (small) matches.
-const formIdList = allForms.map(f => f.id);
-const formIdsArray = formIdList.length > 0
-    ? sql`ARRAY[${sql.join(formIdList.map(id => sql`${id}`), sql`, `)}]::text[]`
-    : sql`ARRAY[]::text[]`;
-const embedRows = (await db.execute<{ href_base: string; entity_id: string; title: string; form_id: string }>(sql`
-    SELECT '/admin/pages/edit' AS href_base, p.id AS entity_id, (p.content -> 'root' -> 'props' ->> 'title') AS title, (jpq.form_id #>> '{}') AS form_id
-    FROM pages p,
-         jsonb_path_query(p.content, '$.** ? (@.type == "FormEmbed").props.form.id') AS jpq(form_id)
-    WHERE (jpq.form_id #>> '{}') = ANY(${formIdsArray})
-    UNION ALL
-    SELECT '/admin/templates/edit' AS href_base, t.id AS entity_id, (t.content -> 'root' -> 'props' ->> 'title') AS title, (jpq.form_id #>> '{}') AS form_id
-    FROM templates t,
-         jsonb_path_query(t.content, '$.** ? (@.type == "FormEmbed").props.form.id') AS jpq(form_id)
-    WHERE (jpq.form_id #>> '{}') = ANY(${formIdsArray})
-`)).rows;
+// Surface where each form is actually embedded so the listing can badge-link straight to the
+// page/template that uses it — see puck/form/embed-usage.ts for how.
+const embedRows = await findFormEmbedUsage(db, allForms.map(f => f.id));
 
 const formUsage = new Map<string, { title: string; href: string }[]>();
 const seen = new Set<string>();
 for (const row of embedRows) {
-    const dedupeKey = `${row.form_id}:${row.href_base}/${row.entity_id}`;
+    const dedupeKey = `${row.formId}:${row.hrefBase}/${row.entityId}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
-    const list = formUsage.get(row.form_id) ?? [];
-    list.push({ title: row.title || 'Untitled', href: `${row.href_base}/${row.entity_id}` });
-    formUsage.set(row.form_id, list);
+    const list = formUsage.get(row.formId) ?? [];
+    list.push({ title: row.title, href: `${row.hrefBase}/${row.entityId}` });
+    formUsage.set(row.formId, list);
 }
 ---
 
