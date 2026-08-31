@@ -1,13 +1,15 @@
 ---
 import externalPuckConfig from "virtual:purplepanda/puck-config";
-import { CircleCheck, CircleX, EllipsisVertical, FilePen, GitBranch, SquareArrowOutUpRight, SquarePen, Trash2 } from '@lucide/astro';
+import { EllipsisVertical, FilePen, GitBranch, SquareArrowOutUpRight, SquarePen, Trash2 } from '@lucide/astro';
 import { and, desc, eq, type InferSelectModel, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import Pagination from '../../../components/Pagination.astro';
+import PublishStateIcon from '../../../components/PublishStateIcon.astro';
 import { getDb } from '../../../db/db.js';
 import { resolvePagePathById } from '../../../db/page-path.js';
 import { dagNodes, pages, userActions, users } from '../../../db/schema.js';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { isWithinSchedule } from '../../../puck/schedule.js';
 import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
 import { parseSearchQuery } from '../../../search/parser.js';
 import SearchBar from '../../../search/SearchBar';
@@ -121,6 +123,13 @@ const [allPages, allDrafts, totalContent] = await Promise.all([
 
 const totalPageCount = Math.ceil(totalContent / itemsPerPage);
 
+// Published but outside its start/end window (see PublishStateIcon.astro) isn't actually visible
+// at its live URL right now — page.astro 404s it — so the "open" link falls back to the same
+// draft preview a plain unpublished row gets, instead of linking to a page that 404s.
+function isLiveNow(page: (typeof allPages)[number]): boolean {
+    return page.state === 1 && isWithinSchedule((page.content as any)?.root?.props);
+}
+
 const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, draft) => {
     const bucket = acc[draft.entityId];
     if (bucket !== undefined) {
@@ -222,7 +231,12 @@ for (const [pageId, path] of livePathEntries) {
                         <th class="w-px whitespace-nowrap">
                             <form action={`/admin/content/${id}/toggle/${page.id}`} method="POST">
                                 <button class="btn btn-square" type="submit">
-                                    {page.state === 1 ? <CircleCheck size={20} class="text-green-500" /> : <CircleX size={20} class="text-red-500" />}
+                                    <PublishStateIcon
+                                        state={page.state}
+                                        start={(page.content as any)?.root?.props?.start}
+                                        end={(page.content as any)?.root?.props?.end}
+                                        size={20}
+                                    />
                                 </button>
                             </form>
                         </th>
@@ -233,7 +247,7 @@ for (const [pageId, path] of livePathEntries) {
                         </td>
                         <td class="w-px whitespace-nowrap">
                             <div class="flex items-center gap-1">
-                                {page.state === 1 ? (
+                                {isLiveNow(page) ? (
                                     livePathByPageId[page.id] !== undefined && (
                                         <a
                                             href={`/${livePathByPageId[page.id]}`}
@@ -346,10 +360,15 @@ for (const [pageId, path] of livePathEntries) {
                         <div class="flex items-center gap-1">
                             <form action={`/admin/content/${id}/toggle/${page.id}`} method="POST">
                                 <button class="btn btn-square btn-sm" type="submit">
-                                    {page.state === 1 ? <CircleCheck size={18} class="text-green-500" /> : <CircleX size={18} class="text-red-500" />}
+                                    <PublishStateIcon
+                                        state={page.state}
+                                        start={(page.content as any)?.root?.props?.start}
+                                        end={(page.content as any)?.root?.props?.end}
+                                        size={18}
+                                    />
                                 </button>
                             </form>
-                            {page.state === 1 ? (
+                            {isLiveNow(page) ? (
                                 livePathByPageId[page.id] !== undefined && (
                                     <a
                                         href={`/${livePathByPageId[page.id]}`}

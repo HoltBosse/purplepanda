@@ -3,6 +3,7 @@ import type { Config, Data, Dictionary, Fields } from "@puckeditor/core";
 import { useMemo } from "react";
 import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
 import { aliasField } from "../puck/component-fields/AliasField.js";
+import { dateTimeField } from "../puck/component-fields/DateTimeField.js";
 import { filterConfigByLocation, wrapConfigWithDataBinding } from "../puck/index.js";
 import { pageRootPropsSchema } from "../puck/page-root-schema.js";
 import PuckEditor from "./PuckEditor.js";
@@ -160,11 +161,15 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
               ...pages.map((p) => ({ label: p.title || p.id, value: p.id })),
             ],
           },
+          start: { ...dateTimeField, label: "Start" },
+          end: { ...dateTimeField, label: "End" },
         },
         defaultProps: {
           title: "",
           alias: "",
           parentPage: "",
+          start: "",
+          end: "",
         },
       },
     };

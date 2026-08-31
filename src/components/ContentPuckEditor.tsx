@@ -2,6 +2,7 @@ import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Data } from "@puckeditor/core";
 import { useMemo } from "react";
 import { aliasField } from "../puck/component-fields/AliasField.js";
+import { dateTimeField } from "../puck/component-fields/DateTimeField.js";
 import PagePuckEditor from "./PagePuckEditor.js";
 
 interface ContentPuckEditorProps {
@@ -42,14 +43,17 @@ export default function ContentPuckEditor({
     }
     // Title and alias are always present for content items and always use these hardcoded
     // definitions — a content type's own "title"/"alias" fields (if any) are dropped so they
-    // can't override them. Every other field the content type defines is added on after.
-    const { title: _title, alias: _alias, ...otherFields } = contentType.fields;
+    // can't override them. Every other field the content type defines is added on after, followed
+    // by the start/end scheduling window.
+    const { title: _title, alias: _alias, start: _start, end: _end, ...otherFields } = contentType.fields;
     return {
       label: contentType.title,
       fields: {
         title: { type: "text" as const, label: "Title" },
         alias: aliasField,
         ...otherFields,
+        start: { ...dateTimeField, label: "Start" },
+        end: { ...dateTimeField, label: "End" },
       },
     };
   }, [contentType]);

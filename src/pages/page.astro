@@ -12,6 +12,7 @@ import { pages, redirects } from '../db/schema.js';
 import { formatPageTitle, resolveSiteName } from '../db/site.js';
 import { resolveTemplateSetting } from '../db/templates.js';
 import { extractFamilyFromLink } from '../form/fields/font-utils.js';
+import { isWithinSchedule } from '../puck/schedule.js';
 import { resolveDataForSSR } from '../puck/server-data-wrapper.js';
 
 // Dynamically imported (not a static top-level import) so it's only pulled into the SSR
@@ -103,7 +104,11 @@ const matchedPage = resolved?.page;
 const headingFontFamily = extractFamilyFromLink(fontSettings.headingFontLink);
 const bodyFontFamily = extractFamilyFromLink(fontSettings.bodyFontLink);
 
-if (!matchedPage) {
+// A page/content item outside its scheduling window (see DateTimeField.tsx and the hardcoded
+// start/end root fields in ContentPuckEditor.tsx/PagePuckEditor.tsx) isn't publicly visible yet,
+// or not anymore — it 404s exactly like a nonexistent path (redirects table included) rather than
+// leaking that it exists.
+if (!matchedPage || !isWithinSchedule((matchedPage.content as any)?.root?.props)) {
     const fromPath = `/${requestPath}`;
     const [redirect] = await db
         .select()

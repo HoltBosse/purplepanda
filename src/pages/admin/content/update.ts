@@ -7,6 +7,7 @@ import { addAlertToSession, alertType, createAlert } from "../../../alert/index.
 import { getDb } from "../../../db/db.js";
 import { dagNodes, pages } from "../../../db/schema.js";
 import { runOverride } from "../../../hooks/index.js";
+import { pageRootPropsSchema } from "../../../puck/page-root-schema.js";
 import { contentValidationErrorsSchema, formatValidationErrors, validateContentTree } from "../../../puck/validate-content.js";
 
 export async function POST(context: APIContext): Promise<Response> {
@@ -61,7 +62,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const parsedContent = JSON.parse(contentResult.data);
 
-    const validationErrors = validateContentTree(externalPuckConfig ?? {}, parsedContent);
+    const validationErrors = validateContentTree(externalPuckConfig ?? {}, parsedContent, { rootPropsSchema: pageRootPropsSchema });
     const overrideErrors = await runOverride(
         "content:validate",
         { entity: "content", contentType: typeId, content: parsedContent },

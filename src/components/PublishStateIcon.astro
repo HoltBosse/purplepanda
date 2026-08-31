@@ -1,0 +1,57 @@
+---
+import { CircleCheck, CircleX, Timer } from '@lucide/astro';
+import { isWithinSchedule } from '../puck/schedule.js';
+
+interface Props {
+    // pages.state: 1 = published, anything else = unpublished.
+    state: number;
+    // Root-level scheduling window (see puck/component-fields/DateTimeField.tsx) — always a UTC
+    // ISO string or null/undefined/"" when unset.
+    start?: string | null;
+    end?: string | null;
+    size?: number;
+}
+
+const { state, start, end, size = 20 } = Astro.props;
+
+const now = Date.now();
+const startTime = start ? Date.parse(start) : NaN;
+
+// A "published" row isn't necessarily live *right now* — its scheduling window may not have
+// started yet, or may already have closed. Either case gets a Timer icon instead of the usual
+// green check so an author isn't misled into thinking the page/content is currently visible.
+const isScheduled = state === 1 && !Number.isNaN(startTime) && now < startTime;
+const isExpired = state === 1 && !isScheduled && !isWithinSchedule({ start, end }, now);
+
+const scheduleLabel = isScheduled ? 'Start' : isExpired ? 'End' : null;
+const scheduleUtc = isScheduled ? start : isExpired ? end : null;
+---
+{scheduleLabel && scheduleUtc ? (
+    <div class="tooltip" data-schedule-tip data-utc={scheduleUtc} data-label={scheduleLabel}>
+        <Timer size={size} class="text-warning" />
+    </div>
+) : state === 1 ? (
+    <CircleCheck size={size} class="text-green-500" />
+) : (
+    <CircleX size={size} class="text-red-500" />
+)}
+
+<script>
+    // The server doesn't know the viewer's timezone (same reasoning as LocalDateTime.astro), so
+    // the tooltip's text — which needs the schedule time in *their* local time, not UTC — is
+    // filled in here rather than server-side. daisyUI's tooltip reads its text from `data-tip`,
+    // which (unlike element text content) can't hold a placeholder + hydrate-in-place, so this
+    // runs once up front instead of lazily on first hover.
+    document.querySelectorAll<HTMLElement>('[data-schedule-tip]').forEach((el) => {
+        const { utc, label } = el.dataset;
+        if (!utc || !label) return;
+        const formatted = new Date(utc).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+        el.setAttribute('data-tip', `${label}: ${formatted}`);
+    });
+</script>
