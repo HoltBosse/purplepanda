@@ -172,10 +172,13 @@ const navItems = (await runOverride('admin:nav', { user, defaultNavItems }, navI
 				<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[100] w-44 p-2 shadow-lg border border-base-300">
 					<li><a href="/admin/profile">Profile</a></li>
 					<li>
-						<a href="/admin/logout" class="text-error flex items-center justify-between">
+						<!-- A plain button (not a form) so this stays the direct child of <li> that
+						daisyUI's menu styling (grid layout, padding, hover state) targets — exactly like
+						the <a> it replaced. The POST itself is fired from the script below. -->
+						<button type="button" id="logout-button" class="text-error flex items-center justify-between">
 							Logout
 							<LogOut size={15} />
-						</a>
+						</button>
 					</li>
 				</ul>
 			</div>
@@ -247,6 +250,16 @@ const navItems = (await runOverride('admin:nav', { user, defaultNavItems }, navI
 				activePanel = null;
 				document.querySelectorAll('.drawer-panel').forEach(p => p.classList.add('hidden'));
 				navBtns.forEach(b => b.classList.remove('bg-base-300', 'text-primary'));
+			}
+		});
+
+		// /admin/logout is POST-only (a GET would be a state-changing request outside Astro's
+		// Origin-check coverage), so this fires the request via fetch rather than a plain link.
+		document.getElementById('logout-button')?.addEventListener('click', async () => {
+			try {
+				await fetch('/admin/logout', { method: 'POST' });
+			} finally {
+				window.location.href = '/admin/login';
 			}
 		});
 	</script>
