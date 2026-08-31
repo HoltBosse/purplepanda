@@ -201,7 +201,9 @@ export const GET: APIRoute = async ({ params, request, rewrite, session }) => {
     });
   }
 
-  if (fmt.success || w.success || h.success || q.success || x1.success || y1.success || x2.success || y2.success) {
+  const hasTransform = paramEntries.length > 0;
+
+  if (hasTransform) {
     // #4: pass file path directly — sharp/libvips reads the file internally
     let image = sharp(filePath);
 
@@ -244,6 +246,8 @@ export const GET: APIRoute = async ({ params, request, rewrite, session }) => {
       return new Response('Not Found', { status: 404, headers: { "Cache-Control": "no-store" } });
     }
 
+    // sharp has no SVG output encoder, so mimeType here is always a raster format
+    // (jpeg/png/webp/avif) — no CSP needed, unlike the raw-passthrough response below.
     const mimeType = getMimeType(outputBuffer);
     return new Response(outputBuffer.buffer as ArrayBuffer, {
       status: 200,
@@ -252,6 +256,7 @@ export const GET: APIRoute = async ({ params, request, rewrite, session }) => {
         "Content-Length": String(outputBuffer.byteLength),
         ...(bypassed ? {} : { "ETag": etag }),
         "Cache-Control": cacheControl,
+        "X-Content-Type-Options": "nosniff",
       },
     });
   }
@@ -272,6 +277,12 @@ export const GET: APIRoute = async ({ params, request, rewrite, session }) => {
       "Content-Length": String(fileStat.size),
       ...(bypassed ? {} : { "ETag": etag }),
       "Cache-Control": cacheControl,
+      "X-Content-Type-Options": "nosniff",
+      // SVG is the only format streamed here unmodified (sharp always rasterizes SVG
+      // when a transform is requested above), so it's the only one that can carry a
+      // <script>. This CSP neutralizes it even if the file is opened directly or
+      // embedded via <object>/<iframe>.
+      ...(mimeType === "image/svg+xml" ? { "Content-Security-Policy": "script-src 'none'; sandbox" } : {}),
     },
   });
 };

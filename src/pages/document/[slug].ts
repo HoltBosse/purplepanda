@@ -59,6 +59,7 @@ export const GET: APIRoute = async ({ params, rewrite }) => {
             "Content-Type": mimeType,
             "Content-Length": String(fileBuffer.byteLength),
             "Content-Disposition": `inline; filename="${doc.title}"`,
+            "X-Content-Type-Options": "nosniff",
         },
     });
 };
