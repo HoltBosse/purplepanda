@@ -159,7 +159,7 @@ function createOverrides(
                     commit?.onCommit?.(appStateData);
                   }}
                 >
-                  Commit
+                  Save
                 </button>
               </div>,
               document.body,
