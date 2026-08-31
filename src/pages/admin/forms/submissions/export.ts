@@ -18,7 +18,10 @@ import { parseSearchQuery } from '../../../../search/parser.js';
 import { searchConfig } from './search-config.js';
 
 function csvCell(value: string): string {
-    return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+    // Spreadsheet apps treat a leading =, +, -, or @ as a formula; prefix with a quote to
+    // force those apps to treat the cell as text and neutralize CSV/formula injection.
+    const safe = /^[=+\-@]/.test(value) ? `'${value}` : value;
+    return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
 export const GET: APIRoute = async ({ url }) => {
