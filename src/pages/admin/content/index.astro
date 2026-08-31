@@ -30,6 +30,10 @@ const db = getDb();
 // below reads `content.root.props.title`. The search builder takes an arbitrary SQL expression in
 // place of a column, so the same path can be filtered on directly in Postgres.
 const titleExpr = sql`${pages.content} -> 'root' -> 'props' ->> 'title'`;
+// start/end are stored as "" (unset) or a UTC ISO string (see DateTimeField.tsx) — nullif turns
+// the former into a real SQL NULL first, since casting an empty string to timestamptz errors.
+const startExpr = sql`nullif(${pages.content} -> 'root' -> 'props' ->> 'start', '')::timestamptz`;
+const endExpr = sql`nullif(${pages.content} -> 'root' -> 'props' ->> 'end', '')::timestamptz`;
 
 // Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
 // valid/invalid highlighting, and the qualifier/value autocomplete dropdown.
@@ -46,6 +50,8 @@ const searchFields: SearchFieldSpec[] = [
     { name: 'title', type: 'text', label: 'Title', description: 'Title contains' },
     { name: 'author', type: 'text', nullable: true, label: 'Author', description: 'Creator email (null = unattributed)' },
     { name: 'created', type: 'date', label: 'Created', description: 'Date created (YYYY-MM-DD)' },
+    { name: 'start', type: 'date', nullable: true, label: 'Start', description: 'Scheduled start date (null = no start set)' },
+    { name: 'end', type: 'date', nullable: true, label: 'End', description: 'Scheduled end date (null = no end set)' },
 ];
 
 // Server-side counterpart. `pages` has no author or created-at column, so both ride on the
@@ -67,6 +73,8 @@ const searchConfig: DrizzleSearchConfig = {
         { name: 'title', type: 'text', column: titleExpr, matchMode: 'contains' },
         { name: 'author', type: 'text', nullable: true, column: users.email, matchMode: 'exact' },
         { name: 'created', type: 'date', column: userActions.date },
+        { name: 'start', type: 'date', nullable: true, column: startExpr },
+        { name: 'end', type: 'date', nullable: true, column: endExpr },
     ],
     // A bare term searches the title — the one piece of content text this listing actually shows.
     fulltext: { columns: [titleExpr] },

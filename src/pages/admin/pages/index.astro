@@ -24,6 +24,10 @@ const db = getDb();
 // SQL expressions in place of columns, so the same paths can be filtered on directly in Postgres.
 const titleExpr = sql`${pages.content} -> 'root' -> 'props' ->> 'title'`;
 const parentPageExpr = sql`${pages.content} -> 'root' -> 'props' ->> 'parentPage'`;
+// start/end are stored as "" (unset) or a UTC ISO string (see DateTimeField.tsx) — nullif turns
+// the former into a real SQL NULL first, since casting an empty string to timestamptz errors.
+const startExpr = sql`nullif(${pages.content} -> 'root' -> 'props' ->> 'start', '')::timestamptz`;
+const endExpr = sql`nullif(${pages.content} -> 'root' -> 'props' ->> 'end', '')::timestamptz`;
 
 // This listing is only the plain pages (content-typed rows live under /admin/content) — the
 // state exclusion (soft-deleted, unless searched for explicitly) lives on `searchConfig` below.
@@ -50,6 +54,8 @@ const searchFields: SearchFieldSpec[] = [
     { name: 'parent', type: 'text', nullable: true, label: 'Parent', description: 'Parent page (null = top level)' },
     { name: 'author', type: 'text', nullable: true, label: 'Author', description: 'Creator email (null = unattributed)' },
     { name: 'created', type: 'date', label: 'Created', description: 'Date created (YYYY-MM-DD)' },
+    { name: 'start', type: 'date', nullable: true, label: 'Start', description: 'Scheduled start date (null = no start set)' },
+    { name: 'end', type: 'date', nullable: true, label: 'End', description: 'Scheduled end date (null = no end set)' },
 ];
 
 // `pages` has no author or created-at column, so both ride on the `page:create` row that
@@ -71,6 +77,8 @@ const searchConfig: DrizzleSearchConfig = {
         { name: 'parent', type: 'text', nullable: true, column: parentTitleExpr, matchMode: 'contains' },
         { name: 'author', type: 'text', nullable: true, column: users.email, matchMode: 'exact' },
         { name: 'created', type: 'date', column: userActions.date },
+        { name: 'start', type: 'date', nullable: true, column: startExpr },
+        { name: 'end', type: 'date', nullable: true, column: endExpr },
     ],
     fulltext: { columns: [titleExpr] },
     joins: [
