@@ -7,6 +7,8 @@ import { getDb } from "../../../db/db.js";
 import { documents } from "../../../db/schema.js";
 import { getDocumentPath } from "../../../document/document.js";
 
+const MAX_UPLOAD_BYTES = 512 * 1024 * 1024; // 512MB
+
 const toSlug = (title: string) =>
     title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
@@ -19,6 +21,12 @@ export async function POST(context: APIContext): Promise<Response> {
 
     if (!title.success || !file.success || title.data.length === 0) {
         const alert = createAlert(alertType.error, "Invalid form data. Please provide a title and a file.");
+        await addAlertToSession(context.session, alert);
+        return context.redirect("/admin/documents");
+    }
+
+    if (file.data.some((f) => f.size > MAX_UPLOAD_BYTES)) {
+        const alert = createAlert(alertType.error, "Each file must be smaller than 512MB.");
         await addAlertToSession(context.session, alert);
         return context.redirect("/admin/documents");
     }

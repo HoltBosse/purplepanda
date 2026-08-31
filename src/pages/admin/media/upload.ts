@@ -8,6 +8,8 @@ import { getDb } from "../../../db/db.js";
 import { media, mediafolders } from "../../../db/schema.js";
 import { getMediaPath } from "../../../media/media.js";
 
+const MAX_UPLOAD_BYTES = 512 * 1024 * 1024; // 512MB
+
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
 
@@ -23,6 +25,13 @@ export async function POST(context: APIContext): Promise<Response> {
 
     if(!title.success || !alt.success || !file.success || !folder.success) {
         const message = "Invalid form data. Please make sure to provide a title, alt text, and a file.";
+        const alert = createAlert(alertType.error, message);
+        await addAlertToSession(context.session, alert);
+        return context.redirect("/admin/media");
+    }
+
+    if(file.data.some((f) => f.size > MAX_UPLOAD_BYTES)) {
+        const message = "Each file must be smaller than 512MB.";
         const alert = createAlert(alertType.error, message);
         await addAlertToSession(context.session, alert);
         return context.redirect("/admin/media");
