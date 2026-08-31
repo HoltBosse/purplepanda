@@ -1,6 +1,7 @@
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Data } from "@puckeditor/core";
 import { useMemo } from "react";
+import { aliasField } from "../puck/component-fields/AliasField.js";
 import PagePuckEditor from "./PagePuckEditor.js";
 
 interface ContentPuckEditorProps {
@@ -35,10 +36,23 @@ export default function ContentPuckEditor({
     [contentTypeId],
   );
 
-  const rootConfig = useMemo(
-    () => contentType ? { label: contentType.title, fields: contentType.fields } : undefined,
-    [contentType],
-  );
+  const rootConfig = useMemo(() => {
+    if (!contentType) {
+      return undefined;
+    }
+    // Title and alias are always present for content items and always use these hardcoded
+    // definitions — a content type's own "title"/"alias" fields (if any) are dropped so they
+    // can't override them. Every other field the content type defines is added on after.
+    const { title: _title, alias: _alias, ...otherFields } = contentType.fields;
+    return {
+      label: contentType.title,
+      fields: {
+        title: { type: "text" as const, label: "Title" },
+        alias: aliasField,
+        ...otherFields,
+      },
+    };
+  }, [contentType]);
 
   const dictionary = useMemo(
     () => contentType ? { "label-page": contentType.title } : undefined,

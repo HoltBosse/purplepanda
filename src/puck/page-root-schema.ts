@@ -1,10 +1,10 @@
 import * as z from "zod";
 
-// Plain pages' root fields (see PagePuckEditor.tsx's default `fields` branch, used whenever no
-// content-type `rootConfig` is supplied) — every page needs a Title (shown in the page list and
-// audit log) and an Alias (its URL path segment) to be usable, so both are required regardless of
-// whatever else ends up in root.props (parentPage, etc.). Not applied to content types, which
-// define their own root fields entirely separately (see ContentPuckEditor.tsx).
+// Every page and content item needs a Title (shown in the page list and audit log) and an Alias
+// (its URL path segment) to be usable, so both are required regardless of whatever else ends up
+// in root.props (parentPage, other content-type fields, etc.). Plain pages get title/alias from
+// PagePuckEditor.tsx's default `fields` branch; content types get them hardcoded into their
+// rootConfig (see ContentPuckEditor.tsx) so they can't be overridden.
 export function pageRootPropsSchema() {
   return z
     .object({
