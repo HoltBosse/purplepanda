@@ -65,6 +65,44 @@ describe('imageField closed state', () => {
     });
 });
 
+describe('imageField minimal mode', () => {
+    it('defaults to minimal: false', () => {
+        expect(imageField.minimal).toBe(false);
+    });
+
+    it('shows the crop, focus, and sizing controls by default', async () => {
+        const Render = imageField.render as unknown as (props: {
+            field: typeof imageField;
+            value: ImageValue;
+            onChange: (value: ImageValue) => void;
+        }) => React.JSX.Element;
+        const s = await render(
+            <Render field={imageField} value={{ id: 'img-1', title: 'Sunset' } as ImageValue} onChange={vi.fn()} />,
+        );
+
+        await expect.element(s.getByRole('button', { name: 'Crop image' })).toBeInTheDocument();
+        await expect.element(s.getByRole('button', { name: 'Set focus point' })).toBeInTheDocument();
+        await expect.element(s.getByText('Sizing')).toBeInTheDocument();
+    });
+
+    it('hides the crop, focus, and sizing controls when minimal: true, leaving just the picker button', async () => {
+        const minimalField = { ...imageField, minimal: true };
+        const Render = imageField.render as unknown as (props: {
+            field: typeof minimalField;
+            value: ImageValue;
+            onChange: (value: ImageValue) => void;
+        }) => React.JSX.Element;
+        const s = await render(
+            <Render field={minimalField} value={{ id: 'img-1', title: 'Sunset' } as ImageValue} onChange={vi.fn()} />,
+        );
+
+        await expect.element(s.getByText('Sunset')).toBeInTheDocument();
+        await expect.element(s.getByRole('button', { name: 'Crop image' })).not.toBeInTheDocument();
+        await expect.element(s.getByRole('button', { name: 'Set focus point' })).not.toBeInTheDocument();
+        await expect.element(s.getByText('Sizing')).not.toBeInTheDocument();
+    });
+});
+
 describe('imageField dialog', () => {
     it('loads media from the lookup endpoint when opened', async () => {
         const fetchMock = stubLookup();

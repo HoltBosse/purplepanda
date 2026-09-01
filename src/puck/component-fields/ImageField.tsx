@@ -128,9 +128,14 @@ function fillCropCanvas(cropperImage: CropperImage, dispWidth: number) {
 function ImagePickerField({
   value,
   onChange,
+  minimal = false,
 }: {
   value: ImageConfig | null;
   onChange: (value: ImageConfig | null) => void;
+  // Hides the crop/focus-point controls and the Sizing section, leaving just the "Select an
+  // image..." picker button — for usages (e.g. an og:image) where the raw uploaded image is
+  // used as-is and the extra editing surface is just noise.
+  minimal?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -190,7 +195,7 @@ function ImagePickerField({
   // smallest possible transfer — quality doesn't affect the decoded width/height, only the resize
   // (w/h) params would, so a heavily-compressed webp still reports the correct natural size.
   useEffect(() => {
-    if (!value?.id) {
+    if (!value?.id || minimal) {
       setNaturalSize(null);
       return;
     }
@@ -203,7 +208,7 @@ function ImagePickerField({
     return () => {
       cancelled = true;
     };
-  }, [value?.id]);
+  }, [value?.id, minimal]);
 
   // Fetch when the dialog opens, the query changes, or the user navigates folders/pages; debounce
   // search typing, immediate otherwise.
@@ -387,112 +392,120 @@ function ImagePickerField({
         <button
           type="button"
           onClick={openDialog}
-          className={`btn btn-outline join-item flex-1 min-w-0 justify-start font-normal rounded-bl-none ${!value ? "border-error text-error" : ""}`}
+          className={`btn btn-outline join-item justify-start font-normal ${
+            minimal ? "w-full" : "flex-1 min-w-0 rounded-bl-none"
+          } ${!value ? "border-error text-error" : ""}`}
         >
           <span className="truncate">{value ? value.title || value.id : "Select an image..."}</span>
         </button>
-        <button
-          type="button"
-          onClick={openCropDialog}
-          disabled={!value || !naturalSize}
-          className="btn btn-outline join-item px-2"
-          aria-label="Crop image"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="size-4"
-            aria-hidden="true"
-          >
-            <path d="M6 2v14a2 2 0 0 0 2 2h14" />
-            <path d="M18 22V8a2 2 0 0 0-2-2H2" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          onClick={openFocusDialog}
-          disabled={!value}
-          className="btn btn-outline join-item px-2 rounded-br-none"
-          aria-label="Set focus point"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="size-4"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="3" />
-            <path d="M3 7V5a2 2 0 0 1 2-2h2" />
-            <path d="M17 3h2a2 2 0 0 1 2 2v2" />
-            <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
-            <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
-          </svg>
-        </button>
+        {!minimal && (
+          <>
+            <button
+              type="button"
+              onClick={openCropDialog}
+              disabled={!value || !naturalSize}
+              className="btn btn-outline join-item px-2"
+              aria-label="Crop image"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="size-4"
+                aria-hidden="true"
+              >
+                <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+                <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={openFocusDialog}
+              disabled={!value}
+              className="btn btn-outline join-item px-2 rounded-br-none"
+              aria-label="Set focus point"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="size-4"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+                <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+                <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+                <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+              </svg>
+            </button>
+          </>
+        )}
       </div>
 
-      <details className="collapse collapse-arrow border bg-base-100 rounded-tl-none rounded-tr-none">
-        <summary className="collapse-title text-sm font-medium py-3">Sizing</summary>
-        <div className="collapse-content space-y-3">
-          <div className="flex items-end gap-2">
-            <div className="flex flex-1 flex-col gap-1">
-              <span className="text-xs text-base-content/60">Width</span>
-              <input
-                type="range"
-                className="range range-primary w-full"
-                value={value?.width ?? naturalSize?.width ?? 0}
-                min={0}
-                max={naturalSize?.width ?? 0}
-                disabled={!value || value.width == null}
-                onChange={(e) => onChange(value ? { ...value, width: Number(e.target.value) } : value)}
-              />
+      {!minimal && (
+        <details className="collapse collapse-arrow border bg-base-100 rounded-tl-none rounded-tr-none">
+          <summary className="collapse-title text-sm font-medium py-3">Sizing</summary>
+          <div className="collapse-content space-y-3">
+            <div className="flex items-end gap-2">
+              <div className="flex flex-1 flex-col gap-1">
+                <span className="text-xs text-base-content/60">Width</span>
+                <input
+                  type="range"
+                  className="range range-primary w-full"
+                  value={value?.width ?? naturalSize?.width ?? 0}
+                  min={0}
+                  max={naturalSize?.width ?? 0}
+                  disabled={!value || value.width == null}
+                  onChange={(e) => onChange(value ? { ...value, width: Number(e.target.value) } : value)}
+                />
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-xs text-base-content/60">100%</span>
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-sm"
+                  checked={!value || value.width == null}
+                  disabled={!value}
+                  onChange={(e) => setWidthAuto(e.target.checked)}
+                />
+              </div>
             </div>
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-xs text-base-content/60">100%</span>
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm"
-                checked={!value || value.width == null}
-                disabled={!value}
-                onChange={(e) => setWidthAuto(e.target.checked)}
-              />
+            <div className="flex items-end gap-2">
+              <div className="flex flex-1 flex-col gap-1">
+                <span className="text-xs text-base-content/60">Height</span>
+                <input
+                  type="range"
+                  className="range range-primary w-full"
+                  value={value?.height ?? naturalSize?.height ?? 0}
+                  min={0}
+                  max={naturalSize?.height ?? 0}
+                  disabled={!value || value.height == null}
+                  onChange={(e) => onChange(value ? { ...value, height: Number(e.target.value) } : value)}
+                />
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-xs text-base-content/60">100%</span>
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-sm"
+                  checked={!value || value.height == null}
+                  disabled={!value}
+                  onChange={(e) => setHeightAuto(e.target.checked)}
+                />
+              </div>
             </div>
           </div>
-          <div className="flex items-end gap-2">
-            <div className="flex flex-1 flex-col gap-1">
-              <span className="text-xs text-base-content/60">Height</span>
-              <input
-                type="range"
-                className="range range-primary w-full"
-                value={value?.height ?? naturalSize?.height ?? 0}
-                min={0}
-                max={naturalSize?.height ?? 0}
-                disabled={!value || value.height == null}
-                onChange={(e) => onChange(value ? { ...value, height: Number(e.target.value) } : value)}
-              />
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-xs text-base-content/60">100%</span>
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm"
-                checked={!value || value.height == null}
-                disabled={!value}
-                onChange={(e) => setHeightAuto(e.target.checked)}
-              />
-            </div>
-          </div>
-        </div>
-      </details>
+        </details>
+      )}
 
       <dialog ref={dialogRef} className="modal">
         <div className="modal-box w-11/12 max-w-4xl">
@@ -728,12 +741,22 @@ function ImagePickerField({
 
 // Reusable field for content types that need an image field of the same shape used here, so
 // items of that type can be bound to by ImagePicker's `image` prop when nested in a card
-// template (see bindableFields below and ../data-binding.js).
-export const imageField: CustomField<ImageConfig | null> = {
+// template (see bindableFields below and ../data-binding.js). Spread and override to opt into
+// `minimal: true` for a usage that just needs the raw uploaded image with no crop/focus/sizing
+// controls, e.g. `{ ...imageField, minimal: true }` (see OpenGraphField.ts) — same pattern as
+// overriding DateTimeField's label elsewhere in this package.
+export type ImageFieldConfig = CustomField<ImageConfig | null> & { minimal?: boolean };
+
+export const imageField: ImageFieldConfig = {
   type: "custom",
   label: "Image",
-  render: ({ value, onChange }) => (
-    <ImagePickerField value={value} onChange={onChange} />
+  minimal: false,
+  render: ({ field, value, onChange }) => (
+    <ImagePickerField
+      value={value}
+      onChange={onChange}
+      minimal={(field as ImageFieldConfig | undefined)?.minimal ?? false}
+    />
   ),
 };
 
