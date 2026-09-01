@@ -5,6 +5,7 @@ import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.j
 import { aliasField } from "../puck/component-fields/AliasField.js";
 import { dateTimeField } from "../puck/component-fields/DateTimeField.js";
 import { notesField } from "../puck/component-fields/NotesField.js";
+import { ogField } from "../puck/component-fields/OpenGraphField.js";
 import { filterConfigByLocation, wrapConfigWithDataBinding } from "../puck/index.js";
 import { pageRootPropsSchema } from "../puck/page-root-schema.js";
 import PuckEditor from "./PuckEditor.js";
@@ -165,6 +166,7 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
           start: { ...dateTimeField, label: "Start" },
           end: { ...dateTimeField, label: "End" },
           notes: notesField,
+          og: ogField,
         },
         defaultProps: {
           title: "",
@@ -173,6 +175,7 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
           start: "",
           end: "",
           notes: "",
+          og: {},
         },
       },
     };

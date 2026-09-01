@@ -12,6 +12,7 @@ import { pages, redirects } from '../db/schema.js';
 import { formatPageTitle, resolveSiteName } from '../db/site.js';
 import { resolveTemplateSetting } from '../db/templates.js';
 import { extractFamilyFromLink } from '../form/fields/font-utils.js';
+import { withCropParams } from '../puck/component-fields/ImageField.js';
 import { isWithinSchedule } from '../puck/schedule.js';
 import { resolveDataForSSR } from '../puck/server-data-wrapper.js';
 
@@ -136,6 +137,14 @@ const [pageData, templateData] = await Promise.all([
 const rawTitle: string = (pageData as any)?.root?.props?.title ?? '';
 const title: string = formatPageTitle(rawTitle, siteName);
 
+// The Open Graph group (see puck/component-fields/OpenGraphField.tsx) is entirely optional —
+// title falls back to the page's own title (same `||` fallback used for rawTitle/breadcrumbs
+// below), description/image are simply omitted from the meta tags when unset.
+const ogProps: { title?: string; description?: string; image?: { id: string; crop?: { x1: number; y1: number; x2: number; y2: number } | null } | null } =
+    (pageData as any)?.root?.props?.og ?? {};
+const ogTitle: string = ogProps.title || rawTitle;
+const ogDescription: string = ogProps.description ?? '';
+
 const jsonLd = contentTypeRoute?.contentType.jsonLd?.((pageData as any)?.root?.props ?? {});
 
 // For a content-type page there's no real page behind its baseUrl segment (e.g. "/articles"), so
@@ -151,6 +160,16 @@ const breadcrumbEntries: BreadcrumbEntry[] = contentTypeRoute
 
 const origin = (Astro.site ?? Astro.url).origin;
 const toAbsoluteUrl = (path: string) => (path ? `${origin}/${path}` : `${origin}/`);
+
+// og:image must be an absolute URL per the OG spec — jpeg is used (rather than the site's usual
+// webp/avif) for the widest crawler/scraper compatibility (Facebook, Slack, etc.), sized to a
+// typical OG width; withCropParams re-applies whatever crop the image picker recorded.
+const ogImageUrl: string | null = ogProps.image?.id
+    ? toAbsoluteUrl(withCropParams(`image/${ogProps.image.id}?fmt=jpeg&w=1200`, ogProps.image.crop ?? null))
+    : null;
+// og:url is the same canonical/absolute-path scheme the breadcrumb JSON-LD below uses for its
+// own '@id's — this page's own path, not wherever a redirect or query string happened to land.
+const ogUrl: string = toAbsoluteUrl(requestPath);
 
 const breadcrumbList: BreadcrumbList | null = requestPath && breadcrumbEntries.length
     ? {
@@ -184,6 +203,13 @@ const jsonLdScript = jsonLdItems.length
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
+    {ogDescription && <meta name="description" content={ogDescription} />}
+    {ogTitle && <meta property="og:title" content={ogTitle} />}
+    <meta property="og:type" content="website" />
+    {ogDescription && <meta property="og:description" content={ogDescription} />}
+    {ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
+    <meta property="og:url" content={ogUrl} />
+    {siteName && <meta property="og:site_name" content={siteName} />}
     {jsonLdScript && <script type="application/ld+json" is:inline set:html={jsonLdScript} />}
     {fontSettings.bodyFontLink && <link rel="stylesheet" href={fontSettings.bodyFontLink} />}
     {fontSettings.headingFontLink && fontSettings.headingFontLink !== fontSettings.bodyFontLink && (

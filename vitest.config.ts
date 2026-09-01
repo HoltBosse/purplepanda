@@ -22,6 +22,7 @@ const { DISPLAY: _display, ...envWithoutDisplay } = process.env;
 const lucideIconEntries = [
   'calendar-clock',
   'chevron-down',
+  'chevron-up',
   'circle-check-big',
   'circle-x',
   'info',

@@ -12,6 +12,7 @@
  */
 export { default as CalendarClock } from "lucide-react/dist/esm/icons/calendar-clock.mjs";
 export { default as ChevronDown } from "lucide-react/dist/esm/icons/chevron-down.mjs";
+export { default as ChevronUp } from "lucide-react/dist/esm/icons/chevron-up.mjs";
 export { default as CircleCheckBig } from "lucide-react/dist/esm/icons/circle-check-big.mjs";
 export { default as CircleX } from "lucide-react/dist/esm/icons/circle-x.mjs";
 export { default as Info } from "lucide-react/dist/esm/icons/info.mjs";
