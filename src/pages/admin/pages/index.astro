@@ -1,5 +1,5 @@
 ---
-import { CornerDownRight, EllipsisVertical, FilePen, GitBranch, SquareArrowOutUpRight, SquarePen, Trash2 } from '@lucide/astro';
+import { CornerDownRight, EllipsisVertical, FilePen, GitBranch, MessageSquare, SquareArrowOutUpRight, SquarePen, Trash2 } from '@lucide/astro';
 import { and, desc, eq, type InferSelectModel, inArray, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
@@ -289,6 +289,7 @@ const totalPageCount = Math.ceil(totalItems / itemsPerPage);
                     {orderedPages.map(({ page, depth }) => {
                         const drafts = draftsByPageId[page.id] ?? [];
                         const masterNode = masterNodeByPageId[page.id];
+                        const notes = (page.content as any)?.root?.props?.notes as string | undefined;
                         return (
                             <tr>
                                 <td>
@@ -315,13 +316,20 @@ const totalPageCount = Math.ceil(totalItems / itemsPerPage);
                                     </form>
                                 </td>
                                 <td>
-                                    <a href={`/admin/pages/edit/${page.id}`}>
-                                        <div class="font-bold flex items-center gap-1">
-                                            {depth > 1 && <span class="whitespace-pre">{' '.repeat((depth - 2) * 2)}</span>}
-                                            {depth > 1 && <CornerDownRight size={14} class="text-base-content/50 shrink-0" />}
-                                            <span class="link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</span>
-                                        </div>
-                                    </a>
+                                    <div class="flex items-center gap-2">
+                                        <a href={`/admin/pages/edit/${page.id}`}>
+                                            <div class="font-bold flex items-center gap-1">
+                                                {depth > 1 && <span class="whitespace-pre">{' '.repeat((depth - 2) * 2)}</span>}
+                                                {depth > 1 && <CornerDownRight size={14} class="text-base-content/50 shrink-0" />}
+                                                <span class="link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</span>
+                                            </div>
+                                        </a>
+                                        {notes && (
+                                            <div class="tooltip tooltip-top before:whitespace-pre-line before:text-left" data-tip={notes}>
+                                                <MessageSquare size={14} class="text-base-content/60" />
+                                            </div>
+                                        )}
+                                    </div>
                                 </td>
                                 <td class="w-px whitespace-nowrap">
                                     <div class="flex items-center gap-1">
@@ -422,6 +430,7 @@ const totalPageCount = Math.ceil(totalItems / itemsPerPage);
                 {orderedPages.map(({ page, depth }) => {
                     const drafts = draftsByPageId[page.id] ?? [];
                     const masterNode = masterNodeByPageId[page.id];
+                    const notes = (page.content as any)?.root?.props?.notes as string | undefined;
                     return (
                         <div class="card bg-base-100 rounded-lg p-4">
                             <div class="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-base-300">
@@ -523,12 +532,19 @@ const totalPageCount = Math.ceil(totalItems / itemsPerPage);
                                 <div class="flex justify-between gap-4">
                                     <dt class="text-sm text-base-content/60">Page</dt>
                                     <dd class="text-right">
-                                        <a href={`/admin/pages/edit/${page.id}`}>
-                                            <div class="font-bold flex items-center justify-end gap-1">
-                                                {depth > 1 && <CornerDownRight size={14} class="text-base-content/50 shrink-0" />}
-                                                <span class="link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</span>
-                                            </div>
-                                        </a>
+                                        <div class="flex items-center justify-end gap-2">
+                                            <a href={`/admin/pages/edit/${page.id}`}>
+                                                <div class="font-bold flex items-center justify-end gap-1">
+                                                    {depth > 1 && <CornerDownRight size={14} class="text-base-content/50 shrink-0" />}
+                                                    <span class="link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</span>
+                                                </div>
+                                            </a>
+                                            {notes && (
+                                                <div class="tooltip tooltip-top before:whitespace-pre-line before:text-left" data-tip={notes}>
+                                                    <MessageSquare size={14} class="text-base-content/60" />
+                                                </div>
+                                            )}
+                                        </div>
                                     </dd>
                                 </div>
                             </dl>

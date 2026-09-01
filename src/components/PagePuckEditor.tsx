@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
 import { aliasField } from "../puck/component-fields/AliasField.js";
 import { dateTimeField } from "../puck/component-fields/DateTimeField.js";
+import { notesField } from "../puck/component-fields/NotesField.js";
 import { filterConfigByLocation, wrapConfigWithDataBinding } from "../puck/index.js";
 import { pageRootPropsSchema } from "../puck/page-root-schema.js";
 import PuckEditor from "./PuckEditor.js";
@@ -163,6 +164,7 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
           },
           start: { ...dateTimeField, label: "Start" },
           end: { ...dateTimeField, label: "End" },
+          notes: notesField,
         },
         defaultProps: {
           title: "",
@@ -170,6 +172,7 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
           parentPage: "",
           start: "",
           end: "",
+          notes: "",
         },
       },
     };

@@ -8,3 +8,4 @@ export type { GridLayout, ResponsiveLayout } from "./LayoutField.js";
 export { DEFAULT_LAYOUT, layoutField } from "./LayoutField.js";
 export type { UserOption } from "./NotifyUsersField.js";
 export { notifyUsersField } from "./NotifyUsersField.js";
+export { notesField } from "./NotesField.js";

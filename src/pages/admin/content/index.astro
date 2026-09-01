@@ -1,6 +1,6 @@
 ---
 import externalPuckConfig from "virtual:purplepanda/puck-config";
-import { EllipsisVertical, FilePen, GitBranch, SquareArrowOutUpRight, SquarePen, Trash2 } from '@lucide/astro';
+import { EllipsisVertical, FilePen, GitBranch, MessageSquare, SquareArrowOutUpRight, SquarePen, Trash2 } from '@lucide/astro';
 import { and, desc, eq, type InferSelectModel, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import Pagination from '../../../components/Pagination.astro';
@@ -223,6 +223,7 @@ for (const [pageId, path] of livePathEntries) {
             {allPages.map(page => {
                 const drafts = draftsByPageId[page.id] ?? [];
                 const masterNode = masterNodeByPageId[page.id];
+                const notes = (page.content as any)?.root?.props?.notes as string | undefined;
                 return (
                     <tr>
                         <td>
@@ -249,9 +250,16 @@ for (const [pageId, path] of livePathEntries) {
                             </form>
                         </th>
                         <td>
-                            <a href={`/admin/content/${id}/edit/${page.id}`}>
-                                <div class="font-bold link link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</div>
-                            </a>
+                            <div class="flex items-center gap-2">
+                                <a href={`/admin/content/${id}/edit/${page.id}`}>
+                                    <div class="font-bold link link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</div>
+                                </a>
+                                {notes && (
+                                    <div class="tooltip tooltip-top before:whitespace-pre-line before:text-left" data-tip={notes}>
+                                        <MessageSquare size={14} class="text-base-content/60" />
+                                    </div>
+                                )}
+                            </div>
                         </td>
                         <td class="w-px whitespace-nowrap">
                             <div class="flex items-center gap-1">
@@ -352,6 +360,7 @@ for (const [pageId, path] of livePathEntries) {
         {allPages.map(page => {
             const drafts = draftsByPageId[page.id] ?? [];
             const masterNode = masterNodeByPageId[page.id];
+            const notes = (page.content as any)?.root?.props?.notes as string | undefined;
             return (
                 <div class="card bg-base-100 rounded-lg p-4">
                     <div class="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-base-300">
@@ -453,9 +462,16 @@ for (const [pageId, path] of livePathEntries) {
                         <div class="flex justify-between gap-4">
                             <dt class="text-sm text-base-content/60">{contentType?.title || 'Content'}</dt>
                             <dd class="text-right">
-                                <a href={`/admin/content/${id}/edit/${page.id}`}>
-                                    <span class="font-bold link link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</span>
-                                </a>
+                                <div class="flex items-center justify-end gap-2">
+                                    <a href={`/admin/content/${id}/edit/${page.id}`}>
+                                        <span class="font-bold link link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</span>
+                                    </a>
+                                    {notes && (
+                                        <div class="tooltip tooltip-top before:whitespace-pre-line before:text-left" data-tip={notes}>
+                                            <MessageSquare size={14} class="text-base-content/60" />
+                                        </div>
+                                    )}
+                                </div>
                             </dd>
                         </div>
                     </dl>
