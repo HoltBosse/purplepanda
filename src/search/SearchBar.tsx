@@ -149,7 +149,13 @@ export default function SearchBar({
   const scrollStyle = { transform: `translateX(${-scrollLeft}px)` };
 
   return (
-    <div className={`relative ${className ?? ""}`}>
+    // z-[5] (not just relative): pins this as its own stacking context so the z-10/z-20/z-30
+    // layers below stay contained here instead of leaking out to compete with unrelated page
+    // chrome. Deliberately between 0 and the page header's z-10 (index.astro): above 0 so it
+    // wins over daisyUI's .table below (position:relative, so an implicit z-index:auto — tied
+    // with a bare z-0 here, and a same-level tie goes to whichever is later in the DOM, which is
+    // the table); below 10 so a header/dropdown that overlaps this bar from above still wins.
+    <div className={`relative z-[5] ${className ?? ""}`}>
       {/* No JS required: a plain GET form with a named input submits `?<name>=...` to the current
           URL on Enter, which the server (see documents/index.astro) parses the same way this
           component does client-side. This is also the positioned ancestor the dropdown is offset

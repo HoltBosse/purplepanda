@@ -1,5 +1,6 @@
 ---
-import { CornerDownRight, EllipsisVertical, FilePen, GitBranch, MessageSquare, SquareArrowOutUpRight, SquarePen, Trash2 } from '@lucide/astro';
+import { CornerDownRight, EllipsisVertical, FilePen, GitBranch, LayoutTemplate, MessageSquare, SquareArrowOutUpRight, SquarePen, Trash2 } from '@lucide/astro';
+import ChevronDown from '@lucide/astro/icons/chevron-down';
 import { and, desc, eq, type InferSelectModel, inArray, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
@@ -7,7 +8,8 @@ import Pagination from '../../../components/Pagination.astro';
 import PublishStateIcon from '../../../components/PublishStateIcon.astro';
 import { getDb } from '../../../db/db.js';
 import { resolvePagePathById } from '../../../db/page-path.js';
-import { dagNodes, pages, userActions, users } from '../../../db/schema.js';
+import { dagNodes, pages, templates, userActions, users } from '../../../db/schema.js';
+import Select from '../../../form/fields/Select.astro';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { isWithinSchedule } from '../../../puck/schedule.js';
 import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
@@ -18,6 +20,13 @@ import type { SearchFieldSpec } from '../../../search/types.js';
 type Page = InferSelectModel<typeof pages>;
 
 const db = getDb();
+
+// Options for the "Choose template" dialog on the New button below — templates have no title
+// column, so the label comes from Puck's own root.props.title, same as the templates admin list.
+const templateOptions = (await db.select().from(templates).where(eq(templates.state, 1))).map(template => ({
+    label: (template.content as any)?.root?.props?.title || 'Untitled',
+    value: template.id,
+}));
 
 // Neither the title nor the parent link is a column — Puck stores both inside the content document,
 // which is why the table below reads `content.root.props.*`. The search builder accepts arbitrary
@@ -245,7 +254,21 @@ const totalPageCount = Math.ceil(totalItems / itemsPerPage);
 <AdminLayout>
 	<div class="flex flex-wrap items-center justify-between gap-3 align-middle border-b border-base-300 pt-2 sticky top-0 z-10 bg-base-200">
         <h1 class="text-2xl font-semibold">Pages</h1>
-        <a href="/admin/pages/new" class="btn btn-primary">New</a>
+        <div class="join">
+            <a href="/admin/pages/new" class="btn btn-primary join-item">New</a>
+            <div class="dropdown dropdown-end">
+                <div tabindex="0" role="button" class="btn btn-primary join-item px-2" aria-label="New page options">
+                    <ChevronDown size={16} />
+                </div>
+                <!-- transition-none: daisyUI fades dropdown-content's opacity in over .2s, which
+                     read as "translucent" when the menu is glanced at (or screenshotted) mid-fade;
+                     dropping the transition makes it snap straight to fully opaque. -->
+                <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-10 w-48 p-2 shadow-lg border border-base-300 transition-none">
+                    <li><a href="/admin/pages/new?blank=1">Blank</a></li>
+                    <li><button type="button" id="open-choose-template-btn">Choose template&hellip;</button></li>
+                </ul>
+            </div>
+        </div>
     </div>
     <div class="pt-4 pb-6">
         <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
@@ -402,6 +425,18 @@ const totalPageCount = Math.ceil(totalItems / itemsPerPage);
                                                         History
                                                     </a>
                                                 </li>
+                                                <li><hr class="my-1 border-base-300" /></li>
+                                                <li>
+                                                    <button
+                                                        type="button"
+                                                        class="gap-2"
+                                                        data-change-template
+                                                        data-page-id={page.id}
+                                                    >
+                                                        <LayoutTemplate size={12} />
+                                                        Change Template
+                                                    </button>
+                                                </li>
                                             </ul>
                                         </div>
                                     </div>
@@ -524,6 +559,18 @@ const totalPageCount = Math.ceil(totalItems / itemsPerPage);
                                                     History
                                                 </a>
                                             </li>
+                                            <li><hr class="my-1 border-base-300" /></li>
+                                            <li>
+                                                <button
+                                                    type="button"
+                                                    class="gap-2"
+                                                    data-change-template
+                                                    data-page-id={page.id}
+                                                >
+                                                    <LayoutTemplate size={12} />
+                                                    Change Template
+                                                </button>
+                                            </li>
                                         </ul>
                                     </div>
                                 </div>
@@ -593,6 +640,43 @@ const totalPageCount = Math.ceil(totalItems / itemsPerPage);
         </form>
     </dialog>
 
+    <!-- Choose Template Modal -->
+    <dialog id="choose-template-modal" class="modal">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Choose Template</h3>
+            <!-- GET so the pick just becomes /admin/pages/new?templateId=<uuid> — new.astro
+                 resolves that into the initial templateData and pins it on save (update.ts). -->
+            <form method="GET" action="/admin/pages/new" id="choose-template-form">
+                <Select id="choose-template-select" name="templateId" type="Select" label="Template" options={templateOptions} placeholder="Select a template" required />
+                <div class="modal-action mt-6">
+                    <button type="button" class="btn btn-ghost" id="cancel-choose-template-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Continue</button>
+                </div>
+            </form>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <!-- Change Template Modal (kebab menu, existing page) -->
+    <dialog id="change-template-modal" class="modal">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Change Template</h3>
+            <!-- action is set per-row by the script below, to /admin/pages/change-template/<id> -->
+            <form method="POST" id="change-template-form">
+                <Select id="change-template-select" name="templateId" type="Select" label="Template" options={templateOptions} placeholder="Select a template" required />
+                <div class="modal-action mt-6">
+                    <button type="button" class="btn btn-ghost" id="cancel-change-template-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
     <script>import '../../../scripts/select-all'</script>
     <script>
         const modal = document.getElementById('create-draft-modal') as HTMLDialogElement;
@@ -611,5 +695,25 @@ const totalPageCount = Math.ceil(totalItems / itemsPerPage);
         });
 
         cancelBtn?.addEventListener('click', () => modal.close());
+
+        const chooseTemplateModal = document.getElementById('choose-template-modal') as HTMLDialogElement;
+        const openChooseTemplateBtn = document.getElementById('open-choose-template-btn');
+        const cancelChooseTemplateBtn = document.getElementById('cancel-choose-template-btn');
+
+        openChooseTemplateBtn?.addEventListener('click', () => chooseTemplateModal.showModal());
+        cancelChooseTemplateBtn?.addEventListener('click', () => chooseTemplateModal.close());
+
+        const changeTemplateModal = document.getElementById('change-template-modal') as HTMLDialogElement;
+        const changeTemplateForm = document.getElementById('change-template-form') as HTMLFormElement;
+        const cancelChangeTemplateBtn = document.getElementById('cancel-change-template-btn');
+
+        document.querySelectorAll<HTMLButtonElement>('[data-change-template]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                changeTemplateForm.action = `/admin/pages/change-template/${btn.dataset.pageId}`;
+                changeTemplateModal.showModal();
+            });
+        });
+
+        cancelChangeTemplateBtn?.addEventListener('click', () => changeTemplateModal.close());
     </script>
 </AdminLayout>

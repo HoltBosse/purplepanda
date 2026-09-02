@@ -352,6 +352,11 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         });
 
         injectRoute({
+          pattern: "/admin/pages/change-template/[id]",
+          entrypoint: "@holtbosse/purplepanda/pages/admin/pages/change-template.ts",
+        });
+
+        injectRoute({
           pattern: "/admin/pages/bulk/[action]",
           entrypoint: "@holtbosse/purplepanda/pages/admin/pages/bulk/[action].ts",
         });

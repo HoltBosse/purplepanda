@@ -5,7 +5,8 @@ import PagePuckEditor from '../../../components/PagePuckEditor';
 import { getDb } from '../../../db/db.js';
 import { resolveFontSettings } from '../../../db/fonts.js';
 import { resolvePrefabSetting } from '../../../db/prefabs.js';
-import { pages, settings, templates } from '../../../db/schema.js';
+import { pages } from '../../../db/schema.js';
+import { resolveTemplateSetting } from '../../../db/templates.js';
 import AdminBareLayout from '../../../layouts/AdminBareLayout.astro';
 
 const db = getDb();
@@ -17,14 +18,17 @@ if (id) {
     saveUrl += `/${id}`;
 }
 
-const [defaultTemplate, allPages, existingPage, prefabSetting, fontSettings] = await Promise.all([
-    db
-        .select()
-        .from(settings)
-        .leftJoin(templates, sql`(${templates.id})::text = (${settings.value} #>> '{}')`)
-        .where(eq(settings.key, 'default_template'))
-        .limit(1)
-        .then(rows => rows[0]),
+// The "Choose template" and "Blank" options on the pages list New button land here as
+// ?templateId=<uuid> / ?blank=1 (see index.astro's split button + dialog). They only apply
+// when creating a page — an existing page's own templateId/noTemplate (set once at creation,
+// see update.ts) is what governs it from then on, same as its front-end rendering in page.astro.
+const templateIdParam = Astro.url.searchParams.get('templateId');
+const isBlank = Astro.url.searchParams.get('blank') === '1';
+// The prefab is the plain-New-button starting point — picking "Blank" or a specific template is
+// an explicit request to start from that instead, so neither should also pull in the prefab.
+const usesDefaultTemplate = !id && !isBlank && !templateIdParam;
+
+const [allPages, existingPage, prefabSetting, fontSettings] = await Promise.all([
     db
         .select({
             id: pages.id,
@@ -35,7 +39,7 @@ const [defaultTemplate, allPages, existingPage, prefabSetting, fontSettings] = a
     id
         ? db.select().from(pages).where(eq(pages.id, id)).limit(1).then(rows => rows[0])
         : Promise.resolve(undefined),
-    id ? Promise.resolve(undefined) : resolvePrefabSetting(db),
+    usesDefaultTemplate ? resolvePrefabSetting(db) : Promise.resolve(undefined),
     resolveFontSettings(db),
 ]);
 
@@ -43,7 +47,13 @@ if (id && !existingPage) {
     throw new Error('Page not found');
 }
 
-const templateData = defaultTemplate?.templates?.content as Data | undefined;
+// New page: pin whatever was picked on the list page (or fall back to the site default, same
+// as before, when neither was picked). Existing page: honor whatever was pinned at creation.
+const resolvedTemplateId: string | null = existingPage ? existingPage.templateId : templateIdParam;
+const resolvedNoTemplate: boolean = existingPage ? existingPage.noTemplate : isBlank;
+
+const templateSetting = await resolveTemplateSetting(db, undefined, { templateId: resolvedTemplateId, noTemplate: resolvedNoTemplate });
+const templateData = templateSetting?.templates?.content as Data | undefined;
 const prefabData = prefabSetting?.value as Data | undefined;
 
 const editorProps = {
@@ -51,6 +61,9 @@ const editorProps = {
         ? { initialData: existingPage.content as Data }
         : (prefabData ? { initialData: prefabData } : {})),
     ...(templateData ? { templateData } : {}),
+    // Only the create flow needs to push these into the save form — editing an existing page
+    // leaves its templateId/noTemplate columns untouched (see update.ts's edit branch).
+    ...(!existingPage ? { templateId: resolvedTemplateId, noTemplate: resolvedNoTemplate } : {}),
     ...(fontSettings.headingFontLink ? { headingFontLink: fontSettings.headingFontLink } : {}),
     ...(fontSettings.bodyFontLink ? { bodyFontLink: fontSettings.bodyFontLink } : {}),
 };

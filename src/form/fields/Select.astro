@@ -50,9 +50,18 @@ const selectedValues = multiple ? (Array.isArray(value) ? value : value !== unde
     // don't leak onto either — the enhanced look is owned entirely by Select.css.
     select.className = "";
 
+    // SlimSelect appends its option list to document.body by default. A <dialog> shown via
+    // showModal() renders in the browser's top layer, above all regular body content regardless
+    // of z-index — so a select inside one needs its list appended inside that same dialog to
+    // render above the dialog's own backdrop instead of behind it.
+    const dialog = select.closest("dialog");
+
     new SlimSelect({
       select,
-      settings: placeholderText ? { placeholderText } : {},
+      settings: {
+        ...(placeholderText ? { placeholderText } : {}),
+        ...(dialog ? { contentLocation: dialog } : {}),
+      },
     });
   });
 </script>

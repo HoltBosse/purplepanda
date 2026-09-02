@@ -67,28 +67,11 @@ const defaultNavItems: NavItem[] = [
 		icon: Users,
 		subItems: [
 			{ label: 'All Users', href: '/admin/users' },
-			{ label: 'Add User', href: '/admin/users/new' },
 			{ label: 'Roles & Permissions', href: '/admin/users/roles' },
 		],
 	},
-	{
-		id: 'templates',
-		label: 'Templates',
-		icon: LayoutTemplate,
-		subItems: [
-			{ label: 'All Templates', href: '/admin/templates' },
-			{ label: 'New Template', href: '/admin/templates/new' },
-		],
-	},
-	{
-		id: 'pages',
-		label: 'Pages',
-		icon: FileText,
-		subItems: [
-			{ label: 'All Pages', href: '/admin/pages' },
-			{ label: 'New Page', href: '/admin/pages/new' },
-		],
-	},
+	{ id: 'templates', label: 'Templates', icon: LayoutTemplate, href: '/admin/templates' },
+	{ id: 'pages', label: 'Pages', icon: FileText, href: '/admin/pages' },
 	{
 		id: 'content',
 		label: 'Content',
@@ -101,7 +84,6 @@ const defaultNavItems: NavItem[] = [
 		icon: ClipboardList,
 		subItems: [
 			{ label: 'All Forms', href: '/admin/forms' },
-			{ label: 'New Form', href: '/admin/forms/new' },
 			{ label: 'Submissions', href: '/admin/forms/submissions' },
 		],
 	},

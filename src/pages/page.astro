@@ -82,7 +82,7 @@ async function resolvePlainPage(path: string) {
 
 const contentTypeRoute = matchContentTypeRoute(requestPath);
 
-const [resolved, templateSetting, fontSettings, siteName] = await Promise.all([
+const [resolved, fontSettings, siteName] = await Promise.all([
     contentTypeRoute
         ? db
             .select()
@@ -95,12 +95,14 @@ const [resolved, templateSetting, fontSettings, siteName] = await Promise.all([
             .limit(1)
             .then(rows => rows[0] ? { page: rows[0], breadcrumbs: undefined as BreadcrumbEntry[] | undefined } : undefined)
         : resolvePlainPage(requestPath),
-    resolveTemplateSetting(db, contentTypeRoute?.contentType.id),
     resolveFontSettings(db),
     resolveSiteName(db),
 ]);
 
 const matchedPage = resolved?.page;
+const templateSetting = matchedPage
+    ? await resolveTemplateSetting(db, contentTypeRoute?.contentType.id, { templateId: matchedPage.templateId, noTemplate: matchedPage.noTemplate })
+    : undefined;
 
 const headingFontFamily = extractFamilyFromLink(fontSettings.headingFontLink);
 const bodyFontFamily = extractFamilyFromLink(fontSettings.bodyFontLink);

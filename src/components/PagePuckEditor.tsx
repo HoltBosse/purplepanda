@@ -50,6 +50,8 @@ export interface PageOption {
 interface PagePuckEditorProps {
   initialData?: Data;
   templateData?: Data;
+  templateId?: string | null;
+  noTemplate?: boolean;
   saveUrl?: string;
   draftPublishUrl?: string;
   onPublish?: (data: Data) => void;
@@ -64,7 +66,27 @@ interface PagePuckEditorProps {
   dictionary?: Dictionary;
 }
 
-export default function PagePuckEditor({ initialData, templateData, saveUrl = "/admin/pages/update", draftPublishUrl, onPublish, onSave, onCommit, isDraft = false, isNew = false, pages = [], rootConfig, headingFontLink, bodyFontLink, dictionary }: PagePuckEditorProps = {}) {
+export default function PagePuckEditor({ initialData, templateData, templateId, noTemplate, saveUrl = "/admin/pages/update", draftPublishUrl, onPublish, onSave, onCommit, isDraft = false, isNew = false, pages = [], rootConfig, headingFontLink, bodyFontLink, dictionary }: PagePuckEditorProps = {}) {
+  // templateId/noTemplate are only passed in for a brand-new page (see new.astro) — an existing
+  // page's template is set once at creation and never resent, so these are omitted there and
+  // this appends nothing.
+  const appendTemplateFields = (form: HTMLFormElement) => {
+    if (templateId !== undefined) {
+      const templateIdInput = document.createElement("input");
+      templateIdInput.type = "hidden";
+      templateIdInput.name = "templateId";
+      templateIdInput.value = templateId ?? "";
+      form.appendChild(templateIdInput);
+    }
+    if (noTemplate !== undefined) {
+      const noTemplateInput = document.createElement("input");
+      noTemplateInput.type = "hidden";
+      noTemplateInput.name = "noTemplate";
+      noTemplateInput.value = String(noTemplate);
+      form.appendChild(noTemplateInput);
+    }
+  };
+
   const defaultSave = (data: Data) => {
     const form = document.createElement("form");
     form.method = "POST";
@@ -76,6 +98,7 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
     input.name = "content";
     input.value = JSON.stringify(data);
     form.appendChild(input);
+    appendTemplateFields(form);
 
     document.body.appendChild(form);
     form.submit();
@@ -102,6 +125,7 @@ export default function PagePuckEditor({ initialData, templateData, saveUrl = "/
     stateInput.name = "state";
     stateInput.value = "-1";
     form.appendChild(stateInput);
+    appendTemplateFields(form);
 
     document.body.appendChild(form);
     form.submit();

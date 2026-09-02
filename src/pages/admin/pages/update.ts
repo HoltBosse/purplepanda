@@ -73,6 +73,14 @@ export async function POST(context: APIContext): Promise<Response> {
         const committed = formData.get("state") === "-1";
         page.content = parsedContent;
         page.state = committed ? 0 : 1;
+        // Pinned by the "Choose template"/"Blank" options on the pages list New button (see
+        // index.astro, new.astro, PagePuckEditor's appendTemplateFields) — absent for the plain
+        // New button, which leaves both at their column defaults (null/false = inherit the
+        // resolved default template, same as before this feature existed).
+        const templateIdField = formData.get("templateId");
+        if (typeof templateIdField === "string") page.templateId = templateIdField || null;
+        const noTemplateField = formData.get("noTemplate");
+        if (typeof noTemplateField === "string") page.noTemplate = noTemplateField === "true";
         // `page` is synthesized from the table's column defaults above, so `page.id` is drizzle's
         // `gen_random_uuid()` SQL expression rather than a real id. Adopt the row Postgres actually
         // inserted — otherwise that expression gets re-evaluated into an unrelated uuid for the
