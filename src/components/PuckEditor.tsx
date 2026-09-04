@@ -12,7 +12,25 @@ import { ChevronDown, Save } from "../puck/icons.js";
 import { validateContentTree } from "../puck/validate-content.js";
 import { ensureTemplateSlot } from "./template-slot.js";
 
+declare global {
+  interface Window {
+    // Set by AdminBareLayout's inline script the instant it renders the loading panda (see
+    // `showLoadingPanda`) — read below so the on-screen-time floor is measured from when the
+    // panda actually became visible, not from whenever this client:only bundle got around to
+    // mounting.
+    __puckLoadingPandaStartedAt?: number;
+  }
+}
+
 const ROOT_SLOT_NAME = "default-zone";
+
+// Rendered as real server-side HTML by AdminBareLayout (see its `showLoadingPanda` prop) so it's
+// visible immediately — before this client:only bundle has even downloaded, let alone mounted.
+// markEditorReady below removes it once the canvas is actually ready.
+const LOADING_PANDA_ID = "puck-loading-panda";
+
+// See markEditorReady below for why this floor exists.
+const MIN_LOADING_PANDA_VISIBLE_MS = 500;
 
 const SLOT_ZONE_STYLE: React.CSSProperties = {
   flexGrow: 1,
@@ -72,6 +90,9 @@ function createOverrides(
   // item (see PuckEditor's isNew prop) — it POSTs to the same endpoint as Publish but persists the
   // row as state -1 instead of going live. Undefined onCommit (editing an existing item) hides it.
   commit: { isNew: boolean | undefined; onCommit: ((data: Data) => void) | undefined } | undefined,
+  // Called once Puck's AutoFrame hands back a live iframe `document` — the earliest reliable signal
+  // that the actual editor canvas (not just the surrounding chrome) is ready to interact with.
+  onEditorReady: () => void,
 ): Partial<Overrides<Config>> {
   const headingFontFamily = extractFamilyFromLink(fontLinks?.headingFontLink);
   const bodyFontFamily = extractFamilyFromLink(fontLinks?.bodyFontLink);
@@ -319,6 +340,56 @@ function createOverrides(
     },
 
     iframe: ({ children, document }) => {
+      // `document` itself becomes available the instant AutoFrame's tiny static srcDoc shell
+      // loads — essentially immediately, well before Puck has portaled the actual canvas content
+      // into #frame-root or (via AutoFrame's CopyHostStyles) finished mirroring this page's
+      // stylesheets into the iframe. Firing onEditorReady() right here swaps the loading panda
+      // for a still-empty, unstyled canvas that then pops into its real appearance a beat later —
+      // this instead polls until real content has landed and every mirrored stylesheet has
+      // resolved, so the swap reveals the actual finished editor.
+      useEffect(() => {
+        if (!document) return;
+
+        let rafId: number | undefined;
+        let settled = false;
+
+        const isCanvasReady = () => {
+          const entry = document.getElementById("frame-root");
+          if (!entry || entry.children.length === 0) return false;
+          return Array.from(document.querySelectorAll('link[rel="stylesheet"]')).every(
+            (link) => (link as HTMLLinkElement).sheet !== null,
+          );
+        };
+
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          if (rafId !== undefined) cancelAnimationFrame(rafId);
+          window.clearTimeout(fallbackId);
+          onEditorReady();
+        };
+
+        const poll = () => {
+          if (isCanvasReady()) {
+            finish();
+            return;
+          }
+          rafId = requestAnimationFrame(poll);
+        };
+
+        // A stylesheet that's slow, blocked, or fails outright (offline dev, a flaky CDN)
+        // shouldn't strand the loading screen up forever — fall back to swapping in the editor
+        // as-is.
+        const fallbackId = window.setTimeout(finish, 4000);
+        poll();
+
+        return () => {
+          settled = true;
+          if (rafId !== undefined) cancelAnimationFrame(rafId);
+          window.clearTimeout(fallbackId);
+        };
+      }, [document]);
+
       // biome-ignore lint/correctness/useExhaustiveDependencies: fontLinks?.headingFontLink/bodyFontLink are read below via a for-of over an array literal, which biome doesn't trace — removing them would let fontLinks change without re-running the effect
       useEffect(() => {
         if (!document) return;
@@ -398,6 +469,36 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
   // a plain PuckEditorProps.onPublish callback, and so can't call useTypedPuck itself.
   const dispatchRef = useRef<((action: PuckAction) => void) | null>(null);
 
+  // AdminBareLayout stamps this the instant it renders the loading panda — i.e. essentially at
+  // navigation start, well before this component's own (heavy, client:only) bundle has even
+  // downloaded. Falling back to this component's own mount time covers the case where the page
+  // didn't opt into `showLoadingPanda` (e.g. these editors' own tests), so there's still a sane
+  // floor to measure from.
+  const mountedAtRef = useRef(window.__puckLoadingPandaStartedAt ?? Date.now());
+  const readyTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(readyTimeoutRef.current), []);
+
+  // On a fast connection (or in local dev) the canvas can go from mounted to actually ready in
+  // well under a second — fast enough that the loading panda would otherwise flash on and off
+  // before it's even registered. Enforcing a minimum on-screen time keeps it a legible loading
+  // step instead of a flicker.
+  const hideLoadingPanda = useCallback(() => {
+    const panda = document.getElementById(LOADING_PANDA_ID);
+    if (!panda) return;
+    panda.style.transition = "opacity 0.3s ease-out";
+    panda.style.opacity = "0";
+    panda.style.pointerEvents = "none";
+    window.setTimeout(() => panda.remove(), 300);
+  }, []);
+  const markEditorReady = useCallback(() => {
+    const remainingMs = MIN_LOADING_PANDA_VISIBLE_MS - (Date.now() - mountedAtRef.current);
+    if (remainingMs <= 0) {
+      hideLoadingPanda();
+      return;
+    }
+    readyTimeoutRef.current = setTimeout(hideLoadingPanda, remainingMs);
+  }, [hideLoadingPanda]);
+
   // Blocks Save/Publish client-side when a component's own propsSchema (see puck/index.js), or
   // rootPropsSchema, isn't satisfied — the same check every content-persisting API route runs
   // server-side (see puck/validate-content.js), so an author gets immediate feedback instead of a
@@ -448,11 +549,16 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
 
   const overrides = useMemo(
     () =>
-      createOverrides(config, guardedOnSave, { headingFontLink, bodyFontLink }, dispatchRef, rootPropsSchema, {
-        isNew,
-        onCommit: guardedOnCommit,
-      }),
-    [config, guardedOnSave, headingFontLink, bodyFontLink, rootPropsSchema, isNew, guardedOnCommit],
+      createOverrides(
+        config,
+        guardedOnSave,
+        { headingFontLink, bodyFontLink },
+        dispatchRef,
+        rootPropsSchema,
+        { isNew, onCommit: guardedOnCommit },
+        markEditorReady,
+      ),
+    [config, guardedOnSave, headingFontLink, bodyFontLink, rootPropsSchema, isNew, guardedOnCommit, markEditorReady],
   );
 
   // Memoized because it feeds the root render below: a fresh object each render would rebuild the

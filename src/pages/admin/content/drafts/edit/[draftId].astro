@@ -31,7 +31,7 @@ const [templateSetting, fontSettings] = await Promise.all([
 
 const templateData = templateSetting?.templates?.content as Data | undefined;
 ---
-<AdminBareLayout>
+<AdminBareLayout showLoadingPanda>
     <ContentPuckEditor
         client:only="react"
         contentTypeId={entity.contentType}

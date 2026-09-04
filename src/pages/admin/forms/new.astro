@@ -25,6 +25,6 @@ if (id && !existingForm) {
 
 const editorProps = existingForm ? { initialData: existingForm.content as Data } : {};
 ---
-<AdminBareLayout>
+<AdminBareLayout showLoadingPanda>
     <FormPuckEditor client:only="react" saveUrl={saveUrl} {...editorProps} />
 </AdminBareLayout>

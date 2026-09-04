@@ -29,7 +29,7 @@ const editorProps = {
 	...(templateData ? { templateData } : {}),
 };
 ---
-<AdminBareLayout>
+<AdminBareLayout showLoadingPanda>
     <PrefabPuckEditor
         client:only="react"
 		contentTypeId={uuid}

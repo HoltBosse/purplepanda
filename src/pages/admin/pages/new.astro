@@ -71,6 +71,6 @@ const editorProps = {
 const pageOptions = allPages.map(p => ({ id: p.id, title: p.title ?? '' }));
 
 ---
-<AdminBareLayout>
+<AdminBareLayout showLoadingPanda>
     <PagePuckEditor client:only="react" saveUrl={saveUrl} isNew={!existingPage} {...editorProps} pages={pageOptions} />
 </AdminBareLayout>

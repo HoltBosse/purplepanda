@@ -20,7 +20,7 @@ const editorProps = {
 	...(templateData ? { templateData } : {}),
 };
 ---
-<AdminBareLayout>
+<AdminBareLayout showLoadingPanda>
     <PrefabPuckEditor
         client:only="react"
 		saveUrl="/admin/settings/prefab/update"

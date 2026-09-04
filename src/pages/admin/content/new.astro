@@ -51,7 +51,7 @@ const editorProps = {
     ...(fontSettings.bodyFontLink ? { bodyFontLink: fontSettings.bodyFontLink } : {}),
 };
 ---
-<AdminBareLayout>
+<AdminBareLayout showLoadingPanda>
     <ContentPuckEditor
         client:only="react"
         contentTypeId={typeId}

@@ -1,8 +1,21 @@
 ---
 import '../styles/global.css';
 import { eq } from 'drizzle-orm';
+import loadingPandaSVGRaw from '../components/LoadingPanda.svg?raw';
 import { getDb } from '../db/db.js';
 import { users } from '../db/schema.js';
+
+interface Props {
+	// The slotted content is a heavy client:only React island (a Puck editor) that renders
+	// nothing until its whole JS bundle downloads, parses and runs — on a throttled connection
+	// that can take seconds, during which client:only content literally cannot show anything of
+	// its own. Opting in here renders a loading panda as real server-rendered HTML instead, so it
+	// appears with the rest of the page and isn't gated on that bundle at all. The island removes
+	// it once it's actually ready — see PuckEditor.tsx's markEditorReady.
+	showLoadingPanda?: boolean;
+}
+
+const { showLoadingPanda = false } = Astro.props;
 
 const db = getDb();
 
@@ -10,6 +23,14 @@ const userId = await Astro.session?.get('userId');
 const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
 const theme = user && user.theme !== 'system' ? user.theme : undefined;
+
+// Same extraction trick as login.astro's LoginPanda: SVGator ships the animation as a <script>
+// that loads its player from a CDN — reinjected below via is:inline + define:vars so Astro's
+// default script processing doesn't mangle it.
+const loadingPandaScriptMatch = loadingPandaSVGRaw.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+const loadingPandaSvgatorScript = loadingPandaScriptMatch?.[1]
+	?.replace(/^\s*<!\[CDATA\[\s*/, '').replace(/\s*\]\]>\s*$/, '') ?? '';
+const loadingPandaSvgInline = loadingPandaSVGRaw.replace(/<script[^>]*>[\s\S]*?<\/script>/, '');
 ---
 <!DOCTYPE html>
 <html lang="en" data-theme={theme}>
@@ -21,6 +42,32 @@ const theme = user && user.theme !== 'system' ? user.theme : undefined;
 	<link rel="icon" href="/admin/assets/favicon.ico" />
 </head>
 <body class="h-screen overflow-x-hidden">
+	{showLoadingPanda && (
+		<Fragment>
+			{/* Rendered before the slot on purpose: the slot's client:only island can carry a
+			    sizeable serialized props payload (e.g. every page's id/title for a "parent page"
+			    picker) in its own HTML attribute, and a browser can't act on bytes it hasn't
+			    received yet — putting the panda after it would mean waiting out that payload
+			    first, on a throttled connection, before the panda even reaches the DOM. */}
+			<div
+				id="puck-loading-panda"
+				role="status"
+				aria-label="Loading editor"
+				style="position: fixed; left: 20px; bottom: 0; z-index: 9999; width: 160px; height: 160px; pointer-events: none;"
+			>
+				<div style="width: 100%; height: 100%;" set:html={loadingPandaSvgInline} />
+			</div>
+			<script is:inline define:vars={{ loadingPandaSvgatorScript }}>
+				window.__puckLoadingPandaStartedAt = Date.now();
+				if (loadingPandaSvgatorScript) {
+					const script = document.createElement('script');
+					script.textContent = loadingPandaSvgatorScript;
+					document.body.appendChild(script);
+					document.body.removeChild(script);
+				}
+			</script>
+		</Fragment>
+	)}
 	<slot />
 </body>
 </html>

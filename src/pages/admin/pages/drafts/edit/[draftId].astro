@@ -40,7 +40,7 @@ const templateSetting = await resolveTemplateSetting(db, page?.contentType ?? un
 const templateData = templateSetting?.templates?.content as Data | undefined;
 const pageOptions = allPages.map(p => ({ id: p.id, title: p.title ?? '' }));
 ---
-<AdminBareLayout>
+<AdminBareLayout showLoadingPanda>
     <PagePuckEditor
         client:only="react"
         saveUrl={saveUrl}
