@@ -240,7 +240,6 @@ for (const templateId of allTemplates.map(t => t.id)) {
                             name="selected[]"
                             value={template.id}
                         />
-                        <span class="text-sm text-base-content/60">Select</span>
                     </label>
                     <div class="flex items-center gap-1">
                         <form action={`/admin/templates/toggle/${template.id}`} method="POST">

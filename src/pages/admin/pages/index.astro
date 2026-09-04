@@ -477,7 +477,6 @@ const totalPageCount = Math.ceil(totalItems / itemsPerPage);
                                         name="selected[]"
                                         value={page.id}
                                     />
-                                    <span class="text-sm text-base-content/60">Select</span>
                                 </label>
                                 <div class="flex items-center gap-1">
                                     <form action={`/admin/pages/toggle/${page.id}`} method="POST">

@@ -239,7 +239,6 @@ for (const row of userRoleRows) {
                             name="selected[]"
                             value={user.id}
                         />
-                        <span class="text-sm text-base-content/60">Select</span>
                     </label>
                     <form action={`/admin/users/toggle/${user.id}`} method="POST">
                         <button type="submit" class="btn btn-square btn-sm">
