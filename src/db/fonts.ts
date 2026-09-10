@@ -1,6 +1,5 @@
-import { inArray } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { settings } from './schema.js';
+import { getSetting } from './content-cache.js';
 
 export interface FontSettings {
     headingFontLink: string | undefined;
@@ -10,13 +9,13 @@ export interface FontSettings {
 export async function resolveFontSettings(
     db: NodePgDatabase<Record<string, unknown>>,
 ): Promise<FontSettings> {
-    const rows = await db
-        .select()
-        .from(settings)
-        .where(inArray(settings.key, ['heading_font_link', 'body_font_link']));
+    const [headingFontLink, bodyFontLink] = await Promise.all([
+        getSetting(db, 'heading_font_link'),
+        getSetting(db, 'body_font_link'),
+    ]);
 
     return {
-        headingFontLink: rows.find((row) => row.key === 'heading_font_link')?.value as string | undefined,
-        bodyFontLink: rows.find((row) => row.key === 'body_font_link')?.value as string | undefined,
+        headingFontLink: headingFontLink as string | undefined,
+        bodyFontLink: bodyFontLink as string | undefined,
     };
 }

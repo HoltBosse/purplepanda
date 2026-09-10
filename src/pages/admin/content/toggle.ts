@@ -1,6 +1,7 @@
 import type { APIContext } from "astro";
 import { eq } from "drizzle-orm";
 import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
+import { invalidatePagesCache } from "../../../db/content-cache.js";
 import { getDb } from "../../../db/db.js";
 import { pages } from "../../../db/schema.js";
 
@@ -23,6 +24,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const newState = page.state === 1 ? 0 : 1;
     await db.update(pages).set({ state: newState }).where(eq(pages.id, id));
+    invalidatePagesCache();
 
     const alert = createAlert(alertType.success, newState === 1 ? "Content enabled." : "Content disabled.");
     await addAlertToSession(context.session, alert);

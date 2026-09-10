@@ -1,6 +1,7 @@
 import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { APIContext } from "astro";
 import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
+import { invalidateSettingsCache } from "../../../db/content-cache.js";
 import { getDb } from "../../../db/db.js";
 import { settings } from "../../../db/schema.js";
 import { createUserAlertMessageFromArray, formDataToRecord, getFieldByName, validateForm } from "../../../form/index.js";
@@ -88,6 +89,8 @@ export async function POST(context: APIContext): Promise<Response> {
             .values({ key: templateSettingKey, value: templateValue })
             .onConflictDoUpdate({ target: settings.key, set: { value: templateValue } });
     }
+
+    invalidateSettingsCache();
 
     await formFlash.delete('settings');
     const alert = createAlert(alertType.success, "Settings updated successfully.");

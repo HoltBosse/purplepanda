@@ -3,12 +3,13 @@ import '../styles/global.css';
 import { has404Page } from 'virtual:purplepanda/has-404';
 import externalPuckConfig from 'virtual:purplepanda/puck-config';
 import type { Data } from '@puckeditor/core';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { BreadcrumbList } from 'schema-dts';
 import PageRenderer from '../components/PageRenderer.js';
+import { getContentTypePage, getPlainPageForPath } from '../db/content-cache.js';
 import { getDb } from '../db/db.js';
 import { resolveFontSettings } from '../db/fonts.js';
-import { pages, redirects } from '../db/schema.js';
+import { redirects } from '../db/schema.js';
 import { formatPageTitle, resolveSiteName } from '../db/site.js';
 import { resolveTemplateSetting } from '../db/templates.js';
 import { extractFamilyFromLink } from '../form/fields/font-utils.js';
@@ -45,56 +46,13 @@ function matchContentTypeRoute(path: string) {
 
 type BreadcrumbEntry = { title: string; path: string };
 
-async function resolvePlainPage(path: string) {
-    const allPages = await db.select().from(pages).where(and(eq(pages.state, 1), isNull(pages.contentType)));
-    const pageById = new Map(allPages.map(p => [p.id, p]));
-
-    function getPagePath(page: typeof allPages[0], visited = new Set<string>()): string {
-        if (visited.has(page.id)) return '';
-        const content = page.content as any;
-        const alias: string = content?.root?.props?.alias ?? '';
-        const parentId: string = content?.root?.props?.parentPage ?? '';
-        if (parentId && pageById.has(parentId)) {
-            const parentPath = getPagePath(pageById.get(parentId)!, new Set([...visited, page.id]));
-            return parentPath ? `${parentPath}/${alias}` : alias;
-        }
-        return alias;
-    }
-
-    // Walks a page's parentPage chain to build its breadcrumb trail, using each ancestor's own
-    // title prop (falling back to its alias) rather than the raw slug segment.
-    function getBreadcrumbs(page: typeof allPages[0], visited = new Set<string>()): BreadcrumbEntry[] {
-        if (visited.has(page.id)) return [];
-        const content = page.content as any;
-        const alias: string = content?.root?.props?.alias ?? '';
-        const title: string = content?.root?.props?.title || alias;
-        const parentId: string = content?.root?.props?.parentPage ?? '';
-        const parent = parentId ? pageById.get(parentId) : undefined;
-        const ancestors = parent ? getBreadcrumbs(parent, new Set([...visited, page.id])) : [];
-        const parentPath = ancestors[ancestors.length - 1]?.path ?? '';
-        return [...ancestors, { title, path: parentPath ? `${parentPath}/${alias}` : alias }];
-    }
-
-    const pathToPage = new Map(allPages.map(p => [getPagePath(p), p]));
-    const page = pathToPage.get(path);
-    return page ? { page, breadcrumbs: getBreadcrumbs(page) } : undefined;
-}
-
 const contentTypeRoute = matchContentTypeRoute(requestPath);
 
 const [resolved, fontSettings, siteName] = await Promise.all([
     contentTypeRoute
-        ? db
-            .select()
-            .from(pages)
-            .where(and(
-                eq(pages.state, 1),
-                eq(pages.contentType, contentTypeRoute.contentType.id),
-                sql`(${pages.content}->'root'->'props'->>'alias') = ${contentTypeRoute.alias}`
-            ))
-            .limit(1)
-            .then(rows => rows[0] ? { page: rows[0], breadcrumbs: undefined as BreadcrumbEntry[] | undefined } : undefined)
-        : resolvePlainPage(requestPath),
+        ? getContentTypePage(db, contentTypeRoute.contentType.id, contentTypeRoute.alias)
+            .then(page => page ? { page, breadcrumbs: undefined as BreadcrumbEntry[] | undefined } : undefined)
+        : getPlainPageForPath(db, requestPath),
     resolveFontSettings(db),
     resolveSiteName(db),
 ]);

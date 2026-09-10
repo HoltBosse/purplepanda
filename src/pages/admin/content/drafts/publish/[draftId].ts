@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import * as z from "zod";
 import { addAction } from "../../../../../actions/index.js";
 import { addAlertToSession, alertType, createAlert } from "../../../../../alert/index.js";
+import { invalidatePagesCache } from "../../../../../db/content-cache.js";
 import { getDb } from "../../../../../db/db.js";
 import { dagNodes, pages } from "../../../../../db/schema.js";
 import { runOverride } from "../../../../../hooks/index.js";
@@ -56,6 +57,7 @@ export async function POST(context: APIContext): Promise<Response> {
     // currently live rather than attempting to merge with changes made to the main
     // branch since the draft was created.
     await db.update(pages).set({ content: parsedContent }).where(eq(pages.id, entity.id));
+    invalidatePagesCache();
 
     // Mark the draft as merged so it drops out of the active drafts list, then log a
     // publish node whose parent is the draft tip -- this is what lets HistoryView draw

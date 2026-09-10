@@ -1,6 +1,7 @@
 import type { APIContext } from "astro";
 import { inArray } from "drizzle-orm";
 import { z } from "zod";
+import { invalidatePagesCache } from "../../../../db/content-cache.js";
 import { getDb } from "../../../../db/db.js";
 import { pages } from "../../../../db/schema.js";
 
@@ -32,6 +33,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const db = getDb();
     await db.update(pages).set({ state: stateMap[action as Action] }).where(inArray(pages.id, result.data));
+    invalidatePagesCache();
 
     return context.redirect(`/admin/content/${typeId}`);
 }

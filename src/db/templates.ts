@@ -1,6 +1,5 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { settings, templates } from './schema.js';
+import { getTemplateById, getTemplateForSettingsKey } from './content-cache.js';
 
 /**
  * Resolves the template that applies for a given content type, falling back
@@ -18,30 +17,15 @@ export async function resolveTemplateSetting(
     if (pageTemplate?.noTemplate) return undefined;
 
     if (pageTemplate?.templateId) {
-        const [row] = await db
-            .select()
-            .from(templates)
-            .where(and(eq(templates.id, pageTemplate.templateId), eq(templates.state, 1)))
-            .limit(1);
-        return row ? { templates: row } : undefined;
+        const template = await getTemplateById(db, pageTemplate.templateId);
+        return template && template.state === 1 ? { templates: template } : undefined;
     }
-
-    const keys = contentTypeId
-        ? [`content_default_template_${contentTypeId}`, 'default_template']
-        : ['default_template'];
-
-    const rows = await db
-        .select()
-        .from(settings)
-        .leftJoin(templates, sql`(${templates.id})::text = (${settings.value} #>> '{}')`)
-        .where(inArray(settings.key, keys));
 
     if (contentTypeId) {
-        const contentTemplate = rows.find(
-            (row) => row.settings.key === `content_default_template_${contentTypeId}` && row.templates,
-        );
-        if (contentTemplate) return contentTemplate;
+        const contentTemplate = await getTemplateForSettingsKey(db, `content_default_template_${contentTypeId}`);
+        if (contentTemplate) return { templates: contentTemplate };
     }
 
-    return rows.find((row) => row.settings.key === 'default_template' && row.templates);
+    const defaultTemplate = await getTemplateForSettingsKey(db, 'default_template');
+    return defaultTemplate ? { templates: defaultTemplate } : undefined;
 }

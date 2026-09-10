@@ -3,7 +3,9 @@ import { inArray } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { addAlertToSession, alertType, createAlert } from "../alert/index.js";
+import { invalidatePagesCache, invalidateTemplatesCache } from "../db/content-cache.js";
 import { getDb } from "../db/db.js";
+import { pages, templates } from "../db/schema.js";
 
 const ACTIONS = ["publish", "unpublish", "delete"] as const;
 type Action = typeof ACTIONS[number];
@@ -46,6 +48,9 @@ export function createBulkHandler(table: PgTable & { id: any; state: any }, redi
 
         const db = getDb();
         await db.update(table).set({ state: stateMap[action] }).where(inArray(table.id, result.data));
+
+        if (table === pages) invalidatePagesCache();
+        else if (table === templates) invalidateTemplatesCache();
 
         return context.redirect(redirectTo);
     };

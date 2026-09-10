@@ -1,6 +1,7 @@
 import type { APIContext } from "astro";
 import { and, eq } from "drizzle-orm";
 import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
+import { invalidatePagesCache } from "../../../db/content-cache.js";
 import { getDb } from "../../../db/db.js";
 import { pages, templates } from "../../../db/schema.js";
 
@@ -39,6 +40,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     // A specific template is now pinned, so any earlier "no template" choice no longer applies.
     await db.update(pages).set({ templateId, noTemplate: false }).where(eq(pages.id, id));
+    invalidatePagesCache();
 
     const alert = createAlert(alertType.success, "Template updated.");
     await addAlertToSession(context.session, alert);

@@ -4,6 +4,7 @@ import { and, desc, eq, getTableColumns, type InferSelectModel } from 'drizzle-o
 import * as z from "zod";
 import { addAction } from "../../../actions/index.js";
 import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
+import { invalidateTemplatesCache } from "../../../db/content-cache.js";
 import { getDb } from "../../../db/db.js";
 import { dagNodes, templates } from "../../../db/schema.js";
 import { runOverride } from "../../../hooks/index.js";
@@ -88,6 +89,8 @@ export async function POST(context: APIContext): Promise<Response> {
     } else {
         await db.update(templates).set({ content: parsedContent }).where(eq(templates.id, template.id));
     }
+
+    invalidateTemplatesCache();
 
     const [latestPublishNode] = await db
         .select()
