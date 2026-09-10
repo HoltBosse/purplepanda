@@ -255,7 +255,11 @@ for (const [pageId, path] of livePathEntries) {
                                     <div class="font-bold link link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</div>
                                 </a>
                                 {notes && (
-                                    <div class="tooltip tooltip-top before:whitespace-pre-line before:text-left" data-tip={notes}>
+                                    // z-20: without an explicit z-index the tooltip's popup (which only
+                                    // sets z-index on its own :before pseudo-element) competes in the page
+                                    // root's stacking context, where SearchBar's z-[5] wrapper (see
+                                    // SearchBar.tsx) paints over it for rows near the top of the table.
+                                    <div class="tooltip tooltip-top z-20 before:whitespace-pre-line before:text-left" data-tip={notes}>
                                         <MessageSquare size={14} class="text-base-content/60" />
                                     </div>
                                 )}
@@ -466,7 +470,8 @@ for (const [pageId, path] of livePathEntries) {
                                         <span class="font-bold link link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</span>
                                     </a>
                                     {notes && (
-                                        <div class="tooltip tooltip-top before:whitespace-pre-line before:text-left" data-tip={notes}>
+                                        // z-20: see the desktop row above.
+                                        <div class="tooltip tooltip-top z-20 before:whitespace-pre-line before:text-left" data-tip={notes}>
                                             <MessageSquare size={14} class="text-base-content/60" />
                                         </div>
                                     )}

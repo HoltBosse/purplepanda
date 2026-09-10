@@ -348,7 +348,14 @@ const totalPageCount = Math.ceil(totalItems / itemsPerPage);
                                             </div>
                                         </a>
                                         {notes && (
-                                            <div class="tooltip tooltip-top before:whitespace-pre-line before:text-left" data-tip={notes}>
+                                            // z-20: the tooltip's popup content only gets a z-index (2) on
+                                            // its own :before pseudo-element, which competes in whatever
+                                            // stacking context the nearest positioned ancestor happens to
+                                            // sit in. Without an explicit z-index here, that context is the
+                                            // page root, where SearchBar's z-[5] wrapper (see SearchBar.tsx)
+                                            // paints over it whenever a note near the top of the table pops
+                                            // up into the search bar's area.
+                                            <div class="tooltip tooltip-top z-20 before:whitespace-pre-line before:text-left" data-tip={notes}>
                                                 <MessageSquare size={14} class="text-base-content/60" />
                                             </div>
                                         )}
@@ -586,7 +593,9 @@ const totalPageCount = Math.ceil(totalItems / itemsPerPage);
                                                 </div>
                                             </a>
                                             {notes && (
-                                                <div class="tooltip tooltip-top before:whitespace-pre-line before:text-left" data-tip={notes}>
+                                                // z-20: see the desktop row above — without this the
+                                                // tooltip's popup renders under SearchBar's z-[5] wrapper.
+                                                <div class="tooltip tooltip-top z-20 before:whitespace-pre-line before:text-left" data-tip={notes}>
                                                     <MessageSquare size={14} class="text-base-content/60" />
                                                 </div>
                                             )}
