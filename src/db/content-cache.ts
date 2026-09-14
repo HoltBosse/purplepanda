@@ -1,7 +1,7 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { pages, templates, settings } from "./schema.js";
+import { pages, settings, templates } from "./schema.js";
 
 type Db = NodePgDatabase<Record<string, unknown>>;
 type PageRow = InferSelectModel<typeof pages>;

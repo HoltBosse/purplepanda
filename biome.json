@@ -10,6 +10,7 @@
 			"**",
 			"!!**/dist",
 			"!!src/components/LoginPanda.svg",
+			"!!src/components/LoadingPanda.svg",
 			"!!src/components/404.svg"
 		]
 	},
