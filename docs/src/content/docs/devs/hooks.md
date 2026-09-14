@@ -31,7 +31,7 @@ import { ssoOverridePlugin } from "./purplepanda-plugins/sso-override.js";
 export default defineConfig({
   integrations: [
     purplePandaIntegration({
-      db,
+      dbModule: "./src/db/index.js",
       mediaPath: "./media",
       documentPath: "./documents",
       puckConfigModule: "./src/puck/config.tsx",

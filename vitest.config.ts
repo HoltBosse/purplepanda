@@ -42,6 +42,7 @@ export default getViteConfig({
     projects: [
       {
         extends: true,
+        plugins: [purplePandaVirtualModules()],
         test: {
           name: 'unit',
           exclude: [...commonExclude, browserTests],

@@ -1,11 +1,6 @@
-const GLOBAL_KEY = "__purplepanda_document_path";
-
-export function setDocumentPath(path: string) {
-  (globalThis as Record<string, unknown>)[GLOBAL_KEY] = path;
-}
+import documentPath from "virtual:purplepanda/document-path";
 
 export function getDocumentPath(): string {
-  const path = (globalThis as Record<string, unknown>)[GLOBAL_KEY] as string | undefined;
-  if (!path) throw new Error("[purplepanda] No document path provided. Pass `documentPath` to purplePandaIntegration().");
-  return path;
+  if (!documentPath) throw new Error("[purplepanda] No document path provided. Pass `documentPath` to purplePandaIntegration().");
+  return documentPath;
 }

@@ -1,8 +1,8 @@
 import type { Plugin } from 'vite';
 
 // The Astro integration (src/index.ts) injects these virtual modules at build time from the host
-// app's own Puck config. Browser tests run without Astro, so any component importing one is
-// otherwise unloadable. This supplies the same module shape.
+// app's own config (Puck config, db, media/document paths). Tests run without Astro, so any
+// module importing one is otherwise unloadable. This supplies the same module shape.
 //
 // `puck-config` registers two throwaway components so tests can assert *where* content ends up:
 //   Block   — renders a leaf marked with its id
@@ -34,6 +34,9 @@ const MODULES: Record<string, string> = {
   'virtual:purplepanda/puck-config': PUCK_CONFIG,
   'virtual:purplepanda/has-404': 'export const has404Page = false;',
   'virtual:purplepanda/islands': 'export default {};',
+  'virtual:purplepanda/db': 'export default {};',
+  'virtual:purplepanda/media-path': 'export default "/tmp/purplepanda-test-media";',
+  'virtual:purplepanda/document-path': 'export default null;',
 };
 
 export function purplePandaVirtualModules(): Plugin {

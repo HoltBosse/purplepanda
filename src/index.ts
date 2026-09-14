@@ -3,12 +3,8 @@ import { extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import type { AstroIntegration } from "astro";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { setDb } from "./db/db.js";
-import { setDocumentPath } from "./document/document.js";
 import { type PurplePandaPlugin, registerPlugins } from "./hooks/index.js";
 import { generateIslandsManifest } from "./islands-manifest.js";
-import { setMediaPath } from "./media/media.js";
 
 const VIRTUAL_PUCK_CONFIG_ID = "virtual:purplepanda/puck-config";
 const RESOLVED_VIRTUAL_PUCK_CONFIG_ID = `\0${VIRTUAL_PUCK_CONFIG_ID}`;
@@ -21,13 +17,38 @@ const RESOLVED_VIRTUAL_HAS_404_ID = `\0${VIRTUAL_HAS_404_ID}`;
 const VIRTUAL_ISLANDS_ID = "virtual:purplepanda/islands";
 const RESOLVED_VIRTUAL_ISLANDS_ID = `\0${VIRTUAL_ISLANDS_ID}`;
 
+// db/media-path/document-path used to be handed to the integration as live values and stashed on
+// `globalThis` (setDb/setMediaPath/setDocumentPath) from this `astro:config:setup` hook. That only
+// ever runs inside an Astro CLI process (`astro dev`/`astro build`/`astro preview`), which loads
+// astro.config.mjs — but a built `output: 'server'` app run standalone (`node
+// dist/server/entry.mjs`, as PM2/Docker/systemd would) never loads astro.config.mjs at all, so
+// those globals were never set and every request 500'd. Baking the resolved module path into a
+// virtual module's source instead (same trick puckConfigModule already used) means Vite/Rollup
+// bundles the real `import` into the SSR output itself, so it's live in *any* process that runs
+// that bundle, standalone or not.
+const VIRTUAL_DB_ID = "virtual:purplepanda/db";
+const RESOLVED_VIRTUAL_DB_ID = `\0${VIRTUAL_DB_ID}`;
+
+const VIRTUAL_MEDIA_PATH_ID = "virtual:purplepanda/media-path";
+const RESOLVED_VIRTUAL_MEDIA_PATH_ID = `\0${VIRTUAL_MEDIA_PATH_ID}`;
+
+const VIRTUAL_DOCUMENT_PATH_ID = "virtual:purplepanda/document-path";
+const RESOLVED_VIRTUAL_DOCUMENT_PATH_ID = `\0${VIRTUAL_DOCUMENT_PATH_ID}`;
+
 export interface PurplePandaIntegrationOptions {
   enabled?: boolean;
-  db?: NodePgDatabase<Record<string, unknown>>;
+  // Path to a module (relative to the project root, or a bare specifier) whose default export is
+  // the drizzle db instance — not a live instance, so it can be re-imported by the actual SSR
+  // bundle rather than only existing in whatever process configured the integration.
+  dbModule?: string;
   mediaPath?: string;
   documentPath?: string;
   puckConfigModule?: string;
   plugins?: PurplePandaPlugin[];
+}
+
+function resolveOptionModulePath(modulePath: string, rootDir: string): string {
+  return modulePath.startsWith(".") ? resolve(rootDir, modulePath) : modulePath;
 }
 
 const MIME_TYPES: Record<string, string> = {
@@ -69,11 +90,9 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
       "astro:config:setup": ({ updateConfig, injectScript, addMiddleware, injectRoute, logger, config }) => {
         if (options.enabled === false) return;
 
-        if (options.db) {
-          setDb(options.db);
-        } else {
+        if (!options.dbModule) {
           //error out if no db provided, since it's required for the integration to work
-          throw new Error("[purple-panda] No db provided. Pass `db` to purplePandaIntegration().");
+          throw new Error("[purple-panda] No dbModule provided. Pass `dbModule` to purplePandaIntegration().");
         }
 
         if(options.mediaPath) {
@@ -81,17 +100,12 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
           if (!existsSync(options.mediaPath) || !statSync(options.mediaPath).isDirectory()) {
             throw new Error(`[purple-panda] Invalid media path provided: ${options.mediaPath}. It must be a valid directory.`);
           }
-
-          setMediaPath(options.mediaPath);
         } else {
           throw new Error("[purple-panda] No media path provided. Pass `mediaPath` to purplePandaIntegration().");
         }
 
-        if (options.documentPath) {
-          if (!existsSync(options.documentPath) || !statSync(options.documentPath).isDirectory()) {
-            throw new Error(`[purple-panda] Invalid document path provided: ${options.documentPath}. It must be a valid directory.`);
-          }
-          setDocumentPath(options.documentPath);
+        if (options.documentPath && (!existsSync(options.documentPath) || !statSync(options.documentPath).isDirectory())) {
+          throw new Error(`[purple-panda] Invalid document path provided: ${options.documentPath}. It must be a valid directory.`);
         }
 
         registerPlugins(options.plugins ?? []);
@@ -177,6 +191,9 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
                   if (id === VIRTUAL_PUCK_CONFIG_ID) return RESOLVED_VIRTUAL_PUCK_CONFIG_ID;
                   if (id === VIRTUAL_HAS_404_ID) return RESOLVED_VIRTUAL_HAS_404_ID;
                   if (id === VIRTUAL_ISLANDS_ID) return RESOLVED_VIRTUAL_ISLANDS_ID;
+                  if (id === VIRTUAL_DB_ID) return RESOLVED_VIRTUAL_DB_ID;
+                  if (id === VIRTUAL_MEDIA_PATH_ID) return RESOLVED_VIRTUAL_MEDIA_PATH_ID;
+                  if (id === VIRTUAL_DOCUMENT_PATH_ID) return RESOLVED_VIRTUAL_DOCUMENT_PATH_ID;
                   return null;
                 },
                 async load(id) {
@@ -184,12 +201,24 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
                     return `export const has404Page = ${has404Page};`;
                   }
 
+                  if (id === RESOLVED_VIRTUAL_DB_ID) {
+                    // Validated non-empty in astro:config:setup above.
+                    const modulePath = resolveOptionModulePath(options.dbModule!, fileURLToPath(config.root));
+                    return `export { default } from ${JSON.stringify(modulePath)};`;
+                  }
+
+                  if (id === RESOLVED_VIRTUAL_MEDIA_PATH_ID) {
+                    return `export default ${JSON.stringify(options.mediaPath)};`;
+                  }
+
+                  if (id === RESOLVED_VIRTUAL_DOCUMENT_PATH_ID) {
+                    return `export default ${JSON.stringify(options.documentPath ?? null)};`;
+                  }
+
                   const puckConfigModulePath = () => {
                     if (!options.puckConfigModule) return null;
                     const rootDir = fileURLToPath(config.root);
-                    return options.puckConfigModule.startsWith(".")
-                      ? resolve(rootDir, options.puckConfigModule)
-                      : options.puckConfigModule;
+                    return resolveOptionModulePath(options.puckConfigModule, rootDir);
                   };
 
                   if (id === RESOLVED_VIRTUAL_ISLANDS_ID) {

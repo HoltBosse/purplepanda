@@ -16,3 +16,20 @@ declare module "virtual:purplepanda/islands" {
   const loaders: Record<string, () => Promise<ComponentConfig>>;
   export default loaders;
 }
+
+declare module "virtual:purplepanda/db" {
+  import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+
+  const db: NodePgDatabase<Record<string, unknown>>;
+  export default db;
+}
+
+declare module "virtual:purplepanda/media-path" {
+  const mediaPath: string;
+  export default mediaPath;
+}
+
+declare module "virtual:purplepanda/document-path" {
+  const documentPath: string | null;
+  export default documentPath;
+}
