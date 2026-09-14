@@ -1,9 +1,15 @@
 import type { InferSelectModel } from "drizzle-orm";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { Pool, PoolClient } from "pg";
 import { pages, settings, templates } from "./schema.js";
 
-type Db = NodePgDatabase<Record<string, unknown>>;
+// `$client` is optional in this type (even though the ambient `virtual:purplepanda/db` module
+// always provides one for a real drizzle(pool) instance) so callers that only have the plain
+// `NodePgDatabase` type from getDb()'s public-facing callers (site.ts, fonts.ts, templates.ts)
+// don't need to thread a stricter type through their own signatures — the functions below already
+// guard every `$client` use for exactly this reason.
+type Db = NodePgDatabase<Record<string, unknown>> & { $client?: Pool };
 type PageRow = InferSelectModel<typeof pages>;
 type TemplateRow = InferSelectModel<typeof templates>;
 
@@ -17,6 +23,17 @@ type PageWithBreadcrumbs = { page: PageRow; breadcrumbs: BreadcrumbEntry[] };
 // the life of the server rather than on a TTL, and those handlers call the invalidate* functions
 // below after writing. A `*Loading` promise alongside each cache guards against a thundering herd
 // of concurrent requests all missing the cache at once and firing the same query repeatedly.
+//
+// Under PM2 cluster mode (or any multi-process deployment on one host) each worker holds its own
+// copy of these caches, so a write handled by worker A must also tell workers B..N to drop theirs
+// — a bare in-process invalidate() only clears A's copy. Postgres LISTEN/NOTIFY does that
+// broadcast without adding new infrastructure (every worker already has the same Postgres): each
+// worker LISTENs on one channel via a dedicated connection, and invalidate*() both clears its own
+// cache immediately (so the writer's own worker doesn't wait on the round trip) and NOTIFYs the
+// channel so the others do the same.
+const CACHE_CHANNEL = "purplepanda_cache_invalidate";
+type CacheKind = "settings" | "templates" | "pages";
+
 let settingsCache: Map<string, unknown> | null = null;
 let settingsLoading: Promise<Map<string, unknown>> | null = null;
 
@@ -29,24 +46,90 @@ let pageTreeLoading: Promise<Map<string, PageWithBreadcrumbs>> | null = null;
 const contentTypePageCache = new Map<string, PageRow | undefined>();
 const contentTypePageLoading = new Map<string, Promise<PageRow | undefined>>();
 
-export function invalidateSettingsCache(): void {
+function clearSettingsCacheLocal(): void {
   settingsCache = null;
   settingsLoading = null;
 }
 
-export function invalidateTemplatesCache(): void {
+function clearTemplatesCacheLocal(): void {
   templatesCache = null;
   templatesLoading = null;
 }
 
-export function invalidatePagesCache(): void {
+function clearPagesCacheLocal(): void {
   pageTreeCache = null;
   pageTreeLoading = null;
   contentTypePageCache.clear();
   contentTypePageLoading.clear();
 }
 
+let listenerClient: PoolClient | null = null;
+let listenerConnecting = false;
+
+// Idempotent and cheap to call before every cache read — only actually connects once per worker.
+// A dropped LISTEN connection (network blip, Postgres restart) would otherwise leave a worker
+// permanently deaf to the others' invalidations, so it reconnects on error instead of giving up.
+//
+// `db.$client` is only guaranteed to be a real `pg.Pool` when the host app's dbModule wraps one
+// (as documented) — a test double or a differently-shaped client degrades to local-only
+// invalidation rather than throwing, since a single process still behaves correctly without it.
+function ensureListening(db: Db): void {
+  if (listenerClient || listenerConnecting || typeof db.$client?.connect !== "function") return;
+  listenerConnecting = true;
+
+  db.$client
+    .connect()
+    .then((client) => {
+      client.on("notification", (msg) => {
+        if (msg.channel !== CACHE_CHANNEL) return;
+        const kind = msg.payload as CacheKind | undefined;
+        if (kind === "settings") clearSettingsCacheLocal();
+        else if (kind === "templates") clearTemplatesCacheLocal();
+        else if (kind === "pages") clearPagesCacheLocal();
+      });
+      client.on("error", (err) => {
+        console.error("[purplepanda] cache invalidation listener connection error, reconnecting", err);
+        listenerClient = null;
+        ensureListening(db);
+      });
+      return client.query(`LISTEN ${CACHE_CHANNEL}`).then(() => {
+        listenerClient = client;
+      });
+    })
+    .catch((err) => {
+      // Retried the next time a cache read calls ensureListening(); until then this worker just
+      // won't hear invalidations from the others (its own writes still clear its local cache).
+      console.error("[purplepanda] failed to start cache invalidation listener", err);
+    })
+    .finally(() => {
+      listenerConnecting = false;
+    });
+}
+
+function broadcastInvalidation(db: Db, kind: CacheKind): void {
+  if (typeof db.$client?.query !== "function") return;
+  db.$client.query("SELECT pg_notify($1, $2)", [CACHE_CHANNEL, kind]).catch((err) => {
+    console.error(`[purplepanda] failed to broadcast ${kind} cache invalidation`, err);
+  });
+}
+
+export function invalidateSettingsCache(db: Db): void {
+  clearSettingsCacheLocal();
+  broadcastInvalidation(db, "settings");
+}
+
+export function invalidateTemplatesCache(db: Db): void {
+  clearTemplatesCacheLocal();
+  broadcastInvalidation(db, "templates");
+}
+
+export function invalidatePagesCache(db: Db): void {
+  clearPagesCacheLocal();
+  broadcastInvalidation(db, "pages");
+}
+
 async function loadSettingsMap(db: Db): Promise<Map<string, unknown>> {
+  ensureListening(db);
   if (settingsCache) return settingsCache;
   if (!settingsLoading) {
     settingsLoading = db.select().from(settings).then((rows) => {
@@ -64,6 +147,7 @@ export async function getSetting(db: Db, key: string): Promise<unknown> {
 }
 
 async function loadTemplatesMap(db: Db): Promise<Map<string, TemplateRow>> {
+  ensureListening(db);
   if (templatesCache) return templatesCache;
   if (!templatesLoading) {
     templatesLoading = db.select().from(templates).then((rows) => {
@@ -120,6 +204,7 @@ function buildPagePath(page: PageRow, pageById: Map<string, PageRow>, visited = 
 }
 
 async function loadPageTree(db: Db): Promise<Map<string, PageWithBreadcrumbs>> {
+  ensureListening(db);
   if (pageTreeCache) return pageTreeCache;
   if (!pageTreeLoading) {
     pageTreeLoading = db
@@ -145,6 +230,7 @@ export async function getPlainPageForPath(db: Db, path: string): Promise<PageWit
 }
 
 export async function getContentTypePage(db: Db, contentTypeId: string, alias: string): Promise<PageRow | undefined> {
+  ensureListening(db);
   const key = `${contentTypeId}:${alias}`;
   if (contentTypePageCache.has(key)) return contentTypePageCache.get(key);
   let loading = contentTypePageLoading.get(key);

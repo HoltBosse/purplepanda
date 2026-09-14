@@ -90,7 +90,7 @@ export async function POST(context: APIContext): Promise<Response> {
             .onConflictDoUpdate({ target: settings.key, set: { value: templateValue } });
     }
 
-    invalidateSettingsCache();
+    invalidateSettingsCache(db);
 
     await formFlash.delete('settings');
     const alert = createAlert(alertType.success, "Settings updated successfully.");

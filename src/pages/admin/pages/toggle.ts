@@ -20,7 +20,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const newState = page.state === 1 ? 0 : 1;
     await db.update(pages).set({ state: newState }).where(eq(pages.id, id));
-    invalidatePagesCache();
+    invalidatePagesCache(db);
 
     const alert = createAlert(alertType.success, newState === 1 ? "Page enabled." : "Page disabled.");
     await addAlertToSession(context.session, alert);

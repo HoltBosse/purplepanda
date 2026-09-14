@@ -90,7 +90,7 @@ export async function POST(context: APIContext): Promise<Response> {
         await db.update(templates).set({ content: parsedContent }).where(eq(templates.id, template.id));
     }
 
-    invalidateTemplatesCache();
+    invalidateTemplatesCache(db);
 
     const [latestPublishNode] = await db
         .select()

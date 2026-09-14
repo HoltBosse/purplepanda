@@ -49,8 +49,8 @@ export function createBulkHandler(table: PgTable & { id: any; state: any }, redi
         const db = getDb();
         await db.update(table).set({ state: stateMap[action] }).where(inArray(table.id, result.data));
 
-        if (table === pages) invalidatePagesCache();
-        else if (table === templates) invalidateTemplatesCache();
+        if (table === pages) invalidatePagesCache(db);
+        else if (table === templates) invalidateTemplatesCache(db);
 
         return context.redirect(redirectTo);
     };

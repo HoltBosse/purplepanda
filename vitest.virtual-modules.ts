@@ -34,9 +34,20 @@ const MODULES: Record<string, string> = {
   'virtual:purplepanda/puck-config': PUCK_CONFIG,
   'virtual:purplepanda/has-404': 'export const has404Page = false;',
   'virtual:purplepanda/islands': 'export default {};',
-  'virtual:purplepanda/db': 'export default {};',
+  // `$client` stands in for the raw pg Pool: content-cache.ts's LISTEN/NOTIFY wiring and
+  // rate-limiter-flexible's RateLimiterPostgres both call `.query()`/`.connect()` on it at module
+  // load, so it needs to resolve rather than being `undefined`/absent, even though no test
+  // exercises real query results through it.
+  'virtual:purplepanda/db': `
+    const client = {
+      query: () => Promise.resolve({ rows: [] }),
+      connect: () => Promise.resolve({ query: () => Promise.resolve({ rows: [] }), on: () => {} }),
+    };
+    export default { $client: client };
+  `,
   'virtual:purplepanda/media-path': 'export default "/tmp/purplepanda-test-media";',
   'virtual:purplepanda/document-path': 'export default null;',
+  'virtual:purplepanda/plugins': 'export default [];',
 };
 
 export function purplePandaVirtualModules(): Plugin {

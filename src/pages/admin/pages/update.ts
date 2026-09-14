@@ -92,7 +92,7 @@ export async function POST(context: APIContext): Promise<Response> {
         await db.update(pages).set({ content: parsedContent }).where(eq(pages.id, page.id));
     }
 
-    invalidatePagesCache();
+    invalidatePagesCache(db);
 
     const [latestPublishNode] = await db
         .select()

@@ -3,7 +3,7 @@ title: Hooks
 description: Extending PurplePanda with plugins that observe events or override built-in decisions.
 ---
 
-`purplePandaIntegration()` accepts a `plugins` option, letting a project observe internal events and override specific built-in decisions without forking the package. There's no central registry of hook names to keep in sync - each hook's contract (its payload/return shape) is defined at the one place in PurplePanda's own source that calls it, and is documented in the [Hook Reference](/devs/hooks-reference).
+`purplePandaIntegration()` accepts a `pluginsModule` option, letting a project observe internal events and override specific built-in decisions without forking the package. There's no central registry of hook names to keep in sync - each hook's contract (its payload/return shape) is defined at the one place in PurplePanda's own source that calls it, and is documented in the [Hook Reference](/devs/hooks-reference).
 
 A plugin is a plain object shaped like this (importable as a type from `@holtbosse/purplepanda/hooks`):
 
@@ -19,14 +19,20 @@ interface PurplePandaPlugin {
 
 ## Wiring a plugin
 
-Pass an array of plugins to the integration in `astro.config.mjs`:
+Point `pluginsModule` at a module whose default export is your plugin array - a path rather than the array itself, for the same reason `dbModule` is a path: the real `import` needs to end up bundled into your built server output so plugins still fire when that build runs standalone (`node dist/server/entry.mjs`, as PM2/Docker/systemd would run it), not only inside an Astro CLI process.
+
+```js
+// src/purplepanda-plugins/index.js
+import { auditLogPlugin } from "./audit-log.js";
+import { ssoOverridePlugin } from "./sso-override.js";
+
+export default [auditLogPlugin, ssoOverridePlugin];
+```
 
 ```js
 // astro.config.mjs
 import { defineConfig } from "astro/config";
 import purplePandaIntegration from "@holtbosse/purplepanda";
-import { auditLogPlugin } from "./purplepanda-plugins/audit-log.js";
-import { ssoOverridePlugin } from "./purplepanda-plugins/sso-override.js";
 
 export default defineConfig({
   integrations: [
@@ -35,7 +41,7 @@ export default defineConfig({
       mediaPath: "./media",
       documentPath: "./documents",
       puckConfigModule: "./src/puck/config.tsx",
-      plugins: [auditLogPlugin, ssoOverridePlugin],
+      pluginsModule: "./src/purplepanda-plugins/index.js",
     }),
   ],
 });
@@ -132,4 +138,4 @@ export const ssoOverridePlugin: PurplePandaPlugin = {
 
 ## Multiple plugins
 
-Plugins run in the array order passed to `plugins`. For an `on` event, every plugin's matching listener runs. For an `override` hook, plugins are tried in order and the first one to return a schema-valid, non-`undefined` value wins - later plugins (and PurplePanda's own built-in default) are skipped.
+Plugins run in the array order returned by `pluginsModule`. For an `on` event, every plugin's matching listener runs. For an `override` hook, plugins are tried in order and the first one to return a schema-valid, non-`undefined` value wins - later plugins (and PurplePanda's own built-in default) are skipped.

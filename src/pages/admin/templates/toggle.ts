@@ -20,7 +20,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const newState = template.state === 1 ? 0 : 1;
     await db.update(templates).set({ state: newState }).where(eq(templates.id, id));
-    invalidateTemplatesCache();
+    invalidateTemplatesCache(db);
 
     const alert = createAlert(alertType.success, newState === 1 ? "Template enabled." : "Template disabled.");
     await addAlertToSession(context.session, alert);

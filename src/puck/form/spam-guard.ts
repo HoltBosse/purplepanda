@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
+import { RateLimiterPostgres } from "rate-limiter-flexible";
 import { getDb } from "../../db/db.js";
 import { settings } from "../../db/schema.js";
 
@@ -84,20 +85,20 @@ function decodeCsrfToken(token: unknown): DecodedCsrfToken | null {
   return { formId, expires, issuedAt: expires - CSRF_TTL_MS, payload, signature };
 }
 
-// Tokens that have already been used to complete a submission, so a captured/replayed token
-// can't be used to flood the same form again within its validity window. Keyed by the full
-// token (payload + signature), which `createCsrfToken`'s nonce guarantees is unique per
-// issuance; values are the token's own expiry so the sweep below can drop entries once they'd
-// fail expiry regardless. In-memory like the rate limiter in submit.ts, so it resets per process
-// rather than being shared across a fleet — acceptable for the same reason the rate limiter is.
-const usedCsrfTokens = new Map<string, number>();
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [token, expiresAt] of usedCsrfTokens) {
-    if (expiresAt <= now) usedCsrfTokens.delete(token);
-  }
-}, 5 * 60 * 1000).unref();
+// Tracks tokens that have already been used to complete a submission, so a captured/replayed
+// token can't be used to flood the same form again within its validity window. Keyed by the full
+// token (payload + signature), which `createCsrfToken`'s nonce guarantees is unique per issuance.
+// Backed by Postgres (not an in-memory Map) so replay detection holds across PM2 cluster workers
+// -- a Map here would let a captured token be replayed once per worker before every worker's own
+// copy had seen it. Modeled as a rate limiter with `points: 1`: the first consume() for a token
+// succeeds (marks it used), any consume() within the same token's TTL after that fails (replay).
+const usedCsrfTokens = new RateLimiterPostgres({
+  storeClient: getDb().$client,
+  storeType: "pool",
+  tableName: "purplepanda_csrf_used_tokens",
+  points: 1,
+  duration: CSRF_TTL_MS / 1000,
+});
 
 // Real humans need at least this long to load the page and fill in a field; bots that submit
 // faster are routed to the same fake-success path as the honeypot so they don't learn to add a
@@ -122,8 +123,13 @@ export async function verifyCsrfToken(formId: string, token: unknown): Promise<b
   if (expectedBuf.length !== actualBuf.length || !timingSafeEqual(expectedBuf, actualBuf)) return false;
 
   const tokenKey = `${decoded.payload}.${decoded.signature}`;
-  if (usedCsrfTokens.has(tokenKey)) return false;
-  usedCsrfTokens.set(tokenKey, decoded.expires);
+  try {
+    // Fails closed: a genuine store error is indistinguishable here from "already used", which
+    // is the safer default for a replay check.
+    await usedCsrfTokens.consume(tokenKey, 1);
+  } catch {
+    return false;
+  }
 
   return true;
 }

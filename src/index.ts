@@ -3,7 +3,6 @@ import { extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import type { AstroIntegration } from "astro";
-import { type PurplePandaPlugin, registerPlugins } from "./hooks/index.js";
 import { generateIslandsManifest } from "./islands-manifest.js";
 
 const VIRTUAL_PUCK_CONFIG_ID = "virtual:purplepanda/puck-config";
@@ -35,6 +34,12 @@ const RESOLVED_VIRTUAL_MEDIA_PATH_ID = `\0${VIRTUAL_MEDIA_PATH_ID}`;
 const VIRTUAL_DOCUMENT_PATH_ID = "virtual:purplepanda/document-path";
 const RESOLVED_VIRTUAL_DOCUMENT_PATH_ID = `\0${VIRTUAL_DOCUMENT_PATH_ID}`;
 
+// Same story as dbModule above: a `plugins` array of live objects (with function hooks, so it
+// can't be baked in as a JSON literal either) only ever reached `hooks/index.ts` when this hook
+// ran in-process, meaning every plugin silently stopped firing under a standalone/PM2 build.
+const VIRTUAL_PLUGINS_ID = "virtual:purplepanda/plugins";
+const RESOLVED_VIRTUAL_PLUGINS_ID = `\0${VIRTUAL_PLUGINS_ID}`;
+
 export interface PurplePandaIntegrationOptions {
   enabled?: boolean;
   // Path to a module (relative to the project root, or a bare specifier) whose default export is
@@ -44,7 +49,9 @@ export interface PurplePandaIntegrationOptions {
   mediaPath?: string;
   documentPath?: string;
   puckConfigModule?: string;
-  plugins?: PurplePandaPlugin[];
+  // Path to a module whose default export is a `PurplePandaPlugin[]` — a module path for the same
+  // reason dbModule is one, not an inline array.
+  pluginsModule?: string;
 }
 
 function resolveOptionModulePath(modulePath: string, rootDir: string): string {
@@ -107,8 +114,6 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
         if (options.documentPath && (!existsSync(options.documentPath) || !statSync(options.documentPath).isDirectory())) {
           throw new Error(`[purple-panda] Invalid document path provided: ${options.documentPath}. It must be a valid directory.`);
         }
-
-        registerPlugins(options.plugins ?? []);
 
         const srcDir = fileURLToPath(config.srcDir);
         const has404Page = ['404.astro', '404.md', '404.mdx'].some(f =>
@@ -194,6 +199,7 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
                   if (id === VIRTUAL_DB_ID) return RESOLVED_VIRTUAL_DB_ID;
                   if (id === VIRTUAL_MEDIA_PATH_ID) return RESOLVED_VIRTUAL_MEDIA_PATH_ID;
                   if (id === VIRTUAL_DOCUMENT_PATH_ID) return RESOLVED_VIRTUAL_DOCUMENT_PATH_ID;
+                  if (id === VIRTUAL_PLUGINS_ID) return RESOLVED_VIRTUAL_PLUGINS_ID;
                   return null;
                 },
                 async load(id) {
@@ -213,6 +219,12 @@ export default function purplePandaIntegration(options: PurplePandaIntegrationOp
 
                   if (id === RESOLVED_VIRTUAL_DOCUMENT_PATH_ID) {
                     return `export default ${JSON.stringify(options.documentPath ?? null)};`;
+                  }
+
+                  if (id === RESOLVED_VIRTUAL_PLUGINS_ID) {
+                    if (!options.pluginsModule) return "export default [];";
+                    const modulePath = resolveOptionModulePath(options.pluginsModule, fileURLToPath(config.root));
+                    return `export { default } from ${JSON.stringify(modulePath)};`;
                   }
 
                   const puckConfigModulePath = () => {

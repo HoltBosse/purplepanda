@@ -19,8 +19,12 @@ declare module "virtual:purplepanda/islands" {
 
 declare module "virtual:purplepanda/db" {
   import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+  import type { Pool } from "pg";
 
-  const db: NodePgDatabase<Record<string, unknown>>;
+  // `$client` (the raw pg Pool) is drizzle's own property on the object returned by
+  // `drizzle(pool)` — needed for LISTEN/NOTIFY-based cache invalidation across cluster workers
+  // (see db/content-cache.ts) and for handing rate-limiter-flexible a real Postgres connection.
+  const db: NodePgDatabase<Record<string, unknown>> & { $client: Pool };
   export default db;
 }
 
@@ -32,4 +36,11 @@ declare module "virtual:purplepanda/media-path" {
 declare module "virtual:purplepanda/document-path" {
   const documentPath: string | null;
   export default documentPath;
+}
+
+declare module "virtual:purplepanda/plugins" {
+  import type { PurplePandaPlugin } from "./hooks/index.js";
+
+  const plugins: PurplePandaPlugin[];
+  export default plugins;
 }

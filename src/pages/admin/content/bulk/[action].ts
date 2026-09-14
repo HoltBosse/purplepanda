@@ -33,7 +33,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const db = getDb();
     await db.update(pages).set({ state: stateMap[action as Action] }).where(inArray(pages.id, result.data));
-    invalidatePagesCache();
+    invalidatePagesCache(db);
 
     return context.redirect(`/admin/content/${typeId}`);
 }

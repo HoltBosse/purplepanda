@@ -57,7 +57,7 @@ export async function POST(context: APIContext): Promise<Response> {
     // currently live rather than attempting to merge with changes made to the main
     // branch since the draft was created.
     await db.update(pages).set({ content: parsedContent }).where(eq(pages.id, entity.id));
-    invalidatePagesCache();
+    invalidatePagesCache(db);
 
     // Mark the draft as merged so it drops out of the active drafts list, then log a
     // publish node whose parent is the draft tip -- this is what lets HistoryView draw

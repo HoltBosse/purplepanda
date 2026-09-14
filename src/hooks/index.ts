@@ -1,3 +1,4 @@
+import plugins from "virtual:purplepanda/plugins";
 import type * as z from "zod";
 
 // Deliberately no central registry of event/hook names or payload shapes here -- like addAction()
@@ -18,12 +19,6 @@ export interface PurplePandaPlugin {
     on?: Record<string, (payload: Record<string, unknown>) => void | Promise<void>>;
     override?: Record<string, (ctx: any) => any>;
   };
-}
-
-let plugins: PurplePandaPlugin[] = [];
-
-export function registerPlugins(registered: PurplePandaPlugin[]): void {
-  plugins = registered;
 }
 
 export async function emit(event: string, payload: Record<string, unknown>): Promise<void> {

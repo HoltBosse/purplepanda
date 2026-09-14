@@ -3,7 +3,7 @@ import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Config, Data } from "@puckeditor/core";
 import type { APIContext, APIRoute } from "astro";
 import { and, eq, inArray } from "drizzle-orm";
-import { RateLimiterMemory } from "rate-limiter-flexible";
+import { RateLimiterPostgres } from "rate-limiter-flexible";
 import * as z from "zod";
 import { addAlertToSession, alertType, createAlert } from "../../../../alert/index.js";
 import { getDb } from "../../../../db/db.js";
@@ -31,8 +31,15 @@ import { resolveDataForSSR } from "../../../../puck/server-data-wrapper.js";
 
 const uuidSchema = z.uuid();
 
-// Per IP + form: 5 submissions per minute, then blocked for 5 minutes.
-const rateLimiter = new RateLimiterMemory({
+// Per IP + form: 5 submissions per minute, then blocked for 5 minutes. Backed by Postgres (not
+// RateLimiterMemory) because this runs once per worker process — under PM2 cluster mode an
+// in-memory counter is per-worker, so a submitter would effectively get `5 * workerCount` before
+// any single worker's copy of the limit kicked in. RateLimiterPostgres manages its own table
+// (CREATE TABLE IF NOT EXISTS, created lazily on first use) so no migration is needed here.
+const rateLimiter = new RateLimiterPostgres({
+  storeClient: getDb().$client,
+  storeType: "pool",
+  tableName: "purplepanda_rate_limits",
   points: 5,
   duration: 60,
   blockDuration: 300,
