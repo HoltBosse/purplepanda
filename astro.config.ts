@@ -96,6 +96,12 @@ export default defineConfig({
     allowedDomains: SITE_HOSTNAME ? [{ hostname: SITE_HOSTNAME }] : [],
   },
 
+  // Sessions live in Postgres (the `sessions` table) so they're shared across PM2 cluster workers
+  // and can be listed/revoked per user. See src/session/driver.ts.
+  session: {
+    driver: { entrypoint: new URL("./src/session/driver.ts", import.meta.url) },
+  },
+
   output: "server",
   adapter: node({
     mode: "standalone",

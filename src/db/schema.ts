@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -134,3 +134,19 @@ export const dagNodes = pgTable("dag_nodes", {
   name: varchar("name", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+// Astro session storage (see session/driver.ts). `data` is Astro's own devalue-serialized session
+// map and is opaque to us; `userId` and `expiresAt` are derived from it on every write so sessions
+// can be listed and revoked per user without deserializing every row. `userId` is null for
+// anonymous sessions (e.g. flash alerts from a public form submission).
+export const sessions = pgTable("sessions", {
+  id: uuid("id").primaryKey(),
+  data: text("data").notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  // Null while any entry in the session has no ttl, i.e. the row lives until destroyed.
+  expiresAt: timestamp("expires_at"),
+}, (t) => [
+  index("sessions_user_id_idx").on(t.userId),
+  index("sessions_expires_at_idx").on(t.expiresAt),
+]);
