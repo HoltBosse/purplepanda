@@ -25,13 +25,14 @@ const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1
 
 const theme = user && user.theme !== 'system' ? user.theme : undefined;
 
-// Same extraction trick as login.astro's LoginPanda: SVGator ships the animation as a <script>
-// that loads its player from a CDN — reinjected below via is:inline + define:vars so Astro's
-// default script processing doesn't mangle it.
-const loadingPandaScriptMatch = loadingPandaSVGRaw.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+// Same extraction trick as login.astro's LoginPanda: SVGator ships the animation as a script
+// element that loads its player from a CDN — reinjected below via is:inline + define:vars so Astro's
+// default script processing doesn't mangle it. The regexes spell `<` as \x3c because Vite's
+// dependency scanner regex-matches literal script tags anywhere in a .astro file, frontmatter included.
+const loadingPandaScriptMatch = loadingPandaSVGRaw.match(/\x3cscript[^>]*>([\s\S]*?)\x3c\/script>/);
 const loadingPandaSvgatorScript = loadingPandaScriptMatch?.[1]
 	?.replace(/^\s*<!\[CDATA\[\s*/, '').replace(/\s*\]\]>\s*$/, '') ?? '';
-const loadingPandaSvgInline = loadingPandaSVGRaw.replace(/<script[^>]*>[\s\S]*?<\/script>/, '');
+const loadingPandaSvgInline = loadingPandaSVGRaw.replace(/\x3cscript[^>]*>[\s\S]*?\x3c\/script>/, '');
 ---
 <!DOCTYPE html>
 <html lang="en" data-theme={theme}>

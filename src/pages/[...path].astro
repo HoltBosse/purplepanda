@@ -139,7 +139,7 @@ const jsonLdDocument = !firstJsonLdItem
     : jsonLdItems.length === 1
         ? { '@context': 'https://schema.org', ...firstJsonLdItem }
         : { '@context': 'https://schema.org', '@graph': jsonLdItems };
-// Escaping `<` prevents a field value like `</script><script>...` from breaking out of the tag.
+// Escaping `<` prevents a field value containing a closing script tag from breaking out of the tag.
 const jsonLdScript = jsonLdDocument ? JSON.stringify(jsonLdDocument).replace(/</g, '\\u003c') : null;
 ---
 

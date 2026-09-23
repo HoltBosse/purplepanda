@@ -5,13 +5,13 @@ import pandaSVGRaw from '../../components/LoginPanda.svg?raw';
 const error = Astro.url.searchParams.get("error");
 
 // Extract the SVGator script from the SVG so we can run it on demand
-const scriptMatch = pandaSVGRaw.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+const scriptMatch = pandaSVGRaw.match(/\x3cscript[^>]*>([\s\S]*?)\x3c\/script>/);
 const svgatorScript = scriptMatch?.[1]
   ?.replace(/^\s*<!\[CDATA\[\s*/, '').replace(/\s*\]\]>\s*$/, '') ?? '';
 
 // Inline SVG without the embedded script, and with explicit 256×256 dimensions
 const pandaSVGInline = pandaSVGRaw
-  .replace(/<script[^>]*>[\s\S]*?<\/script>/, '')
+  .replace(/\x3cscript[^>]*>[\s\S]*?\x3c\/script>/, '')
   .replace('<svg ', '<svg width="256" height="256" ');
 ---
 
