@@ -1,19 +1,18 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { resolve } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import { getDocumentPath } from './document.js';
 
 describe('document path', () => {
-    beforeEach(() => {
-        vi.resetModules();
+    afterEach(() => {
+        delete process.env.DOCUMENT_PATH;
     });
 
-    it('throws when no document path was configured', async () => {
-        vi.doMock('virtual:purplepanda/document-path', () => ({ default: null }));
-        const { getDocumentPath } = await import('./document');
-        expect(() => getDocumentPath()).toThrow(/documentPath/);
+    it('defaults to ./documents under the project root', () => {
+        expect(getDocumentPath()).toBe(resolve('documents'));
     });
 
-    it('returns the path when configured', async () => {
-        vi.doMock('virtual:purplepanda/document-path', () => ({ default: '/tmp/documents' }));
-        const { getDocumentPath } = await import('./document');
+    it('honours DOCUMENT_PATH', () => {
+        process.env.DOCUMENT_PATH = '/tmp/documents';
         expect(getDocumentPath()).toBe('/tmp/documents');
     });
 });

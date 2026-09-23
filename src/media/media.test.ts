@@ -1,13 +1,18 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { resolve } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import { getMediaPath } from './media.js';
 
 describe('media path', () => {
-    beforeEach(() => {
-        vi.resetModules();
+    afterEach(() => {
+        delete process.env.MEDIA_PATH;
     });
 
-    it('returns the path supplied by the integration', async () => {
-        vi.doMock('virtual:purplepanda/media-path', () => ({ default: '/tmp/media' }));
-        const { getMediaPath } = await import('./media');
+    it('defaults to ./media under the project root', () => {
+        expect(getMediaPath()).toBe(resolve('media'));
+    });
+
+    it('honours MEDIA_PATH', () => {
+        process.env.MEDIA_PATH = '/tmp/media';
         expect(getMediaPath()).toBe('/tmp/media');
     });
 });

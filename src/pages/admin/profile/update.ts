@@ -5,7 +5,7 @@ import { getDb } from "../../../db/db.js";
 import { users } from "../../../db/schema.js";
 import { createUserAlertMessageFromArray, formDataToRecord, getAllFields, getFieldByName, validateForm } from "../../../form/index.js";
 import { createFormFlashSession } from "../../../form/session.js";
-import { getProfileForm } from "./form.js";
+import { getProfileForm } from "./_form.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();

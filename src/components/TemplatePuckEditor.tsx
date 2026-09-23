@@ -1,7 +1,7 @@
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Config, Data } from "@puckeditor/core";
 import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
 import { filterConfigByLocation, wrapConfigWithDataBinding } from "../puck/index.js";
+import externalPuckConfig from "../puck.config.js";
 import PuckEditor from "./PuckEditor.js";
 
 const baseConfig: Config = {

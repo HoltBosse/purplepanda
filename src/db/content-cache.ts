@@ -4,7 +4,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool, PoolClient } from "pg";
 import { pages, settings, templates } from "./schema.js";
 
-// `$client` is optional in this type (even though the ambient `virtual:purplepanda/db` module
+// `$client` is optional in this type (even though the ambient `./client.js` module
 // always provides one for a real drizzle(pool) instance) so callers that only have the plain
 // `NodePgDatabase` type from getDb()'s public-facing callers (site.ts, fonts.ts, templates.ts)
 // don't need to thread a stricter type through their own signatures — the functions below already

@@ -1,0 +1,546 @@
+---
+import { EllipsisVertical, FilePen, GitBranch, MessageSquare, SquareArrowOutUpRight, SquarePen, Trash2 } from '@lucide/astro';
+import { and, desc, eq, type InferSelectModel, inArray, sql } from 'drizzle-orm';
+import { z } from 'zod';
+import Pagination from '../../../../components/Pagination.astro';
+import PublishStateIcon from '../../../../components/PublishStateIcon.astro';
+import { getDb } from '../../../../db/db.js';
+import { resolvePagePathById } from '../../../../db/page-path.js';
+import { dagNodes, pages, userActions, users } from '../../../../db/schema.js';
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { isWithinSchedule } from '../../../../puck/schedule.js';
+import externalPuckConfig from "../../../../puck.config.js";
+import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../../search/drizzle.js';
+import { parseSearchQuery } from '../../../../search/parser.js';
+import SearchBar from '../../../../search/SearchBar';
+import type { SearchFieldSpec } from '../../../../search/types.js';
+
+const { typeId } = Astro.params;
+const contentTypes = (externalPuckConfig ? externalPuckConfig.contentTypes : []) ?? [];
+//check that one of contentTypes .id matches typeId param
+if(!typeId || !contentTypes.find(ct => ct.id === typeId)) {
+    return Astro.rewrite('/admin/__not-found');
+}
+
+const contentType = contentTypes.find(ct => ct.id === typeId);
+
+const db = getDb();
+
+// The title isn't a column — Puck stores it inside the content document, which is why the table
+// below reads `content.root.props.title`. The search builder takes an arbitrary SQL expression in
+// place of a column, so the same path can be filtered on directly in Postgres.
+const titleExpr = sql`${pages.content} -> 'root' -> 'props' ->> 'title'`;
+// start/end are stored as "" (unset) or a UTC ISO string (see DateTimeField.tsx) — nullif turns
+// the former into a real SQL NULL first, since casting an empty string to timestamptz errors.
+const startExpr = sql`nullif(${pages.content} -> 'root' -> 'props' ->> 'start', '')::timestamptz`;
+const endExpr = sql`nullif(${pages.content} -> 'root' -> 'props' ->> 'end', '')::timestamptz`;
+
+// Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
+// valid/invalid highlighting, and the qualifier/value autocomplete dropdown.
+const searchFields: SearchFieldSpec[] = [
+    {
+        name: 'state',
+        type: 'enum',
+        // "Published"/"unpublished" rather than enabled/disabled, matching this page's own
+        // Publish/Unpublish bulk actions.
+        enumValues: ['published', 'unpublished', 'deleted'],
+        label: 'State',
+        description: 'Publish state',
+    },
+    { name: 'title', type: 'text', label: 'Title', description: 'Title contains' },
+    { name: 'author', type: 'text', nullable: true, label: 'Author', description: 'Creator email (null = unattributed)' },
+    { name: 'created', type: 'date', label: 'Created', description: 'Date created (YYYY-MM-DD)' },
+    { name: 'start', type: 'date', nullable: true, label: 'Start', description: 'Scheduled start date (null = no start set)' },
+    { name: 'end', type: 'date', nullable: true, label: 'End', description: 'Scheduled end date (null = no end set)' },
+];
+
+// Server-side counterpart. `pages` has no author or created-at column, so both ride on the
+// `content:create` row that `content/update.ts` logs to `userActions`
+// (`{ type: "content:create", data: { id: <pageId> } }`) whenever content is created.
+const searchConfig: DrizzleSearchConfig = {
+    fields: [
+        {
+            name: 'state',
+            type: 'enum',
+            enumValues: ['published', 'unpublished', 'deleted'],
+            column: pages.state,
+            // "deleted" has no matching rows today (toggle only flips between 1 and 0) — -1 is
+            // reserved so a future soft-delete can slot in without a grammar change.
+            valueMap: { published: 1, unpublished: 0, deleted: -1 },
+            // Hidden from the plain listing until searched for explicitly (`state:deleted`).
+            defaultExclude: ['deleted'],
+        },
+        { name: 'title', type: 'text', column: titleExpr, matchMode: 'contains' },
+        { name: 'author', type: 'text', nullable: true, column: users.email, matchMode: 'exact' },
+        { name: 'created', type: 'date', column: userActions.date },
+        { name: 'start', type: 'date', nullable: true, column: startExpr },
+        { name: 'end', type: 'date', nullable: true, column: endExpr },
+    ],
+    // A bare term searches the title — the one piece of content text this listing actually shows.
+    fulltext: { columns: [titleExpr] },
+    joins: [
+        {
+            table: userActions,
+            on: sql`${userActions.type} = 'content:create' and ${userActions.data} ->> 'id' = ${pages.id}::text`,
+            type: 'left',
+        },
+        { table: users, on: eq(userActions.userId, users.id), type: 'left' },
+    ],
+};
+
+const q = Astro.url.searchParams.get('q') ?? '';
+const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig);
+
+// Named `currentPage`/`totalPageCount` rather than the usual `page`/`totalPages` because the rows
+// being listed are themselves `pages`, and the table's map callback already binds `page` per row.
+const itemsPerPage = 12;
+const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);
+let currentPage = 1;
+if (pageData.success) {
+    currentPage = pageData.data;
+}
+const offset = (currentPage - 1) * itemsPerPage;
+
+// Every query below is scoped to this content type, on top of whatever the search matched.
+const listFilter = and(eq(pages.contentType, typeId), searchWhere);
+
+//order by id desc
+// DISTINCT (here and in the count below) because the userActions/users joins are one-to-many:
+// content with more than one `content:create` action would otherwise be listed — and counted —
+// once per matching action row.
+const [allPages, allDrafts, totalContent] = await Promise.all([
+    applySearchJoins(
+        db
+            .selectDistinct({ id: pages.id, state: pages.state, contentType: pages.contentType, content: pages.content })
+            .from(pages)
+            .$dynamic(),
+        searchConfig.joins,
+    )
+        .where(listFilter)
+        .orderBy(desc(pages.id))
+        .limit(itemsPerPage)
+        .offset(offset),
+    db.select().from(dagNodes).where(and(eq(dagNodes.entityType, 'content'), eq(dagNodes.nodeType, 'draft'), eq(dagNodes.state, 1))).orderBy(desc(dagNodes.createdAt)),
+    applySearchJoins(
+        db.select({ count: sql<number>`COUNT(DISTINCT ${pages.id})` }).from(pages).$dynamic(),
+        searchConfig.joins,
+    )
+        .where(listFilter)
+        .then(result => result[0]?.count ?? 0),
+]);
+
+const totalPageCount = Math.ceil(totalContent / itemsPerPage);
+
+// Published but outside its start/end window (see PublishStateIcon.astro) isn't actually visible
+// at its live URL right now — page.astro 404s it — so the "open" link falls back to the same
+// draft preview a plain unpublished row gets, instead of linking to a page that 404s.
+function isLiveNow(page: (typeof allPages)[number]): boolean {
+    return page.state === 1 && isWithinSchedule((page.content as any)?.root?.props);
+}
+
+const draftsByPageId = allDrafts.reduce<Record<string, typeof allDrafts>>((acc, draft) => {
+    const bucket = acc[draft.entityId];
+    if (bucket !== undefined) {
+        bucket.push(draft);
+    } else {
+        acc[draft.entityId] = [draft];
+    }
+    return acc;
+}, {});
+
+// The "view" icon to the left of the kebab menu needs, per row, either the live URL (published)
+// or a preview link for the master branch's latest state (unpublished) — i.e. the newest
+// nodeType='publish' dagNode, which `content/update.ts` inserts on every save regardless of
+// publish state.
+const rowIds = allPages.map(page => page.id);
+const masterNodes = rowIds.length
+    ? await db
+          .select()
+          .from(dagNodes)
+          .where(and(eq(dagNodes.entityType, 'content'), eq(dagNodes.nodeType, 'publish'), eq(dagNodes.state, 1), inArray(dagNodes.entityId, rowIds)))
+          .orderBy(desc(dagNodes.createdAt))
+    : [];
+const masterNodeByPageId: Record<string, InferSelectModel<typeof dagNodes>> = {};
+for (const node of masterNodes) {
+    if (!(node.entityId in masterNodeByPageId)) masterNodeByPageId[node.entityId] = node;
+}
+
+const livePathEntries = await Promise.all(
+    allPages
+        .filter(page => page.state === 1)
+        .map(async page => [page.id, await resolvePagePathById(db, page.id)] as const),
+);
+const livePathByPageId: Record<string, string> = {};
+for (const [pageId, path] of livePathEntries) {
+    if (path !== null) livePathByPageId[pageId] = path;
+}
+---
+
+<AdminLayout>
+	<div class="flex flex-wrap items-center justify-between gap-3 align-middle border-b border-base-300 pt-2 sticky top-0 z-10 bg-base-200">
+        <h1 class="text-2xl font-semibold">{contentType?.title || 'Content'}</h1>
+        <a href={`/admin/content/${typeId}/new`} class="btn btn-primary">New</a>
+    </div>
+    <div class="pt-4 pb-6">
+        <SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
+    </div>
+    <form id="bulk-form" method="POST"></form>
+    {allPages.length === 0 && (
+        <div class="text-center text-base-content/60 py-8 bg-base-100 rounded-lg">
+            {q ? 'No content matches your search.' : 'No content yet.'}
+        </div>
+    )}
+    {allPages.length > 0 && (
+        <>
+    <table class="hidden sm:table p-2 bg-base-100 rounded-lg">
+        <thead>
+            <tr class="hidden [table:has(.row-select:checked)_&]:table-row">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
+                <th colspan="3">
+                    <div class="flex items-center gap-2">
+                        <button form="bulk-form" type="submit" formaction={`/admin/content/${typeId}/bulk/publish`} class="btn btn-xs btn-outline btn-accent">Publish</button>
+                        <button form="bulk-form" type="submit" formaction={`/admin/content/${typeId}/bulk/unpublish`} class="btn btn-xs btn-outline btn-warning">Unpublish</button>
+                        <button form="bulk-form" type="submit" formaction={`/admin/content/${typeId}/bulk/delete`} class="btn btn-xs btn-error">Delete</button>
+                    </div>
+                </th>
+            </tr>
+            <tr class="[table:has(.row-select:checked)_&]:hidden">
+                <th class="w-px whitespace-nowrap">
+                    <label>
+                        <input type="checkbox" class="checkbox select-all" />
+                    </label>
+                </th>
+                <th class="w-px whitespace-nowrap">State</th>
+                <th>{contentType?.title || 'Content'}</th>
+                <th class="w-px whitespace-nowrap"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {allPages.map(page => {
+                const drafts = draftsByPageId[page.id] ?? [];
+                const masterNode = masterNodeByPageId[page.id];
+                const notes = (page.content as any)?.root?.props?.notes as string | undefined;
+                return (
+                    <tr>
+                        <td>
+                            <label>
+                                <input
+                                    form="bulk-form"
+                                    type="checkbox"
+                                    class="checkbox row-select"
+                                    name="selected[]"
+                                    value={page.id}
+                                />
+                            </label>
+                        </td>
+                        <th class="w-px whitespace-nowrap">
+                            <form action={`/admin/content/${typeId}/toggle/${page.id}`} method="POST">
+                                <button class="btn btn-square" type="submit">
+                                    <PublishStateIcon
+                                        state={page.state}
+                                        start={(page.content as any)?.root?.props?.start}
+                                        end={(page.content as any)?.root?.props?.end}
+                                        size={20}
+                                    />
+                                </button>
+                            </form>
+                        </th>
+                        <td>
+                            <div class="flex items-center gap-2">
+                                <a href={`/admin/content/${typeId}/edit/${page.id}`}>
+                                    <div class="font-bold link link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</div>
+                                </a>
+                                {notes && (
+                                    // z-20: without an explicit z-index the tooltip's popup (which only
+                                    // sets z-index on its own :before pseudo-element) competes in the page
+                                    // root's stacking context, where SearchBar's z-[5] wrapper (see
+                                    // SearchBar.tsx) paints over it for rows near the top of the table.
+                                    <div class="tooltip tooltip-top z-20 before:whitespace-pre-line before:text-left" data-tip={notes}>
+                                        <MessageSquare size={14} class="text-base-content/60" />
+                                    </div>
+                                )}
+                            </div>
+                        </td>
+                        <td class="w-px whitespace-nowrap">
+                            <div class="flex items-center gap-1">
+                                {isLiveNow(page) ? (
+                                    livePathByPageId[page.id] !== undefined && (
+                                        <a
+                                            href={`/${livePathByPageId[page.id]}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="btn btn-ghost btn-sm btn-square"
+                                            title="View live page"
+                                        >
+                                            <SquareArrowOutUpRight size={16} />
+                                        </a>
+                                    )
+                                ) : (
+                                    masterNode !== undefined && (
+                                        <a
+                                            href={`/admin/content/preview/${masterNode.id}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="btn btn-ghost btn-sm btn-square"
+                                            title="Preview draft"
+                                        >
+                                            <SquarePen size={16} />
+                                        </a>
+                                    )
+                                )}
+                                <div class="dropdown dropdown-end">
+                                    <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square">
+                                        <EllipsisVertical size={16} />
+                                    </div>
+                                    <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow-lg border border-base-300">
+                                        {drafts.length > 0 ? (
+                                            <>
+                                                <li class="menu-title text-xs text-base-content/60 px-2 py-1">Drafts</li>
+                                                {drafts.map(draft => (
+                                                    <li>
+                                                        <div class="flex items-center gap-1 pr-1">
+                                                            <a href={`/admin/content/drafts/edit/${draft.id}`} class="flex items-center gap-2 flex-1 min-w-0" title={draft.name}>
+                                                                <FilePen size={14} class="shrink-0" />
+                                                                <span class="truncate min-w-0">{draft.name}</span>
+                                                            </a>
+                                                            <form method="POST" action={`/admin/drafts/delete/${draft.id}`}>
+                                                                <button type="submit" class="btn btn-ghost btn-xs btn-square text-error shrink-0" title="Delete draft">
+                                                                    <Trash2 size={12} />
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    </li>
+                                                ))}
+                                                <li><hr class="my-1 border-base-300" /></li>
+                                            </>
+                                        ) : null}
+                                        <li>
+                                            <button
+                                                type="button"
+                                                class="gap-2"
+                                                data-create-draft
+                                                data-entity-id={page.id}
+                                                data-entity-type="content"
+                                            >
+                                                <FilePen size={14} />
+                                                Create new draft
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <a href={`/admin/content/history/${page.id}`} class="gap-2">
+                                                <GitBranch size={12} />
+                                                History
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                );
+            })}
+        </tbody>
+    </table>
+
+    <div class="sm:hidden admin-cards flex flex-col gap-3">
+        <div class="hidden items-center gap-2 bg-base-100 rounded-lg p-3 [.admin-cards:has(.row-select:checked)_&]:flex">
+            <label>
+                <input type="checkbox" class="checkbox select-all" />
+            </label>
+            <button form="bulk-form" type="submit" formaction={`/admin/content/${typeId}/bulk/publish`} class="btn btn-xs btn-outline btn-accent">Publish</button>
+            <button form="bulk-form" type="submit" formaction={`/admin/content/${typeId}/bulk/unpublish`} class="btn btn-xs btn-outline btn-warning">Unpublish</button>
+            <button form="bulk-form" type="submit" formaction={`/admin/content/${typeId}/bulk/delete`} class="btn btn-xs btn-error">Delete</button>
+        </div>
+        <div class="flex items-center gap-2 bg-base-100 rounded-lg p-3 [.admin-cards:has(.row-select:checked)_&]:hidden">
+            <label class="flex items-center gap-2">
+                <input type="checkbox" class="checkbox select-all" />
+                <span class="text-sm text-base-content/60">Select all</span>
+            </label>
+        </div>
+        {allPages.map(page => {
+            const drafts = draftsByPageId[page.id] ?? [];
+            const masterNode = masterNodeByPageId[page.id];
+            const notes = (page.content as any)?.root?.props?.notes as string | undefined;
+            return (
+                <div class="card bg-base-100 rounded-lg p-4">
+                    <div class="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-base-300">
+                        <label class="flex items-center gap-2">
+                            <input
+                                form="bulk-form"
+                                type="checkbox"
+                                class="checkbox row-select"
+                                name="selected[]"
+                                value={page.id}
+                            />
+                        </label>
+                        <div class="flex items-center gap-1">
+                            <form action={`/admin/content/${typeId}/toggle/${page.id}`} method="POST">
+                                <button class="btn btn-square btn-sm" type="submit">
+                                    <PublishStateIcon
+                                        state={page.state}
+                                        start={(page.content as any)?.root?.props?.start}
+                                        end={(page.content as any)?.root?.props?.end}
+                                        size={18}
+                                    />
+                                </button>
+                            </form>
+                            {isLiveNow(page) ? (
+                                livePathByPageId[page.id] !== undefined && (
+                                    <a
+                                        href={`/${livePathByPageId[page.id]}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="btn btn-ghost btn-sm btn-square"
+                                        title="View live page"
+                                    >
+                                        <SquareArrowOutUpRight size={16} />
+                                    </a>
+                                )
+                            ) : (
+                                masterNode !== undefined && (
+                                    <a
+                                        href={`/admin/content/preview/${masterNode.id}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="btn btn-ghost btn-sm btn-square"
+                                        title="Preview draft"
+                                    >
+                                        <SquarePen size={16} />
+                                    </a>
+                                )
+                            )}
+                            <div class="dropdown dropdown-end">
+                                <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square">
+                                    <EllipsisVertical size={16} />
+                                </div>
+                                <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow-lg border border-base-300">
+                                    {drafts.length > 0 ? (
+                                        <>
+                                            <li class="menu-title text-xs text-base-content/60 px-2 py-1">Drafts</li>
+                                            {drafts.map(draft => (
+                                                <li>
+                                                    <div class="flex items-center gap-1 pr-1">
+                                                        <a href={`/admin/content/drafts/edit/${draft.id}`} class="flex items-center gap-2 flex-1 min-w-0" title={draft.name}>
+                                                            <FilePen size={14} class="shrink-0" />
+                                                            <span class="truncate min-w-0">{draft.name}</span>
+                                                        </a>
+                                                        <form method="POST" action={`/admin/drafts/delete/${draft.id}`}>
+                                                            <button type="submit" class="btn btn-ghost btn-xs btn-square text-error shrink-0" title="Delete draft">
+                                                                <Trash2 size={12} />
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </li>
+                                            ))}
+                                            <li><hr class="my-1 border-base-300" /></li>
+                                        </>
+                                    ) : null}
+                                    <li>
+                                        <button
+                                            type="button"
+                                            class="gap-2"
+                                            data-create-draft
+                                            data-entity-id={page.id}
+                                            data-entity-type="content"
+                                        >
+                                            <FilePen size={14} />
+                                            Create new draft
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <a href={`/admin/content/history/${page.id}`} class="gap-2">
+                                            <GitBranch size={12} />
+                                            History
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <dl class="flex flex-col gap-2">
+                        <div class="flex justify-between gap-4">
+                            <dt class="text-sm text-base-content/60">{contentType?.title || 'Content'}</dt>
+                            <dd class="text-right">
+                                <div class="flex items-center justify-end gap-2">
+                                    <a href={`/admin/content/${typeId}/edit/${page.id}`}>
+                                        <span class="font-bold link link-info link-hover">{(page.content as any)?.root?.props?.title || 'Untitled'}</span>
+                                    </a>
+                                    {notes && (
+                                        // z-20: see the desktop row above.
+                                        <div class="tooltip tooltip-top z-20 before:whitespace-pre-line before:text-left" data-tip={notes}>
+                                            <MessageSquare size={14} class="text-base-content/60" />
+                                        </div>
+                                    )}
+                                </div>
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+            );
+        })}
+    </div>
+        </>
+    )}
+    {totalContent - allPages.length > 0 &&
+        <div class="pt-6 pb-6 flex items-center justify-center">
+            <Pagination currentPage={currentPage} totalPages={totalPageCount} basePath={`/admin/content/${typeId}`} params={{ q }} />
+        </div>
+    }
+
+    <!-- Create Draft Modal -->
+    <dialog id="create-draft-modal" class="modal">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Create New Draft</h3>
+            <form method="POST" action="/admin/drafts/create" id="create-draft-form">
+                <input type="hidden" name="entityId" id="draft-entity-id" />
+                <input type="hidden" name="entityType" id="draft-entity-type" />
+                <div class="form-control">
+                    <label class="label" for="draft-name">
+                        <span class="label-text">Draft Name</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="draft-name"
+                        name="name"
+                        class="input input-bordered w-full"
+                        placeholder="e.g. Homepage redesign"
+                        required
+                        autocomplete="off"
+                        maxlength="20"
+                    />
+                </div>
+                <div class="modal-action mt-6">
+                    <button type="button" class="btn btn-ghost" id="cancel-draft-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Draft</button>
+                </div>
+            </form>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <script>import '../../../../scripts/select-all'</script>
+    <script>
+        const modal = document.getElementById('create-draft-modal') as HTMLDialogElement;
+        const entityIdInput = document.getElementById('draft-entity-id') as HTMLInputElement;
+        const entityTypeInput = document.getElementById('draft-entity-type') as HTMLInputElement;
+        const nameInput = document.getElementById('draft-name') as HTMLInputElement;
+        const cancelBtn = document.getElementById('cancel-draft-btn');
+
+        document.querySelectorAll<HTMLButtonElement>('[data-create-draft]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                entityIdInput.value = btn.dataset.entityId ?? '';
+                entityTypeInput.value = btn.dataset.entityType ?? '';
+                nameInput.value = '';
+                modal.showModal();
+            });
+        });
+
+        cancelBtn?.addEventListener('click', () => modal.close());
+    </script>
+</AdminLayout>

@@ -118,8 +118,8 @@ declare module "@puckeditor/core" {
       props: any,
       context?: App.Locals,
     ) => Promise<unknown>;
-    // Set to false to hide this field from the admin submissions viewer (packages/purplepanda/
-    // src/pages/admin/forms/submissions/[id].astro) — for fields whose stored value isn't a
+    // Set to false to hide this field from the admin submissions viewer
+    // (src/pages/admin/forms/submissions/[id].astro) — for fields whose stored value isn't a
     // meaningful answer to show an admin, e.g. Turnstile's verification token. Defaults to shown.
     submissionDisplay?: boolean;
     // Custom rendering of this field's stored submission value in the admin submissions viewer,

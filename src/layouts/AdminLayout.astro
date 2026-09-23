@@ -1,6 +1,5 @@
 ---
 import '../styles/global.css';
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { AstroComponent } from '@lucide/astro';
 import { ClipboardList, FileText, House, Images, LayoutTemplate, LogOut, PenLine, Settings, Users } from '@lucide/astro';
 import { eq } from 'drizzle-orm';
@@ -10,6 +9,7 @@ import Container from '../components/Container.astro';
 import { getDb } from '../db/db.js';
 import { users } from '../db/schema.js';
 import { runOverride } from '../hooks/index.js';
+import externalPuckConfig from "../puck.config.js";
 
 const db = getDb();
 

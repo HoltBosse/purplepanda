@@ -3,48 +3,48 @@ title: Installation
 description: How to set up a purplepanda site.
 ---
 
+PurplePanda is the Astro project itself, not a package you add to one: clone the repo and the CMS,
+its admin UI, and your site's own pages all live in the same `src/`.
+
 # Requirements
 
-1. [Astro react integration](https://docs.astro.build/en/guides/integrations-guide/react/)
-2. [Drizzle orm](https://orm.drizzle.team/)
+1. Node 22.12 or newer
+2. A PostgreSQL database
+3. A place to keep uploaded media and documents (`./media` and `./documents` by default)
 
-# Drizzle orm configuration
+# Setup
 
-you need to include this in it `schema: ['./src/db/schema.ts', '../../node_modules/@holtbosse/purplepanda/dist/db/schema.js'],`
-
-# Your astro.config.mjs file
-
-## options
-
-* `enabled`: boolean
-* `dbModule`: path to a module (relative to your project root, or a bare specifier) whose default export is your drizzle orm db instance
-* `mediaPath`: a place where PurplePanda can store media assets
-* `documentPath`: a place where PurplePanda can store documents
-* `puckConfigModule`: path to your [Puck Editor](https://puckeditor.com/docs/api-reference/configuration/config) file
-
-`dbModule` takes a path rather than the db instance itself so that the real `import` ends up bundled into your built server output — that's what lets a production build (`node dist/server/entry.mjs`, as PM2/Docker/systemd would run it) construct the db connection on its own, without needing `astro.config.mjs` to run first.
-
-## Sample
-
-```js
-// src/db/index.js
-import { drizzle } from 'drizzle-orm/node-postgres';
-
-const db = drizzle(process.env.DATABASE_URL);
-
-export default db;
+```sh
+npm install
+cp .env.example .env   # then set DATABASE_URL
+npx drizzle-kit push   # create the schema
+npm run dev
 ```
 
-```js
-// astro.config.mjs
-integrations: [
-    purplePandaIntegration({
-      enabled: true,
-      dbModule: './src/db/index.js',
-      mediaPath: fs.realpathSync('./media/'),
-      documentPath: fs.realpathSync('./documents/'),
-      puckConfigModule: './src/puck/config.tsx',
-    }),
-    react()
-  ],
+`.env` holds the runtime configuration:
+
+* `DATABASE_URL` - the Postgres connection string (required)
+* `MEDIA_PATH` - absolute path for uploaded media. Defaults to `./media` under the project root
+* `DOCUMENT_PATH` - absolute path for uploaded documents. Defaults to `./documents`
+
+Override the two paths when a deployment keeps uploads on a mounted volume, or starts the server
+from somewhere other than the project root.
+
+# Where things live
+
+| Path | What it is |
+| --- | --- |
+| `src/puck.config.tsx` | Your [Puck Editor](https://puckeditor.com/docs/api-reference/configuration/config) config - the components and content types your site offers |
+| `src/db/client.ts` | The drizzle db instance (the Postgres pool) |
+| `src/db/schema.ts` | The schema, shared by the CMS and your own tables |
+| `src/plugins.ts` | Your [plugins](/devs/hooks), if any |
+| `src/pages/` | File-based routes. `src/pages/admin/` is the CMS admin UI; `src/pages/[...path].astro` renders published pages |
+| `public/admin/assets/` | Admin chrome (favicons, logo) |
+
+# Building and running
+
+```sh
+npm run build                 # produces dist/
+npm start                     # node dist/server/entry.mjs
+npm run start:cluster         # the same build under PM2, one worker per core
 ```

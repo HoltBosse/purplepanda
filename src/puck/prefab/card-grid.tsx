@@ -1,5 +1,5 @@
 // Responsive grid geometry, shared by CardCollection and Grid. Split out of CardCollection.tsx so
-// it can be imported without that file's `virtual:purplepanda/puck-config` dependency, which only
+// it can be imported without that file's `../../puck.config.js` dependency, which only
 // resolves inside an Astro build.
 import type { CSSProperties } from "react";
 import { DEFAULT_LAYOUT, type ResponsiveLayout } from "../component-fields/LayoutField.js";

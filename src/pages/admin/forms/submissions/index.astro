@@ -9,7 +9,7 @@ import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import { applySearchJoins, buildSearchWhere } from '../../../../search/drizzle.js';
 import { parseSearchQuery } from '../../../../search/parser.js';
 import SearchBar from '../../../../search/SearchBar';
-import { searchConfig, searchFields } from './search-config.js';
+import { searchConfig, searchFields } from './_search-config.js';
 
 const db = getDb();
 

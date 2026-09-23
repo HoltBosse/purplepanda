@@ -1,6 +1,6 @@
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 import { and, eq, isNull } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import externalPuckConfig from "../puck.config.js";
 import { pages } from "./schema.js";
 
 function normalizeBaseUrl(baseUrl: string): string {

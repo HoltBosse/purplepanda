@@ -1,9 +1,9 @@
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { ComponentConfig, ComponentData, Config, Field, ObjectField, Slot, SlotComponent } from "@puckeditor/core";
 import { createUsePuck } from "@puckeditor/core";
 import type { CSSProperties, ReactNode } from "react";
 import { Fragment } from "react";
 import * as z from "zod";
+import externalPuckConfig from "../../puck.config.js";
 import { DEFAULT_LAYOUT, layoutField, type ResponsiveLayout, responsiveLayoutSchema } from "../component-fields/LayoutField.js";
 import { ItemContext } from "../data-binding.js";
 import { buildGridLayout } from "./card-grid.js";
@@ -31,8 +31,8 @@ export type CardCollectionProps = {
 const DEFAULT_ORDER_BY: OrderBy = { field: "", direction: "desc" };
 
 // Read lazily (inside resolveFields, below) rather than at module scope: this component is
-// itself registered inside the host's virtual:purplepanda/puck-config, so a top-level read here
-// would race that module's own initialization (CardCollection.js loads virtual:purplepanda/puck-config
+// itself registered inside the host's ../../puck.config.js, so a top-level read here
+// would race that module's own initialization (CardCollection.js loads ../../puck.config.js
 // mid-evaluation of the host config that's still busy importing CardCollection to register it),
 // throwing "Cannot access 'externalPuckConfig' before initialization". Reading it from inside a
 // function body defers evaluation until well after both modules have finished loading.

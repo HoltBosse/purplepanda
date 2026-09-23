@@ -13,6 +13,7 @@
 // emitted chunk is the individual component file rather than a whole barrel.
 
 import { readFileSync } from "node:fs";
+import { transform } from "esbuild";
 
 export type ResolveFn = (
   source: string,
@@ -42,7 +43,6 @@ function esbuildLoader(file: string): "ts" | "tsx" | "jsx" | "js" {
 async function loadAst(file: string, parse: ParseFn): Promise<any | null> {
   try {
     const code = readFileSync(file, "utf8");
-    const { transform } = await import("esbuild");
     const { code: js } = await transform(code, {
       loader: esbuildLoader(file),
       format: "esm",

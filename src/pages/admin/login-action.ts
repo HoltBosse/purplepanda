@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { APIContext } from "astro";
 import { eq } from 'drizzle-orm';
-import { addAction } from '../../actions/index.js';
+import { addAction } from '../../audit/index.js';
 import { getDb } from "../../db/db.js";
 import {users} from "../../db/schema.js";
 import { emit } from "../../hooks/index.js";

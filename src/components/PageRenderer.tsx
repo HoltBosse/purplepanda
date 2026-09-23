@@ -1,4 +1,3 @@
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Config, Data } from "@puckeditor/core";
 import { Render, walkTree } from "@puckeditor/core";
 import type { ReactElement } from "react";
@@ -8,6 +7,7 @@ import {
   wrapConfigWithDataBinding,
   wrapConfigWithIslands,
 } from "../puck/index.js";
+import externalPuckConfig from "../puck.config.js";
 
 // Island wrapping is applied first (innermost) so the props captured in each island marker are the
 // values a component actually renders with — including per-item values resolved by data binding

@@ -3,7 +3,6 @@ import { createReadStream } from "node:fs";
 import { open, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { Readable } from "node:stream";
-import { has404Page } from 'virtual:purplepanda/has-404';
 import type { APIRoute } from "astro";
 import { and, eq } from "drizzle-orm";
 import sharp from 'sharp';
@@ -116,10 +115,7 @@ async function canBypassVisibility(request: Request, session: Parameters<typeof 
 export const GET: APIRoute = async ({ params, request, rewrite, session }) => {
   const parsed = uuidSchema.safeParse(params.id);
   if (!parsed.success) {
-    if (has404Page) {
-      return rewrite('/404');
-    }
-    return new Response(null, { status: 404, headers: { "Cache-Control": "no-store" } });
+    return rewrite('/404');
   }
 
   // Read image transform options from query params (GET-safe).
@@ -143,10 +139,7 @@ export const GET: APIRoute = async ({ params, request, rewrite, session }) => {
     .limit(1);
 
   if (!row) {
-    if (has404Page) {
-      return rewrite('/404');
-    }
-    return new Response('Not Found', { status: 404, headers: { "Cache-Control": "no-store" } });
+    return rewrite('/404');
   }
 
   // A bypassed response must never be cached: HTTP caching keys on URL, not on
@@ -156,10 +149,7 @@ export const GET: APIRoute = async ({ params, request, rewrite, session }) => {
   let bypassed = false;
   if (await isInHiddenFolder(db, row.folder)) {
     if (!(await canBypassVisibility(request, session))) {
-      if (has404Page) {
-        return rewrite('/404');
-      }
-      return new Response('Not Found', { status: 404, headers: { "Cache-Control": "no-store" } });
+      return rewrite('/404');
     }
     bypassed = true;
   }
@@ -171,8 +161,7 @@ export const GET: APIRoute = async ({ params, request, rewrite, session }) => {
   try {
     fileStat = await stat(filePath);
   } catch {
-    if (has404Page) return rewrite('/404');
-    return new Response('Not Found', { status: 404, headers: { "Cache-Control": "no-store" } });
+    return rewrite('/404');
   }
 
   // Only params that change the output bytes belong in the etag — the DB `state`
@@ -242,8 +231,7 @@ export const GET: APIRoute = async ({ params, request, rewrite, session }) => {
     try {
       outputBuffer = await image.toBuffer();
     } catch {
-      if (has404Page) return rewrite('/404');
-      return new Response('Not Found', { status: 404, headers: { "Cache-Control": "no-store" } });
+      return rewrite('/404');
     }
 
     // sharp has no SVG output encoder, so mimeType here is always a raster format

@@ -1,4 +1,3 @@
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Config, Data } from "@puckeditor/core";
 import { Render } from "@puckeditor/core";
 import { eq } from "drizzle-orm";
@@ -6,6 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getDb } from "../../db/db.js";
 import { forms } from "../../db/schema.js";
+import externalPuckConfig from "../../puck.config.js";
 import { filterConfigByLocation, IslandRenderContext, wrapConfigWithIslands } from "../index.js";
 import { resolveDataForSSR } from "../server-data-wrapper.js";
 import { createCsrfToken, renderSpamGuardFieldsHtml } from "./spam-guard.js";

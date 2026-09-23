@@ -1,5 +1,3 @@
-import { has404Page } from "virtual:purplepanda/has-404";
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Config, Data } from "@puckeditor/core";
 import type { APIContext, APIRoute } from "astro";
 import { and, eq, inArray } from "drizzle-orm";
@@ -28,6 +26,7 @@ import {
 } from "../../../../puck/form/submission-display.js";
 import { filterConfigByLocation } from "../../../../puck/index.js";
 import { resolveDataForSSR } from "../../../../puck/server-data-wrapper.js";
+import externalPuckConfig from "../../../../puck.config.js";
 
 const uuidSchema = z.uuid();
 
@@ -202,8 +201,7 @@ async function formDataToJson(formData: FormData): Promise<Record<string, unknow
 export const POST: APIRoute = async ({ params, request, rewrite, clientAddress, session, locals }) => {
   const parsedId = uuidSchema.safeParse(params.id);
   if (!parsedId.success) {
-    if (has404Page) return rewrite("/404");
-    return new Response("Not Found", { status: 404 });
+    return rewrite("/404");
   }
 
   if (!isAllowedUserAgent(request)) {
@@ -233,8 +231,7 @@ export const POST: APIRoute = async ({ params, request, rewrite, clientAddress, 
     .limit(1);
 
   if (!form) {
-    if (has404Page) return rewrite("/404");
-    return new Response("Not Found", { status: 404 });
+    return rewrite("/404");
   }
 
   const formData = await request.formData();

@@ -2,7 +2,7 @@
 import react from '@vitejs/plugin-react';
 import { playwright } from '@vitest/browser-playwright';
 import { getViteConfig } from 'astro/config';
-import { purplePandaVirtualModules } from './vitest.virtual-modules.js';
+import { purplePandaStubModules } from './vitest.stub-modules.js';
 
 const commonExclude = ['dist/**', 'node_modules/**', 'docs/**'];
 const browserTests = 'src/**/*.browser.test.tsx';
@@ -42,7 +42,7 @@ export default getViteConfig({
     projects: [
       {
         extends: true,
-        plugins: [purplePandaVirtualModules()],
+        plugins: [purplePandaStubModules()],
         test: {
           name: 'unit',
           exclude: [...commonExclude, browserTests],
@@ -54,7 +54,7 @@ export default getViteConfig({
       // tester page. `@vitejs/plugin-react` covers the JSX these tests need, and the virtual
       // modules Astro would otherwise inject are supplied by the plugin below.
       {
-        plugins: [react(), purplePandaVirtualModules()],
+        plugins: [react(), purplePandaStubModules()],
         // Without this a dependency that bundles its own React (e.g. @videojs/react) gets a
         // second copy, and any hook it calls reads a null dispatcher — surfacing as
         // "Cannot read properties of null (reading 'useState')" the moment such a component

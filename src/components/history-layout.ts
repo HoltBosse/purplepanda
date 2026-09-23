@@ -1,6 +1,6 @@
 // Pure geometry for the history DAG in HistoryView.tsx. Kept in its own module so it carries no
 // React or Astro imports — HistoryView pulls in PageRenderer, which imports the
-// `virtual:purplepanda/puck-config` module that only exists inside an Astro build.
+// `../puck.config.js` module that only exists inside an Astro build.
 
 export const MAIN_Y = 44;
 export const LANE_GAP = 52;

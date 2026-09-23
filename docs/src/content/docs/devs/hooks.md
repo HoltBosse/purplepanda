@@ -3,9 +3,9 @@ title: Hooks
 description: Extending PurplePanda with plugins that observe events or override built-in decisions.
 ---
 
-`purplePandaIntegration()` accepts a `pluginsModule` option, letting a project observe internal events and override specific built-in decisions without forking the package. There's no central registry of hook names to keep in sync - each hook's contract (its payload/return shape) is defined at the one place in PurplePanda's own source that calls it, and is documented in the [Hook Reference](/devs/hooks-reference).
+`src/plugins.ts` lets a site observe internal events and override specific built-in decisions in one place, instead of editing the code that raises them. There's no central registry of hook names to keep in sync - each hook's contract (its payload/return shape) is defined at the one place in PurplePanda's own source that calls it, and is documented in the [Hook Reference](/devs/hooks-reference).
 
-A plugin is a plain object shaped like this (importable as a type from `@holtbosse/purplepanda/hooks`):
+A plugin is a plain object shaped like this (importable as a type from `src/hooks/index.ts`):
 
 ```ts
 interface PurplePandaPlugin {
@@ -19,32 +19,17 @@ interface PurplePandaPlugin {
 
 ## Wiring a plugin
 
-Point `pluginsModule` at a module whose default export is your plugin array - a path rather than the array itself, for the same reason `dbModule` is a path: the real `import` needs to end up bundled into your built server output so plugins still fire when that build runs standalone (`node dist/server/entry.mjs`, as PM2/Docker/systemd would run it), not only inside an Astro CLI process.
+`src/plugins.ts` default-exports the plugin array. It ships empty; add yours to it.
 
-```js
-// src/purplepanda-plugins/index.js
-import { auditLogPlugin } from "./audit-log.js";
-import { ssoOverridePlugin } from "./sso-override.js";
+```ts
+// src/plugins.ts
+import type { PurplePandaPlugin } from "./hooks/index.js";
+import { auditLogPlugin } from "./purplepanda-plugins/audit-log.js";
+import { ssoOverridePlugin } from "./purplepanda-plugins/sso-override.js";
 
-export default [auditLogPlugin, ssoOverridePlugin];
-```
+const plugins: PurplePandaPlugin[] = [auditLogPlugin, ssoOverridePlugin];
 
-```js
-// astro.config.mjs
-import { defineConfig } from "astro/config";
-import purplePandaIntegration from "@holtbosse/purplepanda";
-
-export default defineConfig({
-  integrations: [
-    purplePandaIntegration({
-      dbModule: "./src/db/index.js",
-      mediaPath: "./media",
-      documentPath: "./documents",
-      puckConfigModule: "./src/puck/config.tsx",
-      pluginsModule: "./src/purplepanda-plugins/index.js",
-    }),
-  ],
-});
+export default plugins;
 ```
 
 ## Observing events (`on`)
@@ -52,8 +37,8 @@ export default defineConfig({
 Observe hooks are fire-and-forget: a listener never changes what PurplePanda does, only reacts after the fact. Every [action](/devs/actions-api) is automatically an observable event (named the same as its `type`), plus a few events that aren't logged as actions - see the [Hook Reference](/devs/hooks-reference) for the complete list and each one's payload shape.
 
 ```ts
-// purplepanda-plugins/audit-log.js
-import type { PurplePandaPlugin } from "@holtbosse/purplepanda/hooks";
+// src/purplepanda-plugins/audit-log.ts
+import type { PurplePandaPlugin } from "../hooks/index.js";
 
 export const auditLogPlugin: PurplePandaPlugin = {
   name: "audit-log",
@@ -98,8 +83,8 @@ hooks: {
 ```
 
 ```ts
-// purplepanda-plugins/sso-override.js
-import type { PurplePandaPlugin } from "@holtbosse/purplepanda/hooks";
+// src/purplepanda-plugins/sso-override.ts
+import type { PurplePandaPlugin } from "../hooks/index.js";
 import { isCompanySsoAdmin } from "./sso-client.js";
 
 export const ssoOverridePlugin: PurplePandaPlugin = {

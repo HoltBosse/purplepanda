@@ -1,4 +1,3 @@
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Config, Data, Dictionary, Fields } from "@puckeditor/core";
 import { useMemo } from "react";
 import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
@@ -8,6 +7,7 @@ import { notesField } from "../puck/component-fields/NotesField.js";
 import { ogField } from "../puck/component-fields/OpenGraphField.js";
 import { filterConfigByLocation, wrapConfigWithDataBinding } from "../puck/index.js";
 import { pageRootPropsSchema } from "../puck/page-root-schema.js";
+import externalPuckConfig from "../puck.config.js";
 import PuckEditor from "./PuckEditor.js";
 
 const baseConfig: Config = {

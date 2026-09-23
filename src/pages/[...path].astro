@@ -1,0 +1,193 @@
+---
+import '../styles/global.css';
+import type { Data } from '@puckeditor/core';
+import { eq } from 'drizzle-orm';
+import type { BreadcrumbList } from 'schema-dts';
+import PageRenderer from '../components/PageRenderer.js';
+import { getContentTypePage, getPlainPageForPath } from '../db/content-cache.js';
+import { getDb } from '../db/db.js';
+import { resolveFontSettings } from '../db/fonts.js';
+import { redirects } from '../db/schema.js';
+import { formatPageTitle, resolveSiteName } from '../db/site.js';
+import { resolveTemplateSetting } from '../db/templates.js';
+import { extractFamilyFromLink } from '../form/fields/font-utils.js';
+import { withCropParams } from '../puck/component-fields/ImageField.js';
+import { isWithinSchedule } from '../puck/schedule.js';
+import { resolveDataForSSR } from '../puck/server-data-wrapper.js';
+import externalPuckConfig from '../puck.config.js';
+
+// Dynamically imported (not a static top-level import) so it's only pulled into the SSR
+// dependency graph on an actual page request, not discovered as a new dependency requiring
+// re-optimization on every dev-server cold start — matches FormEmbed.server.ts's own lazy
+// import of the same module for the same reason.
+const { renderToStaticMarkup } = await import('react-dom/server');
+
+const db = getDb();
+const requestPath = Astro.params.path ?? '';
+const config = externalPuckConfig ?? {};
+
+function normalizeBaseUrl(baseUrl: string): string {
+    return baseUrl.replace(/^\/+|\/+$/g, '');
+}
+
+function matchContentTypeRoute(path: string) {
+    for (const contentType of config.contentTypes ?? []) {
+        if (!contentType.baseUrl) continue;
+        const base = normalizeBaseUrl(contentType.baseUrl);
+        if (!base || !path.startsWith(`${base}/`)) continue;
+        const alias = path.slice(base.length + 1);
+        if (alias && !alias.includes('/')) {
+            return { contentType, alias };
+        }
+    }
+    return null;
+}
+
+type BreadcrumbEntry = { title: string; path: string };
+
+const contentTypeRoute = matchContentTypeRoute(requestPath);
+
+const [resolved, fontSettings, siteName] = await Promise.all([
+    contentTypeRoute
+        ? getContentTypePage(db, contentTypeRoute.contentType.id, contentTypeRoute.alias)
+            .then(page => page ? { page, breadcrumbs: undefined as BreadcrumbEntry[] | undefined } : undefined)
+        : getPlainPageForPath(db, requestPath),
+    resolveFontSettings(db),
+    resolveSiteName(db),
+]);
+
+const matchedPage = resolved?.page;
+const templateSetting = matchedPage
+    ? await resolveTemplateSetting(db, contentTypeRoute?.contentType.id, { templateId: matchedPage.templateId, noTemplate: matchedPage.noTemplate })
+    : undefined;
+
+const headingFontFamily = extractFamilyFromLink(fontSettings.headingFontLink);
+const bodyFontFamily = extractFamilyFromLink(fontSettings.bodyFontLink);
+
+// A page/content item outside its scheduling window (see DateTimeField.tsx and the hardcoded
+// start/end root fields in ContentPuckEditor.tsx/PagePuckEditor.tsx) isn't publicly visible yet,
+// or not anymore — it 404s exactly like a nonexistent path (redirects table included) rather than
+// leaking that it exists.
+if (!matchedPage || !isWithinSchedule((matchedPage.content as any)?.root?.props)) {
+    const fromPath = `/${requestPath}`;
+    const [redirect] = await db
+        .select()
+        .from(redirects)
+        .where(eq(redirects.from, fromPath))
+        .limit(1);
+
+    if (redirect && redirect.state === 1) {
+        return Astro.redirect(redirect.to, 301);
+    }
+
+    return Astro.rewrite('/404');
+}
+
+const [pageData, templateData] = await Promise.all([
+    resolveDataForSSR(config, matchedPage.content as Data, Astro.locals),
+    templateSetting?.templates?.content
+        ? resolveDataForSSR(config, templateSetting.templates.content as Data, Astro.locals)
+        : Promise.resolve(undefined),
+]);
+
+const rawTitle: string = (pageData as any)?.root?.props?.title ?? '';
+const title: string = formatPageTitle(rawTitle, siteName);
+
+// The Open Graph group (see puck/component-fields/OpenGraphField.tsx) is entirely optional —
+// title falls back to the page's own title (same `||` fallback used for rawTitle/breadcrumbs
+// below), description/image are simply omitted from the meta tags when unset.
+const ogProps: { title?: string; description?: string; image?: { id: string; crop?: { x1: number; y1: number; x2: number; y2: number } | null } | null } =
+    (pageData as any)?.root?.props?.og ?? {};
+const ogTitle: string = ogProps.title || rawTitle;
+const ogDescription: string = ogProps.description ?? '';
+
+const jsonLd = contentTypeRoute?.contentType.jsonLd?.((pageData as any)?.root?.props ?? {});
+
+// For a content-type page there's no real page behind its baseUrl segment (e.g. "/articles"), so
+// that crumb is labeled with the content type's own title; the leaf crumb uses the resolved page's
+// title. For a plain page, the trail comes from walking its parentPage ancestry (resolvePlainPage),
+// using each ancestor's own title prop rather than its raw slug.
+const breadcrumbEntries: BreadcrumbEntry[] = contentTypeRoute
+    ? [
+        { title: contentTypeRoute.contentType.title, path: normalizeBaseUrl(contentTypeRoute.contentType.baseUrl ?? '') },
+        { title: rawTitle || contentTypeRoute.alias, path: requestPath },
+    ]
+    : resolved?.breadcrumbs ?? [];
+
+const origin = (Astro.site ?? Astro.url).origin;
+const toAbsoluteUrl = (path: string) => (path ? `${origin}/${path}` : `${origin}/`);
+
+// og:image must be an absolute URL per the OG spec — jpeg is used (rather than the site's usual
+// webp/avif) for the widest crawler/scraper compatibility (Facebook, Slack, etc.), sized to a
+// typical OG width; withCropParams re-applies whatever crop the image picker recorded.
+const ogImageUrl: string | null = ogProps.image?.id
+    ? toAbsoluteUrl(withCropParams(`image/${ogProps.image.id}?fmt=jpeg&w=1200`, ogProps.image.crop ?? null))
+    : null;
+// og:url is the same canonical/absolute-path scheme the breadcrumb JSON-LD below uses for its
+// own '@id's — this page's own path, not wherever a redirect or query string happened to land.
+const ogUrl: string = toAbsoluteUrl(requestPath);
+
+const breadcrumbList: BreadcrumbList | null = requestPath && breadcrumbEntries.length
+    ? {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: { '@id': toAbsoluteUrl('') } },
+            ...breadcrumbEntries.map((entry, index) => ({
+                '@type': 'ListItem' as const,
+                position: index + 2,
+                name: entry.title,
+                item: { '@id': toAbsoluteUrl(entry.path) },
+            })),
+        ],
+    }
+    : null;
+
+// schema-dts models most node types as `<object> | string` (a bare string being a reference by
+// name), and only the object form can be merged into the @context wrapper below.
+const jsonLdItems = [jsonLd, breadcrumbList].filter(
+    (item): item is Exclude<NonNullable<typeof item>, string> => typeof item === 'object' && item !== null,
+);
+// A lone item is emitted inline; two or more go under an @graph.
+const [firstJsonLdItem] = jsonLdItems;
+const jsonLdDocument = !firstJsonLdItem
+    ? null
+    : jsonLdItems.length === 1
+        ? { '@context': 'https://schema.org', ...firstJsonLdItem }
+        : { '@context': 'https://schema.org', '@graph': jsonLdItems };
+// Escaping `<` prevents a field value like `</script><script>...` from breaking out of the tag.
+const jsonLdScript = jsonLdDocument ? JSON.stringify(jsonLdDocument).replace(/</g, '\\u003c') : null;
+---
+
+<!DOCTYPE html>
+<html lang="en" data-theme="false">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {ogDescription && <meta name="description" content={ogDescription} />}
+    {ogTitle && <meta property="og:title" content={ogTitle} />}
+    <meta property="og:type" content="website" />
+    {ogDescription && <meta property="og:description" content={ogDescription} />}
+    {ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
+    <meta property="og:url" content={ogUrl} />
+    {siteName && <meta property="og:site_name" content={siteName} />}
+    {jsonLdScript && <script type="application/ld+json" is:inline set:html={jsonLdScript} />}
+    {fontSettings.bodyFontLink && <link rel="stylesheet" href={fontSettings.bodyFontLink} />}
+    {fontSettings.headingFontLink && fontSettings.headingFontLink !== fontSettings.bodyFontLink && (
+        <link rel="stylesheet" href={fontSettings.headingFontLink} />
+    )}
+    <style define:vars={{
+        bodyFontFamily: bodyFontFamily ? `'${bodyFontFamily}', sans-serif` : 'inherit',
+        headingFontFamily: headingFontFamily ? `'${headingFontFamily}', sans-serif` : 'inherit',
+    }}>
+        body { font-family: var(--bodyFontFamily); }
+        :global(h1), :global(h2), :global(h3), :global(h4), :global(h5), :global(h6) { font-family: var(--headingFontFamily); }
+    </style>
+</head>
+<body>
+    <PageRenderer pageData={pageData} templateData={templateData} renderIsolatedIsland={renderToStaticMarkup} />
+    <script>
+        import "../puck/hydrate-page-islands.js";
+    </script>
+</body>
+</html>

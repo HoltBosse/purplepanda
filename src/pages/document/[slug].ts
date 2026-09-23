@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { has404Page } from 'virtual:purplepanda/has-404';
 import type { APIRoute } from "astro";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../db/db.js";
@@ -32,10 +31,7 @@ export const GET: APIRoute = async ({ params, rewrite }) => {
         .limit(1);
 
     if (!doc) {
-        if (has404Page) {
-            return rewrite('/404');
-        }
-        return new Response('Not Found', { status: 404 });
+        return rewrite('/404');
     }
 
     const documentPath = getDocumentPath();
@@ -45,10 +41,7 @@ export const GET: APIRoute = async ({ params, rewrite }) => {
     try {
         fileBuffer = await readFile(filePath);
     } catch {
-        if (has404Page) {
-            return rewrite('/404');
-        }
-        return new Response('Not Found', { status: 404 });
+        return rewrite('/404');
     }
 
     const mimeType = getMimeType(fileBuffer);

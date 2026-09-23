@@ -1,6 +1,5 @@
 ---
 import '../../../../styles/global.css';
-import externalPuckConfig from 'virtual:purplepanda/puck-config';
 import type { Data } from '@puckeditor/core';
 import { eq } from 'drizzle-orm';
 import PageRenderer from '../../../../components/PageRenderer.js';
@@ -11,6 +10,7 @@ import { formatPageTitle, resolveSiteName } from '../../../../db/site.js';
 import { resolveTemplateSetting } from '../../../../db/templates.js';
 import { extractFamilyFromLink } from '../../../../form/fields/font-utils.js';
 import { resolveDataForSSR } from '../../../../puck/server-data-wrapper.js';
+import externalPuckConfig from '../../../../puck.config.js';
 
 // Dynamically imported (not a static top-level import) so it's only pulled into the SSR
 // dependency graph on an actual page request — see the same comment in page.astro.
@@ -65,7 +65,10 @@ const bodyFontFamily = extractFamilyFromLink(fontSettings.bodyFontLink);
         :global(h1), :global(h2), :global(h3), :global(h4), :global(h5), :global(h6) { font-family: var(--headingFontFamily); }
     </style>
 </head>
-<body data-purplepanda-islands>
+<body>
     <PageRenderer pageData={pageData} templateData={templateData} renderIsolatedIsland={renderToStaticMarkup} />
+    <script>
+        import "../../../../puck/hydrate-page-islands.js";
+    </script>
 </body>
 </html>

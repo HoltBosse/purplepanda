@@ -1,0 +1,24 @@
+---
+// The same media library as /admin/media, scoped to one folder. The view itself reads the folder
+// back off Astro.params; this route only has to reject ids that don't name a real folder, which it
+// does here rather than inside ./index.astro because a Response returned from a nested component
+// is discarded by the renderer.
+import { eq } from 'drizzle-orm';
+import { z } from 'zod';
+import { getDb } from '../../../db/db.js';
+import { mediafolders } from '../../../db/schema.js';
+import MediaLibrary from './index.astro';
+
+const { id } = Astro.params;
+
+// Reject invalid ids before hitting Postgres uuid comparison.
+if (!id || !z.uuid().safeParse(id).success) {
+    return Astro.rewrite('/admin/__not-found');
+}
+
+const folder = await getDb().select().from(mediafolders).where(eq(mediafolders.id, id)).limit(1);
+if (folder.length === 0) {
+    return Astro.rewrite('/admin/__not-found');
+}
+---
+<MediaLibrary />

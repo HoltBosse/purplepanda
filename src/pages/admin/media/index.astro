@@ -16,25 +16,11 @@ import { parseSearchQuery } from '../../../search/parser.js';
 import SearchBar from '../../../search/SearchBar';
 import type { SearchFieldSpec } from '../../../search/types.js';
 
-// This entrypoint is injected under both /admin/media and /admin/media/[id] (see index.ts),
-// so Astro.params isn't statically typed with `id` here even though it's present at runtime.
+// This page also backs /admin/media/[id] (./[id].astro renders it), which is where `id` comes
+// from -- and where it is validated -- so Astro.params isn't statically typed with it here.
 const { id } = Astro.params as { id?: string };
 
 const db = getDb();
-const folderIdSchema = z.uuid();
-
-if(id) {
-    // Reject invalid ids before hitting Postgres uuid comparison.
-    if (!folderIdSchema.safeParse(id).success) {
-        return Astro.rewrite('/admin/__not-found');
-    }
-
-    //check that its a valid form
-    const folders_check = await db.select().from(mediafolders).where(eq(mediafolders.id, id)).limit(1);
-    if(folders_check.length === 0) {
-        return Astro.rewrite('/admin/__not-found');
-    }
-}
 
 // Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
 // valid/invalid highlighting, and the qualifier/value autocomplete dropdown.
@@ -187,7 +173,7 @@ if(id && !isSearching) {
             </div>
         )}
         <script>
-            import "./media-library";
+            import "./_media-library";
         </script>
 
         <dialog id="delete-confirm-dialog" closedby="any" class="relative m-auto w-96 max-w-[calc(100vw-2rem)] rounded-xl bg-base-100 p-6 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">

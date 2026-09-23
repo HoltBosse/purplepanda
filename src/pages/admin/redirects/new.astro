@@ -6,7 +6,7 @@ import Form from '../../../form/Form.astro';
 import { getAllFields } from '../../../form/index.js';
 import { createFormFlashSession } from '../../../form/session.js';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
-import { getRedirectForm } from './form.js';
+import { getRedirectForm } from './_form.js';
 
 const db = getDb();
 const { id } = Astro.params;

@@ -1,4 +1,3 @@
-import externalPuckConfig from 'virtual:purplepanda/puck-config';
 import type { Config, Data } from '@puckeditor/core';
 import type { APIRoute } from 'astro';
 import { and, desc, gt } from 'drizzle-orm';
@@ -13,9 +12,10 @@ import {
 } from '../../../../puck/form/submission-display.js';
 import { filterConfigByLocation } from '../../../../puck/index.js';
 import { resolveDataForSSR } from '../../../../puck/server-data-wrapper.js';
+import externalPuckConfig from '../../../../puck.config.js';
 import { applySearchJoins, buildSearchWhere } from '../../../../search/drizzle.js';
 import { parseSearchQuery } from '../../../../search/parser.js';
-import { searchConfig } from './search-config.js';
+import { searchConfig } from './_search-config.js';
 
 function csvCell(value: string): string {
     // Spreadsheet apps treat a leading =, +, -, or @ as a formula; prefix with a quote to

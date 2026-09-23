@@ -1,42 +1,32 @@
 {
+  "extends": "astro/tsconfigs/strict",
+  "include": [
+    ".astro/types.d.ts",
+    "**/*"
+  ],
+  "exclude": [
+    "dist",
+    "docs",
+    "node_modules",
+    "media",
+    "documents"
+  ],
   "compilerOptions": {
-    "rootDir": "./src",
     "paths": {
-      "@lucide/astro": ["./src/lucide-astro.d.ts"]
+      "@lucide/astro": [
+        "./src/lucide-astro.d.ts"
+      ]
     },
-    "outDir": "./dist",
-    "module": "preserve",
-    "moduleResolution": "bundler",
-    "target": "esnext",
     "types": [
       "astro/client",
       "node"
     ],
-    "typeRoots": [
-      "../../node_modules/@types",
-      "./node_modules/@types"
-    ],
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-    "strict": true,
-    "jsx": "react-jsx",
     "verbatimModuleSyntax": true,
-    "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
-    "moduleDetection": "force",
-    "skipLibCheck": true,
-    "jsxImportSource": "react"
-  },
-  "exclude": [
-    "drizzle.config.ts",
-    "vitest.config.ts",
-    "vitest.virtual-modules.ts",
-    "dist",
-    "node_modules",
-    "**/*.test.ts",
-    "docs/**"
-  ]
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "moduleDetection": "force"
+  }
 }

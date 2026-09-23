@@ -1,4 +1,3 @@
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Config, Data } from "@puckeditor/core";
 import { useMemo } from "react";
 import { wrapConfigWithClientDataResolvers } from "../puck/client-data-wrapper.js";
@@ -6,6 +5,7 @@ import { notifyUsersField } from "../puck/component-fields/NotifyUsersField.js";
 import { collectComponentNodes } from "../puck/content-tree.js";
 import { formRootPropsSchema } from "../puck/form-root-schema.js";
 import { filterConfigByLocation, wrapConfigWithDataBinding } from "../puck/index.js";
+import externalPuckConfig from "../puck.config.js";
 import PuckEditor from "./PuckEditor.js";
 
 type PageOption = { id: string; title: string };

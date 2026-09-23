@@ -1,0 +1,37 @@
+{
+	"name": "purple panda workspace",
+	"image": "mcr.microsoft.com/devcontainers/base:noble",
+	"features": {
+		"ghcr.io/devcontainers/features/node:1": {
+			"nodeGypDependencies": true,
+			"version": "lts/krypton",
+			"nvmVersion": "latest"
+		},
+		"ghcr.io/itsmechlark/features/postgresql:1": {
+		}
+	},
+	"forwardPorts": [
+		3012
+	],
+	"appPort": [
+		"3012:3012"
+	],
+	"portsAttributes": {
+		"3012": {
+			"label": "Astro Dev Server"
+		}
+	},
+	"222postCreateCommand": "npm install",
+	"customizations": {
+		"codespaces": {
+			"openFiles": [
+				"README.md"
+			]
+		},
+		"vscode": {
+			"extensions": [
+				"astro-build.astro-vscode"
+			]
+		}
+	}
+}

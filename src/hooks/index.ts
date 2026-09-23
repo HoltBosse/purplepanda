@@ -1,8 +1,8 @@
-import plugins from "virtual:purplepanda/plugins";
 import type * as z from "zod";
+import plugins from "../plugins.js";
 
 // Deliberately no central registry of event/hook names or payload shapes here -- like addAction()
-// (../actions/index.js), each call site is free to emit()/runOverride() whatever string+shape it
+// (../audit/index.js), each call site is free to emit()/runOverride() whatever string+shape it
 // wants without touching this file. The cost is that plugin authors don't get autocomplete on event
 // names and a typo'd name just silently never fires, checked only by convention/docs, not tsc.
 // runOverride's required schema (below) covers the other half of that gap -- a plugin returning the

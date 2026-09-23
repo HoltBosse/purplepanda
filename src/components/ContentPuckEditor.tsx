@@ -1,10 +1,10 @@
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 import type { Data } from "@puckeditor/core";
 import { useMemo } from "react";
 import { aliasField } from "../puck/component-fields/AliasField.js";
 import { dateTimeField } from "../puck/component-fields/DateTimeField.js";
 import { notesField } from "../puck/component-fields/NotesField.js";
 import { ogField } from "../puck/component-fields/OpenGraphField.js";
+import externalPuckConfig from "../puck.config.js";
 import PagePuckEditor from "./PagePuckEditor.js";
 
 interface ContentPuckEditorProps {

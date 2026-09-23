@@ -2,7 +2,7 @@ import type { Config } from "@puckeditor/core";
 import { createContext, createElement, type ReactElement, useContext } from "react";
 
 // Attribute names shared by the server wrapper (below) and the client hydration runtime
-// (injected in src/index.ts). Kept as constants so the two stay in lockstep.
+// (./hydrate-page-islands.ts). Kept as constants so the two stay in lockstep.
 export const ISLAND_NAME_ATTR = "data-puck-island";
 export const ISLAND_PROPS_ATTR = "data-puck-props";
 
@@ -49,7 +49,7 @@ function serializeIslandProps(props: Record<string, unknown>): string {
 // Renders an island's marker element: the wrapping div carrying the component name and its
 // serialized props, around the component's own output.
 //
-// The client hydration runtime (src/index.ts, hydrate-islands.ts) always hydrates a marker as its
+// The client hydration runtime (hydrate-page-islands.ts, hydrate-islands.ts) always hydrates a marker as its
 // own isolated React root — `hydrateRoot(el, createElement(baseRender, props))`, nothing above it
 // in the tree. `useId()` (called directly, or inside a library like Base UI for aria-* ids) derives
 // its value from the calling component's position in the tree back to that tree's root, not from a

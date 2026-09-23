@@ -8,20 +8,7 @@ export type BoundItem = Record<string, unknown>;
 // The item a repeated card/template instance is currently bound to. Set by CardCollection
 // around each rendered copy of its cardTemplate slot; read by any component that declares
 // `bindableFields` on itself (via the render wrapping below).
-//
-// Pinned to a globalThis singleton (keyed by a registry Symbol) rather than a plain module-level
-// `createContext` call: this package is reachable from a consumer through more than one resolved
-// module path (e.g. "@holtbosse/purplepanda/puck" vs a relative import from within
-// "puck/prefab/CardCollection.js"), and in a symlinked workspace those can end up as two separate
-// evaluations of this file. Two evaluations means two different context objects, and a Provider
-// from one is invisible to a Consumer reading the other — the consumer silently falls back to the
-// default (null) forever. `Symbol.for` + globalThis guarantees a single shared instance across
-// however many times this module is evaluated, since they all run in the same JS realm.
-const ITEM_CONTEXT_KEY = Symbol.for("@holtbosse/purplepanda/puck/ItemContext");
-type GlobalWithItemContext = typeof globalThis & { [ITEM_CONTEXT_KEY]?: Context<BoundItem | null> };
-const globalWithItemContext = globalThis as GlobalWithItemContext;
-globalWithItemContext[ITEM_CONTEXT_KEY] ??= createContext<BoundItem | null>(null);
-export const ItemContext: Context<BoundItem | null> = globalWithItemContext[ITEM_CONTEXT_KEY];
+export const ItemContext: Context<BoundItem | null> = createContext<BoundItem | null>(null);
 
 export function useBoundItem(): BoundItem | null {
   return useContext(ItemContext);

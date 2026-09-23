@@ -220,12 +220,12 @@ function toSubmissionSchema(props: SelectProps) {
 }
 
 // Imported dynamically, only when actually needed (inside resolveFields, below), rather than at
-// module scope: this component is registered as part of the same virtual:purplepanda/puck-config
+// module scope: this component is registered as part of the same ../../puck.config.js
 // that's still busy loading it (see the identical comment in ../prefab/CardCollection.tsx), and a
 // static top-level import also can't resolve outside a real Astro/vite build — e.g. under plain
 // vitest, which imports this module directly (see form/schema.test.ts).
 async function getContentTypeOptions() {
-  const { default: externalPuckConfig } = await import("virtual:purplepanda/puck-config");
+  const { default: externalPuckConfig } = await import("../../puck.config.js");
   return (externalPuckConfig?.contentTypes ?? []).map((contentType) => ({
     label: contentType.title,
     value: contentType.id,

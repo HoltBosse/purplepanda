@@ -1,6 +1,8 @@
-import documentPath from "virtual:purplepanda/document-path";
+import "dotenv/config";
+import { resolve } from "node:path";
 
+// Same arrangement as getMediaPath() in ../media/media.ts: ./documents under the project root by
+// default, DOCUMENT_PATH (absolute) to override.
 export function getDocumentPath(): string {
-  if (!documentPath) throw new Error("[purplepanda] No document path provided. Pass `documentPath` to purplePandaIntegration().");
-  return documentPath;
+  return resolve(process.env.DOCUMENT_PATH ?? "documents");
 }

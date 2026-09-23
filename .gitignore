@@ -11,6 +11,11 @@ out/
 .output/
 *.tsbuildinfo
 
+# Uploaded content. These are the runtime stores behind /image/[id] and /document/[slug]
+# (see src/media/media.ts and src/document/document.ts) -- user data, not source.
+/media/
+/documents/
+
 # Logs
 logs/
 *.log
@@ -22,6 +27,8 @@ pnpm-debug.log*
 # Environment variables
 .env
 .env.local
+.env.production
+.env.example
 .env.*.local
 
 # OS files
@@ -30,7 +37,6 @@ Thumbs.db
 
 # Editor directories and files
 .idea/
-.vscode/
 *.suo
 *.ntvs*
 *.njsproj
@@ -48,13 +54,11 @@ coverage/
 .parcel-cache/
 .turbo/
 .astro/
+.claude/
+astro.config.ts
+.vscode/
+psqlshell.sh
 
 # Vitest browser mode failure artifacts
 .vitest-attachments/
 **/__screenshots__/
-
-# Package manager lockfiles (keep only one)
-# Uncomment the ones you don't use:
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml

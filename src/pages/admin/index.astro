@@ -1,5 +1,4 @@
 ---
-import externalPuckConfig from "virtual:purplepanda/puck-config";
 import {
 	Activity,
 	ChartPie,
@@ -18,11 +17,12 @@ import {
 	Users,
 } from '@lucide/astro';
 import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
-import { describeAction } from '../../actions/index.js';
+import { describeAction } from '../../audit/index.js';
 import LocalDateTime from '../../components/LocalDateTime.astro';
 import { getDb } from '../../db/db.js';
 import { documents, formSubmissions, forms, media, pages, redirects, roles, tags, templates, userActions, userRoles, users } from '../../db/schema.js';
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import externalPuckConfig from "../../puck.config.js";
 import { capitalize } from '../../string';
 
 const db = getDb();
@@ -118,10 +118,12 @@ const [recentSubmissions, submissionCount] = await Promise.all([
 	db.select({ count: sql<number>`COUNT(*)` }).from(formSubmissions).where(gt(formSubmissions.state, -1)).then(r => r[0]?.count ?? 0),
 ]);
 
+const [firstContentType] = contentTypes;
+
 const statItems = [
 	{ label: 'Pages', count: totalPages, href: '/admin/pages', Icon: FileText },
-	...(contentTypes.length > 0
-		? [{ label: 'Content Entries', count: totalContentEntries, href: `/admin/content/${contentTypes[0].id}`, Icon: LayoutTemplate }]
+	...(firstContentType
+		? [{ label: 'Content Entries', count: totalContentEntries, href: `/admin/content/${firstContentType.id}`, Icon: LayoutTemplate }]
 		: []),
 	{ label: 'Templates', count: templateCount, href: '/admin/templates', Icon: LayoutTemplate },
 	{ label: 'Forms', count: formCount, href: '/admin/forms', Icon: ClipboardList },

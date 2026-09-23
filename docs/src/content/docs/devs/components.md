@@ -6,10 +6,11 @@ description: How to set up a your first component.
 # Provided Components
 
 ```js
-import { TextInput, Textarea, Select, Checkbox, RadioGroup, Turnstile, Image } from "@holtbosse/purplepanda/puck/form-fields";
-import { FormEmbed } from "@holtbosse/purplepanda/puck/form";
-import { Grid, Flex, Space, Rich, CardCollection, Margin, Accordion } from "@holtbosse/purplepanda/puck/prefab";
-import { ImagePicker } from "@holtbosse/purplepanda/puck/media";
+// src/puck.config.tsx
+import { TextInput, Textarea, Select, Checkbox, RadioGroup, Turnstile, Image } from "./puck/form-fields/index.js";
+import { FormEmbed } from "./puck/form/index.js";
+import { Grid, Flex, Space, Rich, CardCollection, Margin, Accordion } from "./puck/prefab/index.js";
+import { ImagePicker } from "./puck/media/index.js";
 ```
 
 # Additional Puck component fields

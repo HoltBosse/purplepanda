@@ -9,9 +9,7 @@
 		"includes": [
 			"**",
 			"!!**/dist",
-			"!!src/components/LoginPanda.svg",
-			"!!src/components/LoadingPanda.svg",
-			"!!src/components/404.svg"
+			"!!**/*.svg"
 		]
 	},
 	"formatter": {
@@ -50,7 +48,9 @@
 	},
 	"overrides": [
 		{
-			"includes": ["**/*.astro"],
+			"includes": [
+				"**/*.astro"
+			],
 			"linter": {
 				"rules": {
 					"correctness": {
