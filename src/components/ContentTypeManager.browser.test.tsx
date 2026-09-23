@@ -190,7 +190,7 @@ describe('ContentTypeManager', () => {
 
         const dialog = screen.container.querySelector('dialog');
         expect(dialog?.open).toBe(true);
-        expect(dialog?.textContent).toContain('Its 3 items will disappear from the admin and stop being published.');
+        expect(dialog?.textContent).toContain('3 items will be removed.');
         expect(dialog?.querySelector('form[method="POST"]')?.getAttribute('action')).toBe(
             `/admin/settings/content-types/delete/${id}`,
         );

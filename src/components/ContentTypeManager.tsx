@@ -248,7 +248,7 @@ export default function ContentTypeManager({ contentTypes, itemCounts, actionBas
         <h2 className="text-lg font-medium settings-search-label">Content Types</h2>
         <button
           type="button"
-          className={`btn btn-sm ${open ? "btn-error" : "btn-secondary"}`}
+          className={`btn btn-sm ${open ? "btn-error" : "btn-accent"}`}
           onClick={() => (open ? setOpen(false) : openBuilder(null))}
         >
           {open ? "Cancel" : "New content type"}
@@ -624,7 +624,7 @@ export default function ContentTypeManager({ contentTypes, itemCounts, actionBas
           <input type="hidden" name="jsonld" value={serializedJsonLd} />
 
           <div className="flex justify-end">
-            <button type="submit" className="btn btn-accent btn-sm">
+            <button type="submit" className="btn btn-success btn-sm">
               {editing ? "Save changes" : "Create content type"}
             </button>
           </div>
