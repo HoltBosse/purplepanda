@@ -1,4 +1,3 @@
-import { imageField } from "./puck/component-fields/index.js";
 import { FormEmbed } from "./puck/form/index.js";
 import { Checkbox, Image, RadioGroup, Select, Textarea, TextInput, Turnstile } from "./puck/form-fields/index.js";
 import { definePuckConfig } from "./puck/index.js";
@@ -58,33 +57,6 @@ const config = definePuckConfig({
     },
     ImagePicker
   },
-  // https://www.uuidgenerator.net/version4
-  contentTypes: [
-    {
-      id: "61518547-b321-4b88-aea7-a235acdc4619",
-      title: "Article",
-      fields: {
-        description: { type: "text" },
-        body: { type: "richtext" },
-      },
-      baseUrl: "/articles",
-      jsonLd: (props) => ({
-        "@type": "Article",
-        headline: props.title,
-        description: props.description,
-      }),
-    },
-    {
-      id: "387dc1e1-e2bb-4dce-9f37-ab8ae199c67b",
-      title: "Product",
-      fields: {
-        price: { type: "number" },
-        description: { type: "text" },
-        image: imageField,
-      },
-      baseUrl: "/products",
-    }
-  ],
   fontFamilies: ["https://use.typekit.net/pdw7dwo.css?family=josefin-sans"]
 });
 

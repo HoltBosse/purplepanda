@@ -4,6 +4,8 @@ import type * as z from "zod";
 
 export type { ComponentConfig, Slot } from "@puckeditor/core";
 export { ClientComponentDataWrapper, wrapConfigWithClientDataResolvers } from "./client-data-wrapper.js";
+export type { ContentTypeFieldDef, ContentTypeInput, ContentTypeRecord, JsonLdConfig } from "./content-types.js";
+export { buildJsonLd, getContentTypeRecords, normalizeBaseUrl } from "./content-types.js";
 export type { BoundItem } from "./data-binding.js";
 export { ItemContext, useBoundItem, wrapConfigWithDataBinding } from "./data-binding.js";
 export { formRootPropsSchema } from "./form-root-schema.js";
@@ -33,6 +35,9 @@ type ComponentWithDataResolver<TComponent> = Omit<TComponent, "data" | "location
   locations?: Location | Location[];
 };
 
+// A content type as the editor consumes it, built from its database row by
+// ./content-type-fields.tsx. Content types are authored in /admin/settings, not declared in the
+// site's Puck config — see ./content-types.ts for the stored shape.
 export type ContentType = {
   id: string;
   title: string,
@@ -40,8 +45,8 @@ export type ContentType = {
   baseUrl?: string;
   // Builds this content type's structured-data (JSON-LD) representation from a page's resolved
   // root props (i.e. its `fields` values). Returns a schema.org `Thing` minus `@context`, which
-  // page.astro adds and serializes into a `<script type="application/ld+json">` tag. Omit to skip
-  // structured data for this content type.
+  // page.astro adds and serializes into a `<script type="application/ld+json">` tag. Returns
+  // undefined when the content type has no structured data configured.
   jsonLd?: (props: any) => Thing | undefined;
 };
 
@@ -72,7 +77,6 @@ type ConfigWithDataResolvers<TConfig extends Config> = Omit<TConfig, "components
   components: {
     [TName in keyof TConfig["components"]]: ComponentWithDataResolver<TConfig["components"][TName]>;
   };
-  contentTypes?: ContentType[];
   fontFamilies?: string[];
 };
 

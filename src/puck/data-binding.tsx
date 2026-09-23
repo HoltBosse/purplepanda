@@ -1,7 +1,9 @@
 import type { ComponentConfig, ComponentData, Config, Field } from "@puckeditor/core";
 import type { Context } from "react";
 import { createContext, useContext } from "react";
-import type { BindableFieldMeta, ContentType } from "./index.js";
+import type { ContentTypeRecord } from "./content-types.js";
+import { getContentTypeRecords, puckFieldType } from "./content-types.js";
+import type { BindableFieldMeta } from "./index.js";
 
 export type BoundItem = Record<string, unknown>;
 
@@ -40,12 +42,12 @@ function inferContentTypeId(parent: ComponentData | null | undefined): string | 
   return isNonEmptyString(inherited) ? inherited : undefined;
 }
 
-function fieldOptionsForContentType(contentType: ContentType, meta: BindableFieldMeta) {
-  return Object.entries(contentType.fields ?? {})
-    .filter(([, field]) => !meta.fieldTypes || meta.fieldTypes.includes((field as Field).type))
-    .map(([fieldName, field]) => ({
-      label: (field as Field).label || fieldName,
-      value: fieldName,
+function fieldOptionsForContentType(contentType: ContentTypeRecord, meta: BindableFieldMeta) {
+  return (contentType.fields ?? [])
+    .filter((field) => !meta.fieldTypes || meta.fieldTypes.includes(puckFieldType(field.type) as Field["type"]))
+    .map((field) => ({
+      label: field.label || field.name,
+      value: field.name,
     }));
 }
 
@@ -82,11 +84,9 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 // This mirrors wrapConfigWithClientDataResolvers/resolveDataForSSR: components declare intent
 // via a plain property, and a single function processes the whole config once.
 export function wrapConfigWithDataBinding(config: Config): Config {
-  const contentTypes: ContentType[] = (config as unknown as { contentTypes?: ContentType[] }).contentTypes ?? [];
-
   const wrappedComponents: Config["components"] = {};
   for (const [name, componentConfig] of Object.entries(config.components ?? {})) {
-    wrappedComponents[name] = wrapComponent(componentConfig as ComponentConfig, contentTypes);
+    wrappedComponents[name] = wrapComponent(componentConfig as ComponentConfig);
   }
 
   return {
@@ -95,7 +95,7 @@ export function wrapConfigWithDataBinding(config: Config): Config {
   };
 }
 
-function wrapComponent(componentConfig: ComponentConfig, contentTypes: ContentType[]): ComponentConfig {
+function wrapComponent(componentConfig: ComponentConfig): ComponentConfig {
   const bindable = (componentConfig as { bindableFields?: Record<string, BindableFieldMeta> }).bindableFields;
   const originalResolveFields = componentConfig.resolveFields;
   const originalResolveData = componentConfig.resolveData;
@@ -111,8 +111,11 @@ function wrapComponent(componentConfig: ComponentConfig, contentTypes: ContentTy
 
       if (!bindable || Object.keys(bindable).length === 0) return baseFields;
 
+      // Read per call rather than captured when the config is wrapped: the content types live in
+      // the database (reaching the browser as a global written by the admin layouts), and this
+      // wrapping happens at module scope, before that global is guaranteed to be there.
       const contentTypeId = inferContentTypeId(params.parent);
-      const contentType = contentTypeId ? contentTypes.find((ct) => ct.id === contentTypeId) : undefined;
+      const contentType = contentTypeId ? getContentTypeRecords().find((ct) => ct.id === contentTypeId) : undefined;
       if (!contentType) return baseFields;
 
       const currentProps = (data.props ?? {}) as Record<string, unknown>;

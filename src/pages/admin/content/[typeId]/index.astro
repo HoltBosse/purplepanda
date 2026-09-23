@@ -4,27 +4,28 @@ import { and, desc, eq, type InferSelectModel, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod';
 import Pagination from '../../../../components/Pagination.astro';
 import PublishStateIcon from '../../../../components/PublishStateIcon.astro';
+import { listContentTypes } from '../../../../db/content-types.js';
 import { getDb } from '../../../../db/db.js';
 import { resolvePagePathById } from '../../../../db/page-path.js';
 import { dagNodes, pages, userActions, users } from '../../../../db/schema.js';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import { isWithinSchedule } from '../../../../puck/schedule.js';
-import externalPuckConfig from "../../../../puck.config.js";
 import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../../search/drizzle.js';
 import { parseSearchQuery } from '../../../../search/parser.js';
 import SearchBar from '../../../../search/SearchBar';
 import type { SearchFieldSpec } from '../../../../search/types.js';
 
 const { typeId } = Astro.params;
-const contentTypes = (externalPuckConfig ? externalPuckConfig.contentTypes : []) ?? [];
+
+const db = getDb();
+
+const contentTypes = await listContentTypes(db);
 //check that one of contentTypes .id matches typeId param
 if(!typeId || !contentTypes.find(ct => ct.id === typeId)) {
     return Astro.rewrite('/admin/__not-found');
 }
 
 const contentType = contentTypes.find(ct => ct.id === typeId);
-
-const db = getDb();
 
 // The title isn't a column — Puck stores it inside the content document, which is why the table
 // below reads `content.root.props.title`. The search builder takes an arbitrary SQL expression in

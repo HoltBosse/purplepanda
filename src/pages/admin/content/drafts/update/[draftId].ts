@@ -2,6 +2,7 @@ import type { APIContext } from "astro";
 import { eq } from 'drizzle-orm';
 import * as z from "zod";
 import { addAlertToSession, alertType, createAlert } from "../../../../../alert/index.js";
+import { getContentTypeById } from "../../../../../db/content-types.js";
 import { getDb } from "../../../../../db/db.js";
 import { dagNodes, pages } from "../../../../../db/schema.js";
 import { runOverride } from "../../../../../hooks/index.js";
@@ -19,7 +20,8 @@ export async function POST(context: APIContext): Promise<Response> {
     }
 
     const [entity] = await db.select().from(pages).where(eq(pages.id, draft.entityId)).limit(1);
-    if (!entity?.contentType) {
+    // An item whose content type has been deleted can't be edited or published through a draft.
+    if (!entity?.contentType || !(await getContentTypeById(db, entity.contentType))) {
         return new Response("Content not found", { status: 404 });
     }
 

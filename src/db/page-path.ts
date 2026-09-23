@@ -1,11 +1,8 @@
 import { and, eq, isNull } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import externalPuckConfig from "../puck.config.js";
+import { normalizeBaseUrl } from "../puck/content-types.js";
+import { getContentTypeById } from "./content-types.js";
 import { pages } from "./schema.js";
-
-function normalizeBaseUrl(baseUrl: string): string {
-  return baseUrl.replace(/^\/+|\/+$/g, "");
-}
 
 // Mirrors page.astro's resolvePlainPage/getPagePath walk, but resolves a single page by id
 // (used e.g. by the form submit handler to redirect to a chosen page) rather than building a
@@ -21,8 +18,12 @@ export async function resolvePagePathById(
   const alias: string = content?.root?.props?.alias ?? "";
 
   if (page.contentType) {
-    const contentType = (externalPuckConfig?.contentTypes ?? []).find((ct) => ct.id === page.contentType);
-    const base = contentType?.baseUrl ? normalizeBaseUrl(contentType.baseUrl) : "";
+    // An item of a deleted content type has no public path any more (see [...path].astro, which
+    // only routes live types) — and falling through to the bare alias would point at whatever
+    // plain page happened to share it.
+    const contentType = await getContentTypeById(db, page.contentType);
+    if (!contentType) return null;
+    const base = contentType.baseUrl ? normalizeBaseUrl(contentType.baseUrl) : "";
     return base ? `${base}/${alias}` : alias;
   }
 

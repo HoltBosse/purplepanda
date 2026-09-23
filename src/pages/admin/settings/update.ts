@@ -1,16 +1,16 @@
 import type { APIContext } from "astro";
 import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
 import { invalidateSettingsCache } from "../../../db/content-cache.js";
+import { listContentTypes } from "../../../db/content-types.js";
 import { getDb } from "../../../db/db.js";
 import { settings } from "../../../db/schema.js";
 import { createUserAlertMessageFromArray, formDataToRecord, getFieldByName, validateForm } from "../../../form/index.js";
 import { createFormFlashSession } from "../../../form/session.js";
-import externalPuckConfig from "../../../puck.config.js";
 import { getSettingsForm } from "./_form.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
-    const contentTypes = externalPuckConfig?.contentTypes ?? [];
+    const contentTypes = await listContentTypes(db);
     const form = getSettingsForm(undefined, undefined, undefined, {}, contentTypes);
     const formData = await context.request.formData();
     const formFlash = createFormFlashSession(context.session);

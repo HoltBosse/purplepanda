@@ -2,6 +2,7 @@ import type { APIContext } from "astro";
 import { inArray } from "drizzle-orm";
 import { z } from "zod";
 import { invalidatePagesCache } from "../../../../../db/content-cache.js";
+import { getContentTypeById } from "../../../../../db/content-types.js";
 import { getDb } from "../../../../../db/db.js";
 import { pages } from "../../../../../db/schema.js";
 
@@ -23,6 +24,11 @@ export async function POST(context: APIContext): Promise<Response> {
         return context.rewrite("/admin/404");
     }
 
+    const db = getDb();
+    if (!(await getContentTypeById(db, typeId))) {
+        return new Response("Content type not found", { status: 404 });
+    }
+
     const formData = await context.request.formData();
     const rawIds = formData.getAll("selected[]");
 
@@ -31,7 +37,6 @@ export async function POST(context: APIContext): Promise<Response> {
         return new Response("Invalid IDs", { status: 400 });
     }
 
-    const db = getDb();
     await db.update(pages).set({ state: stateMap[action as Action] }).where(inArray(pages.id, result.data));
     invalidatePagesCache(db);
 

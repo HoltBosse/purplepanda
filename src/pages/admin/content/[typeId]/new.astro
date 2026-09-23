@@ -2,24 +2,23 @@
 import type { Data } from '@puckeditor/core';
 import { eq } from 'drizzle-orm';
 import ContentPuckEditor from '../../../../components/ContentPuckEditor';
+import { getContentTypeById } from '../../../../db/content-types.js';
 import { getDb } from '../../../../db/db.js';
 import { resolveFontSettings } from '../../../../db/fonts.js';
 import { resolvePrefabSetting } from '../../../../db/prefabs.js';
 import { pages } from '../../../../db/schema.js';
 import { resolveTemplateSetting } from '../../../../db/templates.js';
 import AdminBareLayout from '../../../../layouts/AdminBareLayout.astro';
-import externalPuckConfig from "../../../../puck.config.js";
 
 const { typeId, id } = Astro.params;
 
-const contentTypes = (externalPuckConfig?.contentTypes) ?? [];
-const contentType = contentTypes.find(ct => ct.id === typeId);
+const db = getDb();
+
+const contentType = await getContentTypeById(db, typeId);
 
 if (!typeId || !contentType) {
     return Astro.rewrite('/admin/__not-found');
 }
-
-const db = getDb();
 
 let saveUrl = `/admin/content/${typeId}/update`;
 if (id) {

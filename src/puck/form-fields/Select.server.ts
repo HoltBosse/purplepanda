@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import * as z from "zod";
+import { getContentTypeById } from "../../db/content-types.js";
 import { getDb } from "../../db/db.js";
 import { pages, tags, users } from "../../db/schema.js";
 import type { SelectOption } from "./Select.js";
@@ -34,6 +35,8 @@ export async function getTagOptions(): Promise<SelectOption[]> {
 
 export async function getContentOptions(contentTypeId: string): Promise<SelectOption[]> {
   const db = getDb();
+  // A Select sourced from a content type that's since been deleted offers nothing to pick.
+  if (!(await getContentTypeById(db, contentTypeId))) return [];
   const rows = await db
     .select({ id: pages.id, content: pages.content })
     .from(pages)
@@ -68,6 +71,7 @@ export async function isUserOptionValid(value: string): Promise<boolean> {
 export async function isContentOptionValid(contentTypeId: string, value: string): Promise<boolean> {
   if (!uuidSchema.safeParse(value).success) return false;
   const db = getDb();
+  if (!(await getContentTypeById(db, contentTypeId))) return false;
   const rows = await db
     .select({ id: pages.id })
     .from(pages)

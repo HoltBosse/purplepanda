@@ -5,13 +5,13 @@
 // The unknown-content-type guard is repeated here rather than left to ../new.astro alone: a
 // Response returned from a nested component is discarded by the renderer (only a page's own
 // frontmatter can short-circuit), so an unrecognised typeId has to 404 from this route itself.
-import externalPuckConfig from '../../../../../puck.config.js';
+import { getContentTypeById } from '../../../../../db/content-types.js';
+import { getDb } from '../../../../../db/db.js';
 import ContentEditor from '../new.astro';
 
 const { typeId } = Astro.params;
-const contentTypes = externalPuckConfig?.contentTypes ?? [];
 
-if (!typeId || !contentTypes.some(ct => ct.id === typeId)) {
+if (!typeId || !(await getContentTypeById(getDb(), typeId))) {
     return Astro.rewrite('/admin/__not-found');
 }
 ---

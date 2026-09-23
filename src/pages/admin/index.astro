@@ -19,10 +19,10 @@ import {
 import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
 import { describeAction } from '../../audit/index.js';
 import LocalDateTime from '../../components/LocalDateTime.astro';
+import { listContentTypes } from '../../db/content-types.js';
 import { getDb } from '../../db/db.js';
 import { documents, formSubmissions, forms, media, pages, redirects, roles, tags, templates, userActions, userRoles, users } from '../../db/schema.js';
 import AdminLayout from '../../layouts/AdminLayout.astro';
-import externalPuckConfig from "../../puck.config.js";
 import { capitalize } from '../../string';
 
 const db = getDb();
@@ -34,7 +34,7 @@ if (!user) {
 	throw new Error('User not found');
 }
 
-const contentTypes = (externalPuckConfig ? externalPuckConfig.contentTypes : []) ?? [];
+const contentTypes = await listContentTypes(db);
 
 const myRoles = await db
 	.select({ title: roles.title, adminAccess: roles.adminAccess })

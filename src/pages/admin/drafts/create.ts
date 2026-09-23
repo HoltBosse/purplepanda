@@ -3,6 +3,7 @@ import { and, count, desc, eq, gt } from 'drizzle-orm';
 import * as z from "zod";
 import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
 import { MAX_DRAFTS_PER_ENTITY } from "../../../dag/index.js";
+import { getContentTypeById } from "../../../db/content-types.js";
 import { getDb } from "../../../db/db.js";
 import { dagNodes, pages, templates } from "../../../db/schema.js";
 
@@ -40,7 +41,9 @@ export async function POST(context: APIContext): Promise<Response> {
 
     if (entityType === "page" || entityType === "content") {
         const [entity] = await db.select().from(pages).where(eq(pages.id, entityId)).limit(1);
-        if (!entity) {
+        // Content whose type has been deleted is treated as gone, same as the item itself.
+        const contentTypeGone = entityType === "content" && !(await getContentTypeById(db, entity?.contentType ?? undefined));
+        if (!entity || contentTypeGone) {
             const alert = createAlert(alertType.error, entityType === "page" ? "Page not found." : "Content not found.");
             await addAlertToSession(context.session, alert);
             return context.redirect(entityType === "page" ? "/admin/pages" : "/admin/content");

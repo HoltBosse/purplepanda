@@ -4,6 +4,7 @@ import * as z from "zod";
 import { addAlertToSession, alertType, createAlert } from "../../../../../alert/index.js";
 import { addAction } from "../../../../../audit/index.js";
 import { invalidatePagesCache } from "../../../../../db/content-cache.js";
+import { getContentTypeById } from "../../../../../db/content-types.js";
 import { getDb } from "../../../../../db/db.js";
 import { dagNodes, pages } from "../../../../../db/schema.js";
 import { runOverride } from "../../../../../hooks/index.js";
@@ -17,6 +18,11 @@ export async function POST(context: APIContext): Promise<Response> {
 
     if (!typeId) {
         return new Response("Missing content type id", { status: 400 });
+    }
+
+    // A deleted (or unknown) content type takes no new or updated items.
+    if (!(await getContentTypeById(db, typeId))) {
+        return new Response("Content type not found", { status: 404 });
     }
 
     const pageId = id;
@@ -36,6 +42,9 @@ export async function POST(context: APIContext): Promise<Response> {
                 let value: unknown;
                 if (col.defaultFn !== undefined) value = col.defaultFn();
                 else if (col.default !== undefined) value = col.default;
+                // A nullable column with no default (template_id) starts out null — '' isn't
+                // valid for a uuid column and makes the insert fail. Same as pages/update.
+                else if (!col.notNull) value = null;
                 else if (col.dataType === 'number') value = 0;
                 else value = '';
                 return [key, value];

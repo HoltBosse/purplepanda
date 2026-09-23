@@ -1,7 +1,9 @@
 ---
-import { eq, inArray } from 'drizzle-orm';
+import { and, count, eq, gt, inArray, isNotNull } from 'drizzle-orm';
+import ContentTypeManager from '../../../components/ContentTypeManager';
+import { listContentTypes } from '../../../db/content-types.js';
 import { getDb } from '../../../db/db.js';
-import { settings } from '../../../db/schema.js';
+import { pages, settings } from '../../../db/schema.js';
 import Form from '../../../form/Form.astro';
 import { getAllFields } from '../../../form/index.js';
 import { createFormFlashSession } from '../../../form/session.js';
@@ -30,7 +32,15 @@ const emailHost = emailSettings.find(s => s.key === 'email_host')?.value as stri
 const emailAddress = emailSettings.find(s => s.key === 'email_address')?.value as string | undefined;
 const emailPassword = emailSettings.find(s => s.key === 'email_password')?.value as string | undefined;
 const fontFamilies = externalPuckConfig?.fontFamilies ?? [];
-const contentTypes = (externalPuckConfig?.contentTypes ?? []);
+const contentTypes = await listContentTypes(db);
+// Items per content type — anything not deleted, drafts and unpublished included — for the
+// builder's delete confirmation to say what goes with it.
+const itemCountRows = await db
+	.select({ contentType: pages.contentType, total: count() })
+	.from(pages)
+	.where(and(isNotNull(pages.contentType), gt(pages.state, -1)))
+	.groupBy(pages.contentType);
+const itemCounts = Object.fromEntries(itemCountRows.map((row) => [row.contentType, row.total]));
 const contentSettingsKeys = contentTypes.map((ct) => `content_default_template_${ct.id}`);
 const contentSettings = contentSettingsKeys.length > 0
 	? await db.select().from(settings).where(inArray(settings.key, contentSettingsKeys))
@@ -79,6 +89,17 @@ const form = getSettingsForm(
 			/>
 		</div>
 	</Form>
+	{/* The anchor id and the search-section classes live on this plain wrapper rather than on the
+	    island's own root: the anchor-flash and search scripts below add and remove classes on
+	    them, and doing that to an element React renders makes it fail hydration. */}
+	<div id="content-types" class="mt-6 p-6 bg-base-100 rounded-lg settings-search-section">
+		<ContentTypeManager
+			client:load
+			contentTypes={contentTypes}
+			itemCounts={itemCounts}
+			actionBase="/admin/settings/content-types"
+		/>
+	</div>
 </AdminLayout>
 
 <style is:global>
@@ -117,8 +138,15 @@ const form = getSettingsForm(
 
 		// The page body scrolls inside a nested `.drawer-content` (not the document itself), which
 		// native fragment-navigation scrolling doesn't reliably reach — so drive it explicitly
-		// instead of assuming the browser already brought the target into view.
-		target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		// instead of assuming the browser already brought the target into view. Scrolled directly
+		// rather than via scrollIntoView, which would repeat the fragment jump's mistake above:
+		// when centering a target needs more room than `.drawer-content` has, it scrolls every
+		// ancestor too. scrollTo just stops at the container's own bottom.
+		const scroller = target.closest<HTMLElement>('.drawer-content');
+		if (scroller) {
+			const offset = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+			scroller.scrollTo({ top: offset - (scroller.clientHeight - target.offsetHeight) / 2, behavior: 'smooth' });
+		}
 		target.classList.remove('settings-anchor-flash');
 		// Force reflow so re-triggering the flash (e.g. clicking the same anchor link twice) restarts the animation.
 		void target.offsetWidth;

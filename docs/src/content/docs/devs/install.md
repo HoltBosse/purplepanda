@@ -34,7 +34,7 @@ from somewhere other than the project root.
 
 | Path | What it is |
 | --- | --- |
-| `src/puck.config.tsx` | Your [Puck Editor](https://puckeditor.com/docs/api-reference/configuration/config) config - the components and content types your site offers |
+| `src/puck.config.tsx` | Your [Puck Editor](https://puckeditor.com/docs/api-reference/configuration/config) config - the components your site offers |
 | `src/db/client.ts` | The drizzle db instance (the Postgres pool) |
 | `src/db/schema.ts` | The schema, shared by the CMS and your own tables |
 | `src/plugins.ts` | Your [plugins](/devs/hooks), if any |

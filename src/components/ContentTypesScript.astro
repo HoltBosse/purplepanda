@@ -1,0 +1,14 @@
+---
+import { listContentTypes } from '../db/content-types.js';
+import { getDb } from '../db/db.js';
+
+// Hands the admin's client-side code the content types defined in the database. The consumers
+// (CardCollection's and Select's resolveFields, the data-binding wrapper, the content/prefab
+// editors) live deep inside the Puck config where no component props reach, so they read a global
+// instead — see getContentTypeRecords() in ../puck/content-types.ts. Rendered by both admin
+// layouts, ahead of any island, so it's set before hydration runs.
+const records = await listContentTypes(getDb());
+// Escaping `<` keeps a field label like `</script>` from breaking out of the tag.
+const serialized = JSON.stringify(records).replace(/</g, '\\u003c');
+---
+<script is:inline set:html={`window.__PP_CONTENT_TYPES = ${serialized};`} />

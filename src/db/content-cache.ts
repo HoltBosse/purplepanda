@@ -2,7 +2,7 @@ import type { InferSelectModel } from "drizzle-orm";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool, PoolClient } from "pg";
-import { pages, settings, templates } from "./schema.js";
+import { contentTypes, pages, settings, templates } from "./schema.js";
 
 // `$client` is optional in this type (even though the ambient `./client.js` module
 // always provides one for a real drizzle(pool) instance) so callers that only have the plain
@@ -12,6 +12,7 @@ import { pages, settings, templates } from "./schema.js";
 type Db = NodePgDatabase<Record<string, unknown>> & { $client?: Pool };
 type PageRow = InferSelectModel<typeof pages>;
 type TemplateRow = InferSelectModel<typeof templates>;
+type ContentTypeRow = InferSelectModel<typeof contentTypes>;
 
 export type BreadcrumbEntry = { title: string; path: string };
 type PageWithBreadcrumbs = { page: PageRow; breadcrumbs: BreadcrumbEntry[] };
@@ -32,7 +33,7 @@ type PageWithBreadcrumbs = { page: PageRow; breadcrumbs: BreadcrumbEntry[] };
 // cache immediately (so the writer's own worker doesn't wait on the round trip) and NOTIFYs the
 // channel so the others do the same.
 const CACHE_CHANNEL = "purplepanda_cache_invalidate";
-type CacheKind = "settings" | "templates" | "pages";
+type CacheKind = "settings" | "templates" | "pages" | "contentTypes";
 
 let settingsCache: Map<string, unknown> | null = null;
 let settingsLoading: Promise<Map<string, unknown>> | null = null;
@@ -42,6 +43,9 @@ let templatesLoading: Promise<Map<string, TemplateRow>> | null = null;
 
 let pageTreeCache: Map<string, PageWithBreadcrumbs> | null = null;
 let pageTreeLoading: Promise<Map<string, PageWithBreadcrumbs>> | null = null;
+
+let contentTypesCache: ContentTypeRow[] | null = null;
+let contentTypesLoading: Promise<ContentTypeRow[]> | null = null;
 
 const contentTypePageCache = new Map<string, PageRow | undefined>();
 const contentTypePageLoading = new Map<string, Promise<PageRow | undefined>>();
@@ -61,6 +65,11 @@ function clearPagesCacheLocal(): void {
   pageTreeLoading = null;
   contentTypePageCache.clear();
   contentTypePageLoading.clear();
+}
+
+function clearContentTypesCacheLocal(): void {
+  contentTypesCache = null;
+  contentTypesLoading = null;
 }
 
 let listenerClient: PoolClient | null = null;
@@ -86,6 +95,7 @@ function ensureListening(db: Db): void {
         if (kind === "settings") clearSettingsCacheLocal();
         else if (kind === "templates") clearTemplatesCacheLocal();
         else if (kind === "pages") clearPagesCacheLocal();
+        else if (kind === "contentTypes") clearContentTypesCacheLocal();
       });
       client.on("error", (err) => {
         console.error("[purplepanda] cache invalidation listener connection error, reconnecting", err);
@@ -126,6 +136,31 @@ export function invalidateTemplatesCache(db: Db): void {
 export function invalidatePagesCache(db: Db): void {
   clearPagesCacheLocal();
   broadcastInvalidation(db, "pages");
+}
+
+export function invalidateContentTypesCache(db: Db): void {
+  clearContentTypesCacheLocal();
+  broadcastInvalidation(db, "contentTypes");
+}
+
+// Every admin page, every public content-type route and the sitemap needs the content type list,
+// and it only changes through /admin/settings — so it's cached exactly like the settings and
+// templates above, invalidated by the same LISTEN/NOTIFY broadcast.
+export async function getContentTypeRows(db: Db): Promise<ContentTypeRow[]> {
+  ensureListening(db);
+  if (contentTypesCache) return contentTypesCache;
+  if (!contentTypesLoading) {
+    contentTypesLoading = db
+      .select()
+      .from(contentTypes)
+      .where(eq(contentTypes.state, 1))
+      .orderBy(contentTypes.title)
+      .then((rows) => {
+        contentTypesCache = rows;
+        return rows;
+      });
+  }
+  return contentTypesLoading;
 }
 
 async function loadSettingsMap(db: Db): Promise<Map<string, unknown>> {

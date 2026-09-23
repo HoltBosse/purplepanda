@@ -3,6 +3,7 @@ import '../../../../styles/global.css';
 import type { Data } from '@puckeditor/core';
 import { eq } from 'drizzle-orm';
 import PageRenderer from '../../../../components/PageRenderer.js';
+import { getContentTypeById } from '../../../../db/content-types.js';
 import { getDb } from '../../../../db/db.js';
 import { resolveFontSettings } from '../../../../db/fonts.js';
 import { dagNodes, pages } from '../../../../db/schema.js';
@@ -27,6 +28,9 @@ if (!draft || (draft.nodeType !== 'draft' && draft.nodeType !== 'publish') || dr
 }
 
 const [entity] = await db.select().from(pages).where(eq(pages.id, draft.entityId)).limit(1);
+if (!entity?.contentType || !(await getContentTypeById(db, entity.contentType))) {
+    return Astro.redirect('/admin/content');
+}
 
 const templateSetting = await resolveTemplateSetting(db, entity?.contentType ?? undefined);
 

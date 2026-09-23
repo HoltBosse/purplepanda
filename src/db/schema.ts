@@ -32,7 +32,18 @@ export const templates = pgTable("templates", {
   content: jsonb("content").notNull(),
 });
 
-//todo: add nullable content type field once content types are a thing
+// A content type's own definition: the fields its items carry (see puck/content-types.ts for the
+// stored shape), the URL prefix its items are published under, and how to describe one as
+// schema.org structured data. Authored in /admin/settings rather than in the Puck config.
+export const contentTypes = pgTable("content_types", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  state: integer("state").notNull().default(1),
+  title: varchar("title", { length: 255 }).notNull(),
+  baseUrl: varchar("base_url", { length: 255 }),
+  fields: jsonb("fields").notNull().default([]),
+  jsonld: jsonb("jsonld"),
+});
+
 export const pages = pgTable("pages", {
   id: uuid("id").defaultRandom().primaryKey(),
   state: integer("state").notNull().default(1),

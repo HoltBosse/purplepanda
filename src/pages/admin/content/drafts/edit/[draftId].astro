@@ -2,6 +2,7 @@
 import type { Data } from '@puckeditor/core';
 import { eq } from 'drizzle-orm';
 import ContentPuckEditor from '../../../../../components/ContentPuckEditor';
+import { getContentTypeById } from '../../../../../db/content-types.js';
 import { getDb } from '../../../../../db/db.js';
 import { resolveFontSettings } from '../../../../../db/fonts.js';
 import { dagNodes, pages } from '../../../../../db/schema.js';
@@ -17,7 +18,8 @@ if (draft?.nodeType !== 'draft' || draft.entityType !== 'content' || draft.state
 }
 
 const [entity] = await db.select().from(pages).where(eq(pages.id, draft.entityId)).limit(1);
-if (!entity?.contentType) {
+// An item whose content type has been deleted no longer has an editor to open it in.
+if (!entity?.contentType || !(await getContentTypeById(db, entity.contentType))) {
     return Astro.redirect('/admin/content');
 }
 

@@ -1,6 +1,7 @@
 import type { ComponentConfig, Fields } from "@puckeditor/core";
 import { useEffect, useRef } from "react";
 import * as z from "zod";
+import { getContentTypeRecords } from "../content-types.js";
 
 export type SelectOption = {
   label: string;
@@ -219,14 +220,11 @@ function toSubmissionSchema(props: SelectProps) {
   return required ? optionSchema : optionSchema.optional();
 }
 
-// Imported dynamically, only when actually needed (inside resolveFields, below), rather than at
-// module scope: this component is registered as part of the same ../../puck.config.js
-// that's still busy loading it (see the identical comment in ../prefab/CardCollection.tsx), and a
-// static top-level import also can't resolve outside a real Astro/vite build — e.g. under plain
-// vitest, which imports this module directly (see form/schema.test.ts).
-async function getContentTypeOptions() {
-  const { default: externalPuckConfig } = await import("../../puck.config.js");
-  return (externalPuckConfig?.contentTypes ?? []).map((contentType) => ({
+// Read inside resolveFields (below), at the moment the field is rendered, rather than captured at
+// module scope: the content types come from the database and reach the browser as a global the
+// admin layouts write before any island hydrates — see puck/content-types.ts.
+function getContentTypeOptions() {
+  return getContentTypeRecords().map((contentType) => ({
     label: contentType.title,
     value: contentType.id,
   }));
@@ -358,7 +356,7 @@ const Select: ComponentConfig<SelectProps> = {
     if (field === "contentType") {
       resolved.contentType = {
         ...contentTypeField,
-        options: [{ label: "— select a content type —", value: "" }, ...(await getContentTypeOptions())],
+        options: [{ label: "— select a content type —", value: "" }, ...getContentTypeOptions()],
       };
     } else if (field === "options") {
       resolved.options = optionsField;

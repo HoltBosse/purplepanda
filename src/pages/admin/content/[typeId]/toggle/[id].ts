@@ -2,6 +2,7 @@ import type { APIContext } from "astro";
 import { eq } from "drizzle-orm";
 import { addAlertToSession, alertType, createAlert } from "../../../../../alert/index.js";
 import { invalidatePagesCache } from "../../../../../db/content-cache.js";
+import { getContentTypeById } from "../../../../../db/content-types.js";
 import { getDb } from "../../../../../db/db.js";
 import { pages } from "../../../../../db/schema.js";
 
@@ -15,6 +16,10 @@ export async function POST(context: APIContext): Promise<Response> {
 
     if (!typeId) {
         return new Response("Missing content type id", { status: 400 });
+    }
+
+    if (!(await getContentTypeById(db, typeId))) {
+        return new Response("Content type not found", { status: 404 });
     }
 
     const [page] = await db.select().from(pages).where(eq(pages.id, id)).limit(1);

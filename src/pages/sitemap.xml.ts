@@ -1,12 +1,9 @@
 import type { APIRoute } from "astro";
 import { and, eq, sql } from "drizzle-orm";
+import { listContentTypes } from "../db/content-types.js";
 import { getDb } from "../db/db.js";
 import { dagNodes, pages } from "../db/schema.js";
-import externalPuckConfig from "../puck.config.js";
-
-function normalizeBaseUrl(baseUrl: string): string {
-    return baseUrl.replace(/^\/+|\/+$/g, '');
-}
+import { normalizeBaseUrl } from "../puck/content-types.js";
 
 function getPagePath(page: { id: string; content: unknown }, pageById: Map<string, typeof page>, visited = new Set<string>()): string {
     if (visited.has(page.id)) return '';
@@ -22,7 +19,6 @@ function getPagePath(page: { id: string; content: unknown }, pageById: Map<strin
 
 export const GET: APIRoute = async ({ site, url }) => {
     const db = getDb();
-    const config = externalPuckConfig ?? {};
     const origin = (site ?? url).origin;
 
     const latestPublish = db
@@ -48,9 +44,9 @@ export const GET: APIRoute = async ({ site, url }) => {
     const pageById = new Map(allPages.map(p => [p.id, p]));
 
     const contentTypeBaseUrls = new Map(
-        (config.contentTypes ?? [])
+        (await listContentTypes(db))
             .filter(ct => ct.baseUrl)
-            .map(ct => [ct.id, normalizeBaseUrl(ct.baseUrl!)])
+            .map(ct => [ct.id, normalizeBaseUrl(ct.baseUrl as string)])
     );
 
     const entries = allPages

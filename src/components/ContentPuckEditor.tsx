@@ -4,7 +4,7 @@ import { aliasField } from "../puck/component-fields/AliasField.js";
 import { dateTimeField } from "../puck/component-fields/DateTimeField.js";
 import { notesField } from "../puck/component-fields/NotesField.js";
 import { ogField } from "../puck/component-fields/OpenGraphField.js";
-import externalPuckConfig from "../puck.config.js";
+import { getContentType } from "../puck/content-type-fields.js";
 import PagePuckEditor from "./PagePuckEditor.js";
 
 interface ContentPuckEditorProps {
@@ -34,10 +34,7 @@ export default function ContentPuckEditor({
   headingFontLink,
   bodyFontLink,
 }: ContentPuckEditorProps) {
-  const contentType = useMemo(
-    () => (externalPuckConfig?.contentTypes ?? []).find(ct => ct.id === contentTypeId),
-    [contentTypeId],
-  );
+  const contentType = useMemo(() => getContentType(contentTypeId), [contentTypeId]);
 
   const rootConfig = useMemo(() => {
     if (!contentType) {

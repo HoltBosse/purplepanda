@@ -14,7 +14,6 @@ const PUCK_CONFIG = `
 import { createElement } from 'react';
 
 export default {
-  contentTypes: [],
   fontFamilies: [],
   components: {
     Block: {

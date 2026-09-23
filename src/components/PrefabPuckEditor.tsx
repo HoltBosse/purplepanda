@@ -1,6 +1,6 @@
 import type { Data } from "@puckeditor/core";
 import { useMemo } from "react";
-import externalPuckConfig from "../puck.config.js";
+import { getContentType } from "../puck/content-type-fields.js";
 import PagePuckEditor from "./PagePuckEditor.js";
 
 interface PrefabPuckEditorProps {
@@ -18,10 +18,7 @@ export default function PrefabPuckEditor({
   saveUrl = "/admin/settings/prefab/update",
   onPublish,
 }: PrefabPuckEditorProps) {
-  const contentType = useMemo(
-    () => (contentTypeId ? (externalPuckConfig?.contentTypes ?? []).find(ct => ct.id === contentTypeId) : undefined),
-    [contentTypeId],
-  );
+  const contentType = useMemo(() => getContentType(contentTypeId), [contentTypeId]);
 
   const rootConfig = useMemo(
     () => ({

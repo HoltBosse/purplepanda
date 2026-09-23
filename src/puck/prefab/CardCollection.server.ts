@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { getContentTypeById } from "../../db/content-types.js";
 import { getDb } from "../../db/db.js";
 import { pages } from "../../db/schema.js";
 import type { CardCollectionItem, OrderBy } from "./CardCollection.js";
@@ -10,6 +11,9 @@ export async function getTopContentItems(
   offset?: number,
 ): Promise<CardCollectionItem[]> {
   const db = getDb();
+  // A collection pointed at a content type that's since been deleted shows nothing, rather than
+  // publishing items that are gone from everywhere else.
+  if (!(await getContentTypeById(db, contentTypeId))) return [];
   const orderColumn = orderBy?.field ? sql`(${pages.content}->'root'->'props'->>${orderBy.field})` : pages.id;
   const orderFn = orderBy?.direction === "asc" ? asc : desc;
 
