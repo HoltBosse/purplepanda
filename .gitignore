@@ -55,7 +55,6 @@ coverage/
 .turbo/
 .astro/
 .claude/
-astro.config.ts
 .vscode/
 psqlshell.sh
 
