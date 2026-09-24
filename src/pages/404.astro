@@ -1,101 +1,36 @@
 ---
+import type { Data } from '@puckeditor/core';
+import CustomNotFound from '../components/CustomNotFound.astro';
+import DefaultNotFound from '../components/DefaultNotFound.astro';
+import { getSetting } from '../db/content-cache.js';
+import { getDb } from '../db/db.js';
+import { resolveFontSettings } from '../db/fonts.js';
+import { NOT_FOUND_SETTING_KEY } from '../db/not-found.js';
+import { formatPageTitle, resolveSiteName } from '../db/site.js';
+import { resolveDataForSSR } from '../puck/server-data-wrapper.js';
+import externalPuckConfig from '../puck.config.js';
+
 Astro.response.status = 404;
+
+const db = getDb();
+const config = externalPuckConfig ?? {};
+
+// The custom 404 page is edited under /admin/settings/not-found. Until one is saved, the built-in
+// page in DefaultNotFound.astro is rendered instead. It's standalone: never wrapped in a template.
+const notFoundContent = await getSetting(db, NOT_FOUND_SETTING_KEY) as Data | undefined;
+
+const custom = notFoundContent
+    ? await (async () => {
+        const [pageData, fontSettings, siteName] = await Promise.all([
+            resolveDataForSSR(config, notFoundContent, Astro.locals),
+            resolveFontSettings(db),
+            resolveSiteName(db),
+        ]);
+
+        const rawTitle: string = (pageData as any)?.root?.props?.title || 'Page Not Found';
+        return { pageData, title: formatPageTitle(rawTitle, siteName), fontSettings };
+    })()
+    : undefined;
 ---
 
-<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<title>404 — Page Not Found</title>
-	</head>
-	<body>
-		<main>
-			<div class="container">
-				<div class="code">404</div>
-				<h1>Page not found</h1>
-				<p>The page you're looking for doesn't exist or has been moved.</p>
-				<a href="/" class="home-link">Go home</a>
-			</div>
-		</main>
-	</body>
-</html>
-
-<style>
-	*, *::before, *::after {
-		box-sizing: border-box;
-		margin: 0;
-		padding: 0;
-	}
-
-	html, body {
-		height: 100%;
-		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-		background: #0f0f13;
-		color: #e2e2e9;
-	}
-
-	main {
-		display: grid;
-		place-items: center;
-		min-height: 100%;
-		padding: 2rem;
-	}
-
-	.container {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 1rem;
-		text-align: center;
-		max-width: 480px;
-	}
-
-	.code {
-		font-size: clamp(6rem, 20vw, 10rem);
-		font-weight: 800;
-		line-height: 1;
-		letter-spacing: -0.05em;
-		background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
-		-webkit-background-clip: text;
-		-webkit-text-fill-color: transparent;
-		background-clip: text;
-		user-select: none;
-	}
-
-	h1 {
-		font-size: 1.5rem;
-		font-weight: 600;
-		color: #f4f4f5;
-	}
-
-	p {
-		font-size: 1rem;
-		color: #71717a;
-		line-height: 1.6;
-	}
-
-	.home-link {
-		display: inline-block;
-		margin-top: 0.5rem;
-		padding: 0.625rem 1.5rem;
-		border-radius: 0.5rem;
-		background: #6366f1;
-		color: #fff;
-		text-decoration: none;
-		font-size: 0.9375rem;
-		font-weight: 500;
-		transition: background 0.15s ease, transform 0.1s ease;
-	}
-
-	.home-link:hover {
-		background: #4f46e5;
-		transform: translateY(-1px);
-	}
-
-	.home-link:active {
-		transform: translateY(0);
-	}
-</style>
+{custom ? <CustomNotFound {...custom} /> : <DefaultNotFound />}

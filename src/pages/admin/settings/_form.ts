@@ -226,6 +226,47 @@ export function getSettingsForm(
                 ]
             },
             {
+                id: 'not-found-group-wrapper',
+                name: 'not-found-group-wrapper',
+                type: "Group",
+                fields: fields,
+                classList: "p-6 bg-base-100 rounded-lg settings-search-section",
+                groupFields: [
+                    {
+                        id: 'not-found-group-header',
+                        name: 'not-found-group-header',
+                        type: 'Html',
+                        markup: '<h2 class="text-lg font-medium settings-search-label">404 Page</h2>',
+                    },
+                    {
+                        id: 'not-found-group',
+                        name: 'not-found-group',
+                        type: "Group",
+                        fields: fields,
+                        classList: "grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6 mt-6",
+                        groupFields: [
+                            {
+                                id: 'not-found-header',
+                                name: 'not-found-header',
+                                type: 'Html',
+                                markup: '<h2 class="text-md font-medium flex items-center settings-search-label">Not Found Page</h2>',
+                            },
+                            {
+                                id: 'not-found-option',
+                                name: 'not-found-option',
+                                type: 'Html',
+                                markup: `<div class="flex items-center justify-end gap-2">
+                                    <a href="/admin/settings/not-found/history" class="btn btn-ghost btn-sm btn-square" title="Source Control">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-git-branch"><path d="M15 6a9 9 0 0 0-9 9V3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/></svg>
+                                    </a>
+                                    <a href="/admin/settings/not-found" class="btn btn-ghost btn-sm">Edit</a>
+                                </div>`,
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
                 id: 'fonts-group-wrapper',
                 name: 'fonts-group-wrapper',
                 type: "Group",

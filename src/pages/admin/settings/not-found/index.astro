@@ -1,0 +1,16 @@
+---
+import type { Data } from '@puckeditor/core';
+import NotFoundPuckEditor from '../../../../components/NotFoundPuckEditor';
+import { getDb } from '../../../../db/db.js';
+import { resolveNotFoundSetting } from '../../../../db/not-found.js';
+import AdminBareLayout from '../../../../layouts/AdminBareLayout.astro';
+
+// The 404 page is standalone — it's never wrapped in a template, here or in 404.astro.
+const notFoundSetting = await resolveNotFoundSetting(getDb());
+---
+<AdminBareLayout showLoadingPanda>
+    <NotFoundPuckEditor
+        client:only="react"
+		{...(notFoundSetting ? { initialData: notFoundSetting.value as Data } : {})}
+    />
+</AdminBareLayout>

@@ -27,6 +27,8 @@ Logged via [`addAction`](/devs/actions-api) - persisted to the audit log (`/admi
 | `page:publish` | `{ id: string, draftId: string, version: string \| null }` | Page draft published |
 | `prefab:create` | `{ id: string, version: string \| null }` | New prefab saved |
 | `prefab:update` | `{ id: string, version: string \| null }` | Existing prefab saved |
+| `not-found:create` | `{ id: string, version: string \| null }` | Custom 404 page saved for the first time |
+| `not-found:update` | `{ id: string, version: string \| null }` | Existing custom 404 page saved |
 | `redirect:create` | `{ id: string }` | New redirect saved |
 | `redirect:update` | `{ id: string }` | Existing redirect saved |
 | `template:create` | `{ id: string, version: string \| null }` | New template saved |
@@ -49,7 +51,7 @@ Registered via `hooks.override`. A returned value must pass the listed schema or
 | Name | Context (`ctx`) | Expected return | Behavior |
 | --- | --- | --- | --- |
 | `auth:isAdmin` | `{ userId: string, defaultIsAdmin: boolean }` | `boolean` | Replaces PurplePanda's built-in admin role check. Runs on every `/admin/*` request via the auth middleware. |
-| `content:validate` | `{ entity: "page" \| "content" \| "form" \| "template" \| "prefab", contentType?: string, content: unknown }` | `ContentValidationError[]` (`{ componentId, componentType, field, message }[]`) | Additive - returned errors are appended to PurplePanda's own Puck content validation on every save/publish. Can only make validation stricter, never bypass it. |
+| `content:validate` | `{ entity: "page" \| "content" \| "form" \| "template" \| "prefab" \| "not-found", contentType?: string, content: unknown }` | `ContentValidationError[]` (`{ componentId, componentType, field, message }[]`) | Additive - returned errors are appended to PurplePanda's own Puck content validation on every save/publish. Can only make validation stricter, never bypass it. |
 | `admin:nav` | `{ user: User, defaultNavItems: NavItem[] }` | `NavItem[]` (`{ id, label, icon, href?, subItems?: { label, href }[] }[]`) | Replaces the admin nav rail + drawer panels entirely. Return a modified copy of `defaultNavItems` to reorder/relabel/add/remove items rather than rebuilding the whole nav from scratch. `icon` must be a Lucide Astro component (e.g. `import { Settings } from "@lucide/astro"`) - any value that isn't a function fails the schema. Runs on every `/admin/*` page render (`AdminLayout.astro`); the user avatar dropdown isn't part of this hook. |
 
 See [Hooks](/devs/hooks) for wiring and example plugins.

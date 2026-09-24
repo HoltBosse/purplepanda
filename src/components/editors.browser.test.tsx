@@ -1,4 +1,4 @@
-// The five editor wrappers are thin: each picks a Puck config subset and wires up save/publish
+// The editor wrappers are thin: each picks a Puck config subset and wires up save/publish
 // URLs. These mount each one for real to catch the failure that thin wrappers actually have —
 // blowing up on load, or dropping the editor entirely — which no amount of prop plumbing review
 // would surface.
@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-react';
 import ContentPuckEditor from './ContentPuckEditor';
 import FormPuckEditor from './FormPuckEditor';
+import NotFoundPuckEditor from './NotFoundPuckEditor';
 import PagePuckEditor from './PagePuckEditor';
 import PrefabPuckEditor from './PrefabPuckEditor';
 import TemplatePuckEditor from './TemplatePuckEditor';
@@ -67,5 +68,20 @@ describe('PrefabPuckEditor', () => {
         const screen = await render(<PrefabPuckEditor initialData={emptyData} />);
 
         await expect.poll(() => mounted(screen.container)).toBe(true);
+    });
+});
+
+describe('NotFoundPuckEditor', () => {
+    it('mounts the editor', async () => {
+        const screen = await render(<NotFoundPuckEditor initialData={emptyData} />);
+
+        await expect.poll(() => mounted(screen.container)).toBe(true);
+    });
+
+    it('does not flag the page-only alias/title fields it has no inputs for', async () => {
+        const screen = await render(<NotFoundPuckEditor initialData={emptyData} />);
+
+        await expect.poll(() => mounted(screen.container)).toBe(true);
+        expect(screen.container.querySelector('[data-puck-validation-errors]')).toBeNull();
     });
 });

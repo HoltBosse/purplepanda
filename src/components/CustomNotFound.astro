@@ -1,0 +1,48 @@
+---
+import '../styles/global.css';
+import type { Data } from '@puckeditor/core';
+import type { FontSettings } from '../db/fonts.js';
+import { extractFamilyFromLink } from '../form/fields/font-utils.js';
+import PageRenderer from './PageRenderer.js';
+
+interface Props {
+    pageData: Data;
+    title: string;
+    fontSettings: FontSettings;
+}
+
+const { pageData, title, fontSettings } = Astro.props;
+
+// See [...path].astro for why this is imported lazily.
+const { renderToStaticMarkup } = await import('react-dom/server');
+
+const headingFontFamily = extractFamilyFromLink(fontSettings.headingFontLink);
+const bodyFontFamily = extractFamilyFromLink(fontSettings.bodyFontLink);
+---
+
+<!DOCTYPE html>
+<html lang="en" data-theme="false">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>{title}</title>
+    {fontSettings.bodyFontLink && <link rel="stylesheet" href={fontSettings.bodyFontLink} />}
+    {fontSettings.headingFontLink && fontSettings.headingFontLink !== fontSettings.bodyFontLink && (
+        <link rel="stylesheet" href={fontSettings.headingFontLink} />
+    )}
+    <style define:vars={{
+        bodyFontFamily: bodyFontFamily ? `'${bodyFontFamily}', sans-serif` : 'inherit',
+        headingFontFamily: headingFontFamily ? `'${headingFontFamily}', sans-serif` : 'inherit',
+    }}>
+        body { font-family: var(--bodyFontFamily); }
+        :global(h1), :global(h2), :global(h3), :global(h4), :global(h5), :global(h6) { font-family: var(--headingFontFamily); }
+    </style>
+</head>
+<body>
+    <PageRenderer pageData={pageData} renderIsolatedIsland={renderToStaticMarkup} />
+    <script>
+        import "../puck/hydrate-page-islands.js";
+    </script>
+</body>
+</html>

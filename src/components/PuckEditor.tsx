@@ -444,7 +444,7 @@ function createOverrides(
   };
 }
 
-interface PuckEditorProps {
+export interface PuckEditorProps {
   config: Config;
   data: Data;
   templateData?: Data;

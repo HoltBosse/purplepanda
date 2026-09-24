@@ -126,7 +126,7 @@ export const actionSchemas = pgTable("action_schemas", {
 export const dagNodes = pgTable("dag_nodes", {
   id: uuid("id").defaultRandom().primaryKey(),
   state: integer("state").notNull().default(1), // 1 = active, -1 = deleted
-  entityType: varchar("entity_type", { length: 50 }).notNull(), // 'page' | 'template' | 'content' | 'form' | 'prefab'
+  entityType: varchar("entity_type", { length: 50 }).notNull(), // 'page' | 'template' | 'content' | 'form' | 'prefab' | 'not-found'
   entityId: uuid("entity_id").notNull(),
   parentId: uuid("parent_id").references((): any => dagNodes.id),
   content: jsonb("content").notNull(),

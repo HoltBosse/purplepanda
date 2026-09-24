@@ -8,7 +8,7 @@ import { ogField } from "../puck/component-fields/OpenGraphField.js";
 import { filterConfigByLocation, wrapConfigWithDataBinding } from "../puck/index.js";
 import { pageRootPropsSchema } from "../puck/page-root-schema.js";
 import externalPuckConfig from "../puck.config.js";
-import PuckEditor from "./PuckEditor.js";
+import PuckEditor, { type PuckEditorProps } from "./PuckEditor.js";
 
 const baseConfig: Config = {
     categories: {
@@ -64,9 +64,12 @@ interface PagePuckEditorProps {
   headingFontLink?: string;
   bodyFontLink?: string;
   dictionary?: Dictionary;
+  // Overrides the default title/alias page schema, for callers whose rootConfig doesn't expose
+  // those fields (e.g. the 404 page editor).
+  rootPropsSchema?: PuckEditorProps["rootPropsSchema"];
 }
 
-export default function PagePuckEditor({ initialData, templateData, templateId, noTemplate, saveUrl = "/admin/pages/update", draftPublishUrl, onPublish, onSave, onCommit, isDraft = false, isNew = false, pages = [], rootConfig, headingFontLink, bodyFontLink, dictionary }: PagePuckEditorProps = {}) {
+export default function PagePuckEditor({ initialData, templateData, templateId, noTemplate, saveUrl = "/admin/pages/update", draftPublishUrl, onPublish, onSave, onCommit, isDraft = false, isNew = false, pages = [], rootConfig, headingFontLink, bodyFontLink, dictionary, rootPropsSchema = pageRootPropsSchema }: PagePuckEditorProps = {}) {
   // templateId/noTemplate are only passed in for a brand-new page (see new.astro) — an existing
   // page's template is set once at creation and never resent, so these are omitted there and
   // this appends nothing.
@@ -210,8 +213,8 @@ export default function PagePuckEditor({ initialData, templateData, templateId, 
     ...(resolvedOnSave ? { onSave: resolvedOnSave } : {}),
     ...(resolvedOnCommit ? { onCommit: resolvedOnCommit, isNew } : {}),
     // Title/alias are hardcoded into both plain pages' default fields (below) and content types'
-    // rootConfig (see ContentPuckEditor.tsx), so this schema applies to both.
-    rootPropsSchema: pageRootPropsSchema,
+    // rootConfig (see ContentPuckEditor.tsx), so the default schema applies to both.
+    rootPropsSchema,
     ...(headingFontLink ? { headingFontLink } : {}),
     ...(bodyFontLink ? { bodyFontLink } : {}),
     ...(dictionary ? { dictionary } : {}),
