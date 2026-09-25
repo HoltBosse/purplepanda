@@ -1,0 +1,9 @@
+---
+import { dashboardAccess } from '../../../auth/dashboard.js';
+
+const access = await dashboardAccess(Astro, { superAdmin: true });
+if (access.response) {
+	return access.response;
+}
+return Astro.redirect('/dashboard/admin/sites');
+---

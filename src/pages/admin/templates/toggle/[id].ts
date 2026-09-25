@@ -4,6 +4,7 @@ import { addAlertToSession, alertType, createAlert } from "../../../../alert/ind
 import { invalidateTemplatesCache } from "../../../../db/content-cache.js";
 import { getDb } from "../../../../db/db.js";
 import { templates } from "../../../../db/schema.js";
+import { sameOriginReferer } from "../../../../http/referer.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -25,12 +26,9 @@ export async function POST(context: APIContext): Promise<Response> {
     const alert = createAlert(alertType.success, newState === 1 ? "Template enabled." : "Template disabled.");
     await addAlertToSession(context.session, alert);
 
-    const referer = context.request.headers.get("referer");
-    if (referer) {
-        const refererUrl = new URL(referer);
-        if (refererUrl.origin === context.url.origin) {
-            return context.redirect(referer);
-        }
+    const back = sameOriginReferer(context);
+    if (back) {
+        return context.redirect(back);
     }
 
     return context.redirect("/admin/templates");

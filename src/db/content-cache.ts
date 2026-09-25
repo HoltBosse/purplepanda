@@ -2,7 +2,8 @@ import type { InferSelectModel } from "drizzle-orm";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool, PoolClient } from "pg";
-import { contentTypes, pages, settings, templates } from "./schema.js";
+import { requireTenant } from "../tenant/context.js";
+import { contentTypes, pages, settings, templates, tenantDomains, tenants } from "./schema.js";
 
 // `$client` is optional in this type (even though the ambient `./client.js` module
 // always provides one for a real drizzle(pool) instance) so callers that only have the plain
@@ -25,51 +26,108 @@ type PageWithBreadcrumbs = { page: PageRow; breadcrumbs: BreadcrumbEntry[] };
 // below after writing. A `*Loading` promise alongside each cache guards against a thundering herd
 // of concurrent requests all missing the cache at once and firing the same query repeatedly.
 //
+// All of that is per tenant: each tenant gets its own set of caches, keyed by the tenant in the
+// request's context (tenant/context.ts), which is also the tenant row-level security scopes the
+// loading queries to — so a cache is only ever filled with, and read back for, its own tenant.
+// Invalidating clears just the current tenant's set.
+//
 // Under PM2 cluster mode (or any multi-process deployment on one host) each worker holds its own
 // copy of these caches, so a write handled by worker A must also tell workers B..N to drop theirs
 // — a bare in-process invalidate() only clears A's copy. Postgres LISTEN/NOTIFY does that
 // broadcast without adding new infrastructure (every worker already has the same Postgres): each
 // worker LISTENs on one channel via a dedicated connection, and invalidate*() both clears its own
 // cache immediately (so the writer's own worker doesn't wait on the round trip) and NOTIFYs the
-// channel so the others do the same.
+// channel so the others do the same. The payload is `<kind>:<tenantId>`, or just `tenants` for the
+// domain map below, which isn't per tenant.
 const CACHE_CHANNEL = "purplepanda_cache_invalidate";
-type CacheKind = "settings" | "templates" | "pages" | "contentTypes";
+type TenantCacheKind = "settings" | "templates" | "pages" | "contentTypes";
+const TENANT_CACHE_KINDS: readonly string[] = ["settings", "templates", "pages", "contentTypes"] satisfies TenantCacheKind[];
 
-let settingsCache: Map<string, unknown> | null = null;
-let settingsLoading: Promise<Map<string, unknown>> | null = null;
-
-let templatesCache: Map<string, TemplateRow> | null = null;
-let templatesLoading: Promise<Map<string, TemplateRow>> | null = null;
-
-let pageTreeCache: Map<string, PageWithBreadcrumbs> | null = null;
-let pageTreeLoading: Promise<Map<string, PageWithBreadcrumbs>> | null = null;
-
-let contentTypesCache: ContentTypeRow[] | null = null;
-let contentTypesLoading: Promise<ContentTypeRow[]> | null = null;
-
-const contentTypePageCache = new Map<string, PageRow | undefined>();
-const contentTypePageLoading = new Map<string, Promise<PageRow | undefined>>();
-
-function clearSettingsCacheLocal(): void {
-  settingsCache = null;
-  settingsLoading = null;
+interface TenantCaches {
+  settings: Map<string, unknown> | null;
+  settingsLoading: Promise<Map<string, unknown>> | null;
+  templates: Map<string, TemplateRow> | null;
+  templatesLoading: Promise<Map<string, TemplateRow>> | null;
+  pageTree: Map<string, PageWithBreadcrumbs> | null;
+  pageTreeLoading: Promise<Map<string, PageWithBreadcrumbs>> | null;
+  contentTypes: ContentTypeRow[] | null;
+  contentTypesLoading: Promise<ContentTypeRow[]> | null;
+  contentTypePage: Map<string, PageRow | undefined>;
+  contentTypePageLoading: Map<string, Promise<PageRow | undefined>>;
 }
 
-function clearTemplatesCacheLocal(): void {
-  templatesCache = null;
-  templatesLoading = null;
+const cachesByTenant = new Map<string, TenantCaches>();
+
+function cachesFor(tenantId: string): TenantCaches {
+  let caches = cachesByTenant.get(tenantId);
+  if (!caches) {
+    caches = {
+      settings: null,
+      settingsLoading: null,
+      templates: null,
+      templatesLoading: null,
+      pageTree: null,
+      pageTreeLoading: null,
+      contentTypes: null,
+      contentTypesLoading: null,
+      contentTypePage: new Map(),
+      contentTypePageLoading: new Map(),
+    };
+    cachesByTenant.set(tenantId, caches);
+  }
+  return caches;
 }
 
-function clearPagesCacheLocal(): void {
-  pageTreeCache = null;
-  pageTreeLoading = null;
-  contentTypePageCache.clear();
-  contentTypePageLoading.clear();
+function currentCaches(): TenantCaches {
+  return cachesFor(requireTenant().id);
 }
 
-function clearContentTypesCacheLocal(): void {
-  contentTypesCache = null;
-  contentTypesLoading = null;
+function clearTenantCacheLocal(kind: TenantCacheKind, tenantId: string): void {
+  const caches = cachesByTenant.get(tenantId);
+  if (!caches) return;
+  if (kind === "settings") {
+    caches.settings = null;
+    caches.settingsLoading = null;
+  } else if (kind === "templates") {
+    caches.templates = null;
+    caches.templatesLoading = null;
+  } else if (kind === "pages") {
+    caches.pageTree = null;
+    caches.pageTreeLoading = null;
+    caches.contentTypePage.clear();
+    caches.contentTypePageLoading.clear();
+  } else if (kind === "contentTypes") {
+    caches.contentTypes = null;
+    caches.contentTypesLoading = null;
+  }
+}
+
+// Every enabled tenant's domains, for the middleware to resolve each request's tenant from its
+// hostname before any tenant is in context (tenant/index.ts). Global rather than per tenant, and
+// changed only through /dashboard/admin/sites.
+export interface TenantDomainEntry {
+  tenantId: string;
+  tenantName: string;
+  tenantState: number;
+}
+
+export interface TenantDomainMap {
+  byDomain: Map<string, TenantDomainEntry>;
+  // Each tenant's hostnames, sorted.
+  domainsByTenant: Map<string, string[]>;
+  // The hostname each tenant's others redirect to, for tenants that have marked one.
+  primaryByTenant: Map<string, string>;
+  // The root domain and the tenant owning it, if one is marked.
+  rootDomain: string | null;
+  rootTenantId: string | null;
+}
+
+let tenantDomainCache: TenantDomainMap | null = null;
+let tenantDomainLoading: Promise<TenantDomainMap> | null = null;
+
+function clearTenantDomainCacheLocal(): void {
+  tenantDomainCache = null;
+  tenantDomainLoading = null;
 }
 
 let listenerClient: PoolClient | null = null;
@@ -90,15 +148,20 @@ function ensureListening(db: Db): void {
     .connect()
     .then((client) => {
       client.on("notification", (msg) => {
-        if (msg.channel !== CACHE_CHANNEL) return;
-        const kind = msg.payload as CacheKind | undefined;
-        if (kind === "settings") clearSettingsCacheLocal();
-        else if (kind === "templates") clearTemplatesCacheLocal();
-        else if (kind === "pages") clearPagesCacheLocal();
-        else if (kind === "contentTypes") clearContentTypesCacheLocal();
+        if (msg.channel !== CACHE_CHANNEL || !msg.payload) return;
+        if (msg.payload === "tenants") {
+          clearTenantDomainCacheLocal();
+          return;
+        }
+        const [kind, tenantId] = msg.payload.split(":");
+        if (kind && tenantId && TENANT_CACHE_KINDS.includes(kind)) {
+          clearTenantCacheLocal(kind as TenantCacheKind, tenantId);
+        }
       });
       client.on("error", (err) => {
         console.error("[purplepanda] cache invalidation listener connection error, reconnecting", err);
+        // Hand the broken connection back so the pool discards it, rather than leaking its slot.
+        client.release(err);
         listenerClient = null;
         ensureListening(db);
       });
@@ -116,31 +179,90 @@ function ensureListening(db: Db): void {
     });
 }
 
-function broadcastInvalidation(db: Db, kind: CacheKind): void {
+function broadcastInvalidation(db: Db, payload: string): void {
   if (typeof db.$client?.query !== "function") return;
-  db.$client.query("SELECT pg_notify($1, $2)", [CACHE_CHANNEL, kind]).catch((err) => {
-    console.error(`[purplepanda] failed to broadcast ${kind} cache invalidation`, err);
+  db.$client.query("SELECT pg_notify($1, $2)", [CACHE_CHANNEL, payload]).catch((err) => {
+    console.error(`[purplepanda] failed to broadcast ${payload} cache invalidation`, err);
   });
 }
 
+function invalidateTenantCache(db: Db, kind: TenantCacheKind): void {
+  const tenantId = requireTenant().id;
+  clearTenantCacheLocal(kind, tenantId);
+  broadcastInvalidation(db, `${kind}:${tenantId}`);
+}
+
 export function invalidateSettingsCache(db: Db): void {
-  clearSettingsCacheLocal();
-  broadcastInvalidation(db, "settings");
+  invalidateTenantCache(db, "settings");
 }
 
 export function invalidateTemplatesCache(db: Db): void {
-  clearTemplatesCacheLocal();
-  broadcastInvalidation(db, "templates");
+  invalidateTenantCache(db, "templates");
 }
 
 export function invalidatePagesCache(db: Db): void {
-  clearPagesCacheLocal();
-  broadcastInvalidation(db, "pages");
+  invalidateTenantCache(db, "pages");
 }
 
 export function invalidateContentTypesCache(db: Db): void {
-  clearContentTypesCacheLocal();
-  broadcastInvalidation(db, "contentTypes");
+  invalidateTenantCache(db, "contentTypes");
+}
+
+export function invalidateTenantDomainCache(db: Db): void {
+  clearTenantDomainCacheLocal();
+  broadcastInvalidation(db, "tenants");
+}
+
+export async function getTenantDomainMap(db: Db): Promise<TenantDomainMap> {
+  ensureListening(db);
+  if (tenantDomainCache) return tenantDomainCache;
+  if (!tenantDomainLoading) {
+    tenantDomainLoading = db
+      .select({
+        domain: tenantDomains.domain,
+        isRoot: tenantDomains.isRoot,
+        isPrimary: tenantDomains.isPrimary,
+        tenantId: tenants.id,
+        tenantName: tenants.name,
+        tenantState: tenants.state,
+      })
+      .from(tenantDomains)
+      .innerJoin(tenants, eq(tenantDomains.tenantId, tenants.id))
+      .then((rows) => {
+        const map: TenantDomainMap = {
+          byDomain: new Map(),
+          domainsByTenant: new Map(),
+          primaryByTenant: new Map(),
+          rootDomain: null,
+          rootTenantId: null,
+        };
+        for (const row of rows) {
+          map.byDomain.set(row.domain, {
+            tenantId: row.tenantId,
+            tenantName: row.tenantName,
+            tenantState: row.tenantState,
+          });
+          if (row.isRoot) {
+            map.rootTenantId = row.tenantId;
+            map.rootDomain = row.domain;
+          }
+          if (row.isPrimary) map.primaryByTenant.set(row.tenantId, row.domain);
+          const domains = map.domainsByTenant.get(row.tenantId) ?? [];
+          domains.push(row.domain);
+          map.domainsByTenant.set(row.tenantId, domains);
+        }
+        for (const domains of map.domainsByTenant.values()) domains.sort();
+        tenantDomainCache = map;
+        return map;
+      })
+      .catch((err) => {
+        // Unlike the tenant caches, a failed load here would otherwise wedge every request on the
+        // same rejected promise until an invalidation happened to clear it.
+        tenantDomainLoading = null;
+        throw err;
+      });
+  }
+  return tenantDomainLoading;
 }
 
 // Every admin page, every public content-type route and the sitemap needs the content type list,
@@ -148,32 +270,34 @@ export function invalidateContentTypesCache(db: Db): void {
 // templates above, invalidated by the same LISTEN/NOTIFY broadcast.
 export async function getContentTypeRows(db: Db): Promise<ContentTypeRow[]> {
   ensureListening(db);
-  if (contentTypesCache) return contentTypesCache;
-  if (!contentTypesLoading) {
-    contentTypesLoading = db
+  const caches = currentCaches();
+  if (caches.contentTypes) return caches.contentTypes;
+  if (!caches.contentTypesLoading) {
+    caches.contentTypesLoading = db
       .select()
       .from(contentTypes)
       .where(eq(contentTypes.state, 1))
       .orderBy(contentTypes.title)
       .then((rows) => {
-        contentTypesCache = rows;
+        caches.contentTypes = rows;
         return rows;
       });
   }
-  return contentTypesLoading;
+  return caches.contentTypesLoading;
 }
 
 async function loadSettingsMap(db: Db): Promise<Map<string, unknown>> {
   ensureListening(db);
-  if (settingsCache) return settingsCache;
-  if (!settingsLoading) {
-    settingsLoading = db.select().from(settings).then((rows) => {
+  const caches = currentCaches();
+  if (caches.settings) return caches.settings;
+  if (!caches.settingsLoading) {
+    caches.settingsLoading = db.select().from(settings).then((rows) => {
       const map = new Map(rows.map((row) => [row.key, row.value]));
-      settingsCache = map;
+      caches.settings = map;
       return map;
     });
   }
-  return settingsLoading;
+  return caches.settingsLoading;
 }
 
 export async function getSetting(db: Db, key: string): Promise<unknown> {
@@ -183,15 +307,16 @@ export async function getSetting(db: Db, key: string): Promise<unknown> {
 
 async function loadTemplatesMap(db: Db): Promise<Map<string, TemplateRow>> {
   ensureListening(db);
-  if (templatesCache) return templatesCache;
-  if (!templatesLoading) {
-    templatesLoading = db.select().from(templates).then((rows) => {
+  const caches = currentCaches();
+  if (caches.templates) return caches.templates;
+  if (!caches.templatesLoading) {
+    caches.templatesLoading = db.select().from(templates).then((rows) => {
       const map = new Map(rows.map((row) => [row.id, row]));
-      templatesCache = map;
+      caches.templates = map;
       return map;
     });
   }
-  return templatesLoading;
+  return caches.templatesLoading;
 }
 
 export async function getTemplateById(db: Db, id: string): Promise<TemplateRow | undefined> {
@@ -240,9 +365,10 @@ function buildPagePath(page: PageRow, pageById: Map<string, PageRow>, visited = 
 
 async function loadPageTree(db: Db): Promise<Map<string, PageWithBreadcrumbs>> {
   ensureListening(db);
-  if (pageTreeCache) return pageTreeCache;
-  if (!pageTreeLoading) {
-    pageTreeLoading = db
+  const caches = currentCaches();
+  if (caches.pageTree) return caches.pageTree;
+  if (!caches.pageTreeLoading) {
+    caches.pageTreeLoading = db
       .select()
       .from(pages)
       .where(and(eq(pages.state, 1), isNull(pages.contentType)))
@@ -252,11 +378,11 @@ async function loadPageTree(db: Db): Promise<Map<string, PageWithBreadcrumbs>> {
         for (const page of allPages) {
           map.set(buildPagePath(page, pageById), { page, breadcrumbs: buildBreadcrumbs(page, pageById) });
         }
-        pageTreeCache = map;
+        caches.pageTree = map;
         return map;
       });
   }
-  return pageTreeLoading;
+  return caches.pageTreeLoading;
 }
 
 export async function getPlainPageForPath(db: Db, path: string): Promise<PageWithBreadcrumbs | undefined> {
@@ -266,9 +392,10 @@ export async function getPlainPageForPath(db: Db, path: string): Promise<PageWit
 
 export async function getContentTypePage(db: Db, contentTypeId: string, alias: string): Promise<PageRow | undefined> {
   ensureListening(db);
+  const caches = currentCaches();
   const key = `${contentTypeId}:${alias}`;
-  if (contentTypePageCache.has(key)) return contentTypePageCache.get(key);
-  let loading = contentTypePageLoading.get(key);
+  if (caches.contentTypePage.has(key)) return caches.contentTypePage.get(key);
+  let loading = caches.contentTypePageLoading.get(key);
   if (!loading) {
     loading = db
       .select()
@@ -281,11 +408,11 @@ export async function getContentTypePage(db: Db, contentTypeId: string, alias: s
       .limit(1)
       .then((rows) => {
         const result = rows[0];
-        contentTypePageCache.set(key, result);
-        contentTypePageLoading.delete(key);
+        caches.contentTypePage.set(key, result);
+        caches.contentTypePageLoading.delete(key);
         return result;
       });
-    contentTypePageLoading.set(key, loading);
+    caches.contentTypePageLoading.set(key, loading);
   }
   return loading;
 }

@@ -1,5 +1,6 @@
 import type { APIContext } from "astro";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { isActiveMemberOfCurrentTenant } from "../../../../auth/accounts.js";
 import { getDb } from "../../../../db/db.js";
 import { users } from "../../../../db/schema.js";
 
@@ -17,7 +18,7 @@ export async function GET(context: APIContext): Promise<Response> {
   const allUsers = await db
     .select({ id: users.id, fname: users.fname, lname: users.lname, email: users.email })
     .from(users)
-    .where(eq(users.state, 1));
+    .where(and(eq(users.state, 1), isActiveMemberOfCurrentTenant()));
 
   const result = allUsers
     .map((user) => ({

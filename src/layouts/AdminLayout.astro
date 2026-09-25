@@ -5,12 +5,14 @@ import { ClipboardList, FileText, House, Images, LayoutTemplate, LogOut, PenLine
 import { eq } from 'drizzle-orm';
 import * as z from 'zod';
 import { AlertList } from '../alert/AlertList.js';
+import { canSwitchSites } from '../auth/index.js';
 import Container from '../components/Container.astro';
 import ContentTypesScript from '../components/ContentTypesScript.astro';
 import { listContentTypes } from '../db/content-types.js';
 import { getDb } from '../db/db.js';
 import { users } from '../db/schema.js';
 import { runOverride } from '../hooks/index.js';
+import { getRootDomain, urlOnDomain } from '../tenant/index.js';
 
 const db = getDb();
 
@@ -26,6 +28,13 @@ const alerts = Astro.locals.alerts ?? [];
 const contentTypes = await listContentTypes(db);
 
 const theme = user.theme !== 'system' ? user.theme : undefined;
+
+// Someone who can administer more than one site gets a way back to the root site's dashboard,
+// where every site they can open is listed.
+const rootDomain = await getRootDomain(db);
+const switchSitesUrl = rootDomain && (await canSwitchSites(user))
+	? urlOnDomain(Astro.url, rootDomain, '/dashboard')
+	: undefined;
 
 interface NavSubItem {
 	label: string;
@@ -155,6 +164,7 @@ const navItems = (await runOverride('admin:nav', { user, defaultNavItems }, navI
 				</button>
 				<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[100] w-44 p-2 shadow-lg border border-base-300">
 					<li><a href="/admin/profile">Profile</a></li>
+					{switchSitesUrl && <li><a href={switchSitesUrl}>Switch sites</a></li>}
 					<li>
 						<!-- A plain button (not a form) so this stays the direct child of <li> that
 						daisyUI's menu styling (grid layout, padding, hover state) targets — exactly like

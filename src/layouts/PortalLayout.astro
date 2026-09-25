@@ -1,0 +1,94 @@
+---
+import '../styles/global.css';
+import { House, LogOut, ShieldCheck } from '@lucide/astro';
+import { AlertList } from '../alert/AlertList.js';
+import Container from '../components/Container.astro';
+
+// The root site's account pages (/dashboard/*): the admin layout's shell — icon rail, profile
+// menu, content area — with just Home, plus Admin (/dashboard/admin, managing every site and
+// account) for super admins, since there's no one site being administered here.
+interface Props {
+	user: { fname: string; lname: string; email: string; theme: string; superAdmin: boolean };
+	title: string;
+}
+
+const { user, title } = Astro.props;
+const theme = user.theme !== 'system' ? user.theme : undefined;
+const alerts = Astro.locals.alerts ?? [];
+---
+<!DOCTYPE html>
+<html lang="en" data-theme={theme}>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>{title}</title>
+	<link rel="icon" type="image/svg+xml" href="/admin/assets/favicon.svg" />
+	<link rel="icon" href="/admin/assets/favicon.ico" />
+</head>
+<body class="h-screen overflow-hidden">
+	<div class="flex h-full">
+
+		<!-- Vertical Icon Nav -->
+		<nav class="flex flex-col w-16 bg-base-100 border-r border-base-300 items-center py-3 gap-1 shrink-0 z-50">
+			<a href="/dashboard" class="flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
+				<House size={20} />
+				<span class="text-[10px] font-medium leading-tight">Home</span>
+			</a>
+			{user.superAdmin && (
+				<a href="/dashboard/admin" class="flex flex-col items-center justify-center gap-1 w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors text-base-content">
+					<ShieldCheck size={20} />
+					<span class="text-[10px] font-medium leading-tight">Admin</span>
+				</a>
+			)}
+
+			<!-- User Avatar -->
+			<div class="mt-auto dropdown dropdown-right dropdown-end">
+				<button tabindex="0" role="button" class="flex flex-col items-center justify-center w-full py-3 px-1 rounded-lg hover:bg-base-300 transition-colors">
+					<div class="avatar avatar-placeholder">
+						<div class="bg-primary text-primary-content rounded-full w-9">
+							<span class="text-xs font-semibold">{user.fname[0]?.toUpperCase()}{user.lname[0]?.toUpperCase()}</span>
+						</div>
+					</div>
+				</button>
+				<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[100] w-56 p-2 shadow-lg border border-base-300">
+					<li class="menu-title">
+						<span class="text-base-content">{user.fname} {user.lname}</span>
+						<span class="font-normal text-xs truncate">{user.email}</span>
+					</li>
+					<li>
+						<!-- A plain button (not a form), matching the admin layout: the POST is fired
+						from the script below. -->
+						<button type="button" id="logout-button" class="text-error flex items-center justify-between">
+							Logout
+							<LogOut size={15} />
+						</button>
+					</li>
+				</ul>
+			</div>
+		</nav>
+
+		<div class="flex-1 h-full overflow-auto bg-base-200">
+			<main class="p-6 h-full bg-base-200">
+				<Container>
+					<AlertList alerts={alerts} />
+					<slot />
+				</Container>
+			</main>
+		</div>
+
+	</div>
+
+	<script>
+		// /logout is POST-only (a GET would be a state-changing request outside Astro's Origin-check
+		// coverage), so this fires the request via fetch rather than a plain link.
+		document.getElementById('logout-button')?.addEventListener('click', async () => {
+			try {
+				await fetch('/logout', { method: 'POST' });
+			} finally {
+				window.location.href = '/login';
+			}
+		});
+	</script>
+</body>
+</html>

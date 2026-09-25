@@ -31,6 +31,8 @@ export declare const CircleCheck: AstroComponent;
 export declare const Circlex: AstroComponent;
 export declare const CircleCheckBig: AstroComponent;
 export declare const House: AstroComponent;
+export declare const Globe: AstroComponent;
+export declare const ShieldCheck: AstroComponent;
 export declare const Users: AstroComponent;
 export declare const LayoutTemplate: AstroComponent;
 export declare const FileText: AstroComponent;

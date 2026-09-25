@@ -1,0 +1,102 @@
+---
+import { CircleCheck, CircleX, ExternalLink } from '@lucide/astro';
+import { asc, desc, sql } from 'drizzle-orm';
+import { dashboardAccess } from '../../../../auth/dashboard.js';
+import { getDb } from '../../../../db/db.js';
+import { tenantDomains, tenants, userTenants } from '../../../../db/schema.js';
+import PortalLayout from '../../../../layouts/PortalLayout.astro';
+import AdminTabs from '../_tabs.astro';
+
+// Managing sites is a super admin power, and only on the root site (see dashboardAccess()).
+const access = await dashboardAccess(Astro, { superAdmin: true });
+if (access.response) {
+    return access.response;
+}
+const { user } = access;
+
+const db = getDb();
+
+// Neither tenants, tenant_domains nor user_tenants are row-level-secured, so this sees every tenant.
+const [allTenants, allDomains, memberCounts] = await Promise.all([
+    db.select().from(tenants).orderBy(desc(tenants.createdAt)),
+    db.select().from(tenantDomains).orderBy(desc(tenantDomains.isRoot), asc(tenantDomains.domain)),
+    db
+        .select({ tenantId: userTenants.tenantId, count: sql<number>`count(*)::int` })
+        .from(userTenants)
+        .groupBy(userTenants.tenantId),
+]);
+
+const domainsByTenant = new Map<string, typeof allDomains>();
+for (const domain of allDomains) {
+    if (!domainsByTenant.has(domain.tenantId)) domainsByTenant.set(domain.tenantId, []);
+    domainsByTenant.get(domain.tenantId)!.push(domain);
+}
+const membersByTenant = new Map(memberCounts.map((row) => [row.tenantId, row.count]));
+
+// Links to each tenant's own admin keep this request's scheme and port, so they work the same in
+// development (e.g. http://blog.localhost:3012) as behind a production proxy.
+const port = Astro.url.port ? `:${Astro.url.port}` : '';
+const adminUrl = (domain: string) => `${Astro.url.protocol}//${domain}${port}/admin`;
+const currentTenantId = Astro.locals.tenant.id;
+---
+
+<PortalLayout user={user} title="Sites">
+    <div class="flex flex-wrap items-center justify-between gap-3 align-middle border-b border-base-300 pt-2 sticky top-0 z-10 bg-base-200">
+        <h1 class="text-2xl font-semibold">Admin</h1>
+        <a href="/dashboard/admin/sites/new" class="btn btn-primary">New site</a>
+    </div>
+    <AdminTabs active="sites" />
+    <p class="pt-4 pb-6 text-sm text-base-content/70">
+        Each site has its own pages, media, settings, users and roles, and answers on its own domains.
+        As a super admin you can sign in to any site's admin with your account here.
+    </p>
+    {allTenants.length === 0 && (
+        <div class="text-center text-base-content/60 py-8 bg-base-100 rounded-lg">No sites yet.</div>
+    )}
+    {allTenants.length > 0 && (
+        <div class="flex flex-col gap-3">
+            {allTenants.map((tenant) => {
+                const domains = domainsByTenant.get(tenant.id) ?? [];
+                const isRoot = domains.some((domain) => domain.isRoot);
+                return (
+                    <div class="card bg-base-100 rounded-lg p-4 flex flex-col gap-3 sm:flex-row sm:items-start">
+                        <form action={`/dashboard/admin/sites/toggle/${tenant.id}`} method="POST">
+                            <button
+                                type="submit"
+                                class="btn btn-square"
+                                disabled={isRoot}
+                                title={isRoot ? 'The root site can’t be disabled' : tenant.state === 1 ? 'Disable' : 'Enable'}
+                            >
+                                {tenant.state === 1 ? <CircleCheck size={20} class="text-green-500" /> : <CircleX size={20} class="text-red-500" />}
+                            </button>
+                        </form>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <a href={`/dashboard/admin/sites/edit/${tenant.id}`} class="font-bold link link-info link-hover">{tenant.name}</a>
+                                {isRoot && <span class="badge badge-primary badge-sm">Root</span>}
+                                {tenant.id === currentTenantId && <span class="badge badge-ghost badge-sm">This site</span>}
+                                {tenant.state !== 1 && <span class="badge badge-warning badge-sm">Disabled</span>}
+                            </div>
+                            <div class="text-sm text-base-content/60 mt-1">
+                                {membersByTenant.get(tenant.id) ?? 0} member(s)
+                            </div>
+                            <ul class="mt-2 flex flex-wrap gap-2">
+                                {domains.map((domain) => (
+                                    <li>
+                                        <a href={adminUrl(domain.domain)} class="badge badge-outline gap-1 hover:badge-info" title="Open this site's admin">
+                                            {domain.domain}
+                                            {domain.isRoot && <span class="opacity-60">(root)</span>}
+                                            {domain.isPrimary && <span class="opacity-60">(primary)</span>}
+                                            <ExternalLink size={12} />
+                                        </a>
+                                    </li>
+                                ))}
+                                {domains.length === 0 && <li class="text-sm text-base-content/60">No domains</li>}
+                            </ul>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    )}
+</PortalLayout>

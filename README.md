@@ -11,6 +11,8 @@ Requirements:
 * Node 22.12+
 * PostgreSQL
 
+One install serves any number of sites, each on its own domains; see the Tenancy page in the docs.
+
 ```sh
 npm install
 cp .env.example .env   # set DATABASE_URL

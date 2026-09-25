@@ -18,6 +18,7 @@ import {
 } from '@lucide/astro';
 import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
 import { describeAction } from '../../audit/index.js';
+import { isMemberOfCurrentTenant } from '../../auth/accounts.js';
 import LocalDateTime from '../../components/LocalDateTime.astro';
 import { listContentTypes } from '../../db/content-types.js';
 import { getDb } from '../../db/db.js';
@@ -81,7 +82,7 @@ const [
 	db.select({ count: sql<number>`COUNT(*)` }).from(forms).where(gt(forms.state, -1)).then(r => r[0]?.count ?? 0),
 	db.select({ count: sql<number>`COUNT(*)` }).from(media).where(gt(media.state, -1)).then(r => r[0]?.count ?? 0),
 	db.select({ count: sql<number>`COUNT(*)` }).from(documents).where(gt(documents.state, -1)).then(r => r[0]?.count ?? 0),
-	db.select({ count: sql<number>`COUNT(*)` }).from(users).where(gt(users.state, -1)).then(r => r[0]?.count ?? 0),
+	db.select({ count: sql<number>`COUNT(*)` }).from(users).where(and(gt(users.state, -1), isMemberOfCurrentTenant())).then(r => r[0]?.count ?? 0),
 	db.select({ count: sql<number>`COUNT(*)` }).from(tags).where(gt(tags.state, -1)).then(r => r[0]?.count ?? 0),
 	db.select({ count: sql<number>`COUNT(*)` }).from(redirects).where(gt(redirects.state, -1)).then(r => r[0]?.count ?? 0),
 ]);

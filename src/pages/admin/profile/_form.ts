@@ -23,12 +23,22 @@ const THEME_OPTIONS = [
 
 const THEME_VALUES = THEME_OPTIONS.map((option) => option.value) as [string, ...string[]];
 
-export function getProfileForm(user: User, fields: Record<string, any>, redirectUrl: string, flash: Record<string, string> = {}, showCurrentPassword: boolean = false, roleOptions: { value: string; label: string }[] = [], selectedRoleIds: string[] = []): FormSection {
-	return {
-		id: 'profile-form',
-		title: 'Profile',
-		classList: "space-y-6",
-		fields: [
+export interface ProfileFormOptions {
+	// The account is shared with other tenants (or is a super admin's), so the editing admin may only
+	// change its roles here — see canManageAccount() in auth/accounts.ts. Its profile and password
+	// sections are replaced with a note saying so.
+	identityLocked?: boolean;
+}
+
+export function getProfileForm(user: User, fields: Record<string, any>, redirectUrl: string, flash: Record<string, string> = {}, showCurrentPassword: boolean = false, roleOptions: { value: string; label: string }[] = [], selectedRoleIds: string[] = [], options: ProfileFormOptions = {}): FormSection {
+	const identityFields = options.identityLocked ? [
+			{
+				id: 'identity-locked-wrapper',
+				name: 'identity-locked-wrapper',
+				type: 'Html',
+				markup: '<div class="p-6 bg-base-100 rounded-lg"><h2 class="text-lg font-medium">Profile</h2><p class="mt-2 text-sm opacity-70">This account also has access to other sites, so its name, email and password can only be changed by its owner (from their profile) or by a super admin. You can still change its roles on this site.</p></div>',
+			},
+		] : [
 			{
 				id: 'profile-group-wrapper',
 				name: 'profile-group-wrapper',
@@ -155,6 +165,14 @@ export function getProfileForm(user: User, fields: Record<string, any>, redirect
 					}
 				]
 			},
+		];
+
+	return {
+		id: 'profile-form',
+		title: 'Profile',
+		classList: "space-y-6",
+		fields: [
+			...identityFields,
 			...(roleOptions.length > 0 ? [{
 				id: 'roles-group-wrapper',
 				name: 'roles-group-wrapper',

@@ -1,0 +1,148 @@
+---
+import { asc, eq, gte } from 'drizzle-orm';
+import { z } from 'zod';
+import { dashboardAccess } from '../../../../../auth/dashboard.js';
+import { getDb } from '../../../../../db/db.js';
+import { roles, tenants, userRoles, users, userTenants } from '../../../../../db/schema.js';
+import PortalLayout from '../../../../../layouts/PortalLayout.astro';
+import { runWithTenant } from '../../../../../tenant/context.js';
+import AdminTabs from '../../_tabs.astro';
+
+// One account's sites: which it belongs to and with what roles on each, with adding it to another
+// site (optionally with one of that site's roles) or removing it from one. Everything about the
+// account itself stays with each site's own admin (and the super admin toggle on the list).
+const access = await dashboardAccess(Astro, { superAdmin: true });
+if (access.response) {
+	return access.response;
+}
+const { user } = access;
+
+const id = z.uuid().safeParse(Astro.params.id);
+const db = getDb();
+const [account] = id.success ? await db.select().from(users).where(eq(users.id, id.data)).limit(1) : [];
+if (!account) {
+	return Astro.rewrite('/404');
+}
+
+const allTenants = await db.select().from(tenants).orderBy(asc(tenants.name));
+// Site id → whether the account is enabled there (user_tenants.state, set from that site's admin).
+const memberOf = new Map(
+	(await db.select({ tenantId: userTenants.tenantId, state: userTenants.state }).from(userTenants).where(eq(userTenants.userId, account.id)))
+		.map((row) => [row.tenantId, row.state >= 1]),
+);
+
+// roles and user_roles are row-level-secured per site, so each site's are read in its own context.
+const rootTenantId = Astro.locals.tenant.id;
+const sites = await Promise.all(allTenants.map(async (tenant) => {
+	const context = { id: tenant.id, name: tenant.name, isRoot: tenant.id === rootTenantId };
+	return runWithTenant(context, async () => {
+		const siteRoles = await db.select({ id: roles.id, title: roles.title, adminAccess: roles.adminAccess })
+			.from(roles).where(gte(roles.state, 1)).orderBy(asc(roles.title));
+		const held = memberOf.has(tenant.id)
+			? (await db.select({ roleId: userRoles.roleId }).from(userRoles).where(eq(userRoles.userId, account.id))).map((row) => row.roleId)
+			: [];
+		return { tenant, roles: siteRoles, heldRoleTitles: siteRoles.filter((role) => held.includes(role.id)).map((role) => role.title) };
+	});
+}));
+
+const memberSites = sites.filter((site) => memberOf.has(site.tenant.id));
+const otherSites = sites.filter((site) => !memberOf.has(site.tenant.id));
+const inputClassList = 'w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200 bg-base-100 text-base-content';
+---
+
+<PortalLayout user={user} title={`${account.fname} ${account.lname}`}>
+	<div class="flex flex-wrap items-center justify-between gap-3 align-middle border-b border-base-300 pt-2 sticky top-0 z-10 bg-base-200">
+		<h1 class="text-2xl font-semibold">Admin</h1>
+	</div>
+	<AdminTabs active="users" />
+
+	<div class="pt-4 space-y-6">
+		<div class="flex items-center gap-3">
+			<a href="/dashboard/admin/users" class="btn btn-ghost btn-sm">← All users</a>
+		</div>
+
+		<div class="p-6 bg-base-100 rounded-lg flex items-center gap-4">
+			<div class="avatar avatar-placeholder">
+				<div class="bg-neutral text-neutral-content rounded-full w-12">
+					<span class="font-semibold">{account.fname[0]?.toUpperCase()}{account.lname[0]?.toUpperCase()}</span>
+				</div>
+			</div>
+			<div class="min-w-0">
+				<div class="text-lg font-bold">{account.fname} {account.lname}</div>
+				<div class="text-sm opacity-60 truncate">{account.email}</div>
+			</div>
+			<div class="ms-auto flex gap-2">
+				{account.superAdmin && <span class="badge badge-primary">Super admin</span>}
+				{account.state !== 1 && <span class="badge badge-warning">{account.state === 0 ? 'Disabled' : 'Deleted'}</span>}
+			</div>
+		</div>
+
+		<div class="p-6 bg-base-100 rounded-lg">
+			<h2 class="text-lg font-medium">Sites</h2>
+			{memberSites.length === 0 && <p class="mt-2 text-sm opacity-60">Not a member of any site.</p>}
+			{memberSites.length > 0 && (
+				<table class="table mt-2">
+					<thead>
+						<tr><th>Site</th><th>Roles on it</th><th class="w-px"></th></tr>
+					</thead>
+					<tbody>
+						{memberSites.map((site) => (
+							<tr>
+								<td class="font-medium">
+									{site.tenant.name}
+									{site.tenant.state !== 1 && <span class="badge badge-warning badge-sm ms-2">Disabled</span>}
+									{!memberOf.get(site.tenant.id) && (
+										<span class="badge badge-warning badge-sm ms-2" title="This site's admin has disabled the account here">Account disabled here</span>
+									)}
+								</td>
+								<td>
+									<div class="flex flex-wrap gap-1">
+										{site.heldRoleTitles.map((title) => <span class="badge badge-ghost badge-sm">{title}</span>)}
+										{site.heldRoleTitles.length === 0 && <span class="text-sm opacity-50">No roles — can't open its admin</span>}
+									</div>
+								</td>
+								<td>
+									<form action={`/dashboard/admin/users/${account.id}/sites/remove`} method="POST">
+										<input type="hidden" name="site" value={site.tenant.id} />
+										<button class="btn btn-xs btn-outline btn-error">Remove</button>
+									</form>
+								</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			)}
+			{account.superAdmin && (
+				<p class="mt-3 text-sm opacity-60">As a super admin this account can open every site's admin whether or not it's a member.</p>
+			)}
+		</div>
+
+		<div class="p-6 bg-base-100 rounded-lg">
+			<h2 class="text-lg font-medium">Add to a site</h2>
+			{otherSites.length === 0 && <p class="mt-2 text-sm opacity-60">Already a member of every site.</p>}
+			{otherSites.length > 0 && (
+				<form action={`/dashboard/admin/users/${account.id}/sites/add`} method="POST" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+					<label class="block flex-1">
+						<span class="block mb-1 font-medium">Site and role</span>
+						<select name="target" class={inputClassList} required>
+							{otherSites.map((site) => (
+								<optgroup class="bg-base-100 text-base-content" label={site.tenant.name}>
+									{site.roles.map((role) => (
+										<option class="bg-base-100 text-base-content" value={`${site.tenant.id}:${role.id}`}>
+											{site.tenant.name} — {role.title}{role.adminAccess ? ' (admin access)' : ''}
+										</option>
+									))}
+									<option class="bg-base-100 text-base-content" value={`${site.tenant.id}:`}>{site.tenant.name} — no role</option>
+								</optgroup>
+							))}
+						</select>
+					</label>
+					<button class="btn btn-primary">Add</button>
+				</form>
+			)}
+			<p class="mt-3 text-sm opacity-60">
+				The account is added as-is — its name and password don't change. More roles can be given from that site's own admin.
+			</p>
+		</div>
+	</div>
+</PortalLayout>

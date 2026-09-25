@@ -3,7 +3,7 @@ import { addAlertToSession, alertType, createAlert } from "../../../alert/index.
 import { invalidateSettingsCache } from "../../../db/content-cache.js";
 import { listContentTypes } from "../../../db/content-types.js";
 import { getDb } from "../../../db/db.js";
-import { settings } from "../../../db/schema.js";
+import { settings, settingsKeyTarget } from "../../../db/schema.js";
 import { createUserAlertMessageFromArray, formDataToRecord, getFieldByName, validateForm } from "../../../form/index.js";
 import { createFormFlashSession } from "../../../form/session.js";
 import { getSettingsForm } from "./_form.js";
@@ -37,47 +37,47 @@ export async function POST(context: APIContext): Promise<Response> {
     await db
         .insert(settings)
         .values({ key: 'site_name', value: siteName })
-        .onConflictDoUpdate({ target: settings.key, set: { value: siteName } });
+        .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: siteName } });
 
     await db
         .insert(settings)
         .values({ key: 'default_template', value: defaultTemplateId })
-        .onConflictDoUpdate({ target: settings.key, set: { value: defaultTemplateId } });
+        .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: defaultTemplateId } });
 
     await db
         .insert(settings)
         .values({ key: 'turnstile_site_key', value: turnstileSiteKey })
-        .onConflictDoUpdate({ target: settings.key, set: { value: turnstileSiteKey } });
+        .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: turnstileSiteKey } });
 
     await db
         .insert(settings)
         .values({ key: 'turnstile_secret_key', value: turnstileSecretKey })
-        .onConflictDoUpdate({ target: settings.key, set: { value: turnstileSecretKey } });
+        .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: turnstileSecretKey } });
 
     await db
         .insert(settings)
         .values({ key: 'heading_font_link', value: headingFontLink })
-        .onConflictDoUpdate({ target: settings.key, set: { value: headingFontLink } });
+        .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: headingFontLink } });
 
     await db
         .insert(settings)
         .values({ key: 'body_font_link', value: bodyFontLink })
-        .onConflictDoUpdate({ target: settings.key, set: { value: bodyFontLink } });
+        .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: bodyFontLink } });
 
     await db
         .insert(settings)
         .values({ key: 'email_host', value: emailHost })
-        .onConflictDoUpdate({ target: settings.key, set: { value: emailHost } });
+        .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: emailHost } });
 
     await db
         .insert(settings)
         .values({ key: 'email_address', value: emailAddress })
-        .onConflictDoUpdate({ target: settings.key, set: { value: emailAddress } });
+        .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: emailAddress } });
 
     await db
         .insert(settings)
         .values({ key: 'email_password', value: emailPassword })
-        .onConflictDoUpdate({ target: settings.key, set: { value: emailPassword } });
+        .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: emailPassword } });
 
     for (const contentType of contentTypes) {
         const templateFormKey = `content-default-template-${contentType.id}`;
@@ -87,7 +87,7 @@ export async function POST(context: APIContext): Promise<Response> {
         await db
             .insert(settings)
             .values({ key: templateSettingKey, value: templateValue })
-            .onConflictDoUpdate({ target: settings.key, set: { value: templateValue } });
+            .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: templateValue } });
     }
 
     invalidateSettingsCache(db);

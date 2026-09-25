@@ -1,0 +1,16 @@
+---
+// The tabs across the top of /dashboard/admin/*.
+interface Props {
+	active: 'sites' | 'users';
+}
+const { active } = Astro.props;
+const tabs = [
+	{ id: 'sites', label: 'Sites', href: '/dashboard/admin/sites' },
+	{ id: 'users', label: 'Users', href: '/dashboard/admin/users' },
+] as const;
+---
+<div role="tablist" class="tabs tabs-border pt-4">
+	{tabs.map((tab) => (
+		<a role="tab" href={tab.href} class={`tab ${tab.id === active ? 'tab-active' : ''}`}>{tab.label}</a>
+	))}
+</div>

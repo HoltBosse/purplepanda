@@ -6,7 +6,7 @@ import { addAction } from "../../../../audit/index.js";
 import { invalidateSettingsCache } from "../../../../db/content-cache.js";
 import { getDb } from "../../../../db/db.js";
 import { NOT_FOUND_SETTING_KEY } from "../../../../db/not-found.js";
-import { dagNodes, settings } from "../../../../db/schema.js";
+import { dagNodes, settings, settingsKeyTarget } from "../../../../db/schema.js";
 import { runOverride } from "../../../../hooks/index.js";
 import { contentValidationErrorsSchema, formatValidationErrors, validateContentTree } from "../../../../puck/validate-content.js";
 import externalPuckConfig from "../../../../puck.config.js";
@@ -51,7 +51,7 @@ export async function POST(context: APIContext): Promise<Response> {
     const [settingRow] = await db
         .insert(settings)
         .values({ key: settingsKey, value: parsedContent })
-        .onConflictDoUpdate({ target: settings.key, set: { value: parsedContent } })
+        .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: parsedContent } })
         .returning();
 
     if (!settingRow) {

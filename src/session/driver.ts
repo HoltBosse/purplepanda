@@ -5,34 +5,47 @@ import { sessions } from "../db/schema.js";
 
 // Astro session driver backed by the `sessions` table. Astro hands us its session map already
 // serialized (devalue, a Map of key -> { data, expires }), and reads it back as-is. We also parse
-// it on write to keep the queryable `userId` / `expiresAt` columns in sync with what's stored.
+// it on write to keep the queryable `userId` / `tenantId` / `loginId` / `expiresAt` columns in sync with what's
+// stored. Sessions aren't row-level-secured: Astro persists them after the request's tenant context
+// has already unwound, and they're looked up by their unguessable id anyway.
 
 type SessionEntry = { data: unknown; expires?: number };
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function describe(serialized: string): { userId: string | null; expiresAt: Date | null } {
+type SessionColumns = { userId: string | null; tenantId: string | null; loginId: string | null; expiresAt: Date | null };
+
+// A live (unexpired) uuid-valued entry, or null.
+function uuidEntry(entries: Map<string, SessionEntry>, key: string, now: number): string | null {
+  const entry = entries.get(key);
+  return entry && !(typeof entry.expires === "number" && entry.expires < now)
+    && typeof entry.data === "string" && UUID_REGEX.test(entry.data) ? entry.data : null;
+}
+
+export function describe(serialized: string): SessionColumns {
   let entries: Map<string, SessionEntry>;
   try {
     // Same reviver Astro serializes with, so URL values don't make the parse throw.
     entries = parse(serialized, { URL: (href: string) => new URL(href) });
   } catch {
-    return { userId: null, expiresAt: null };
+    return { userId: null, tenantId: null, loginId: null, expiresAt: null };
   }
-  if (!(entries instanceof Map)) return { userId: null, expiresAt: null };
+  if (!(entries instanceof Map)) return { userId: null, tenantId: null, loginId: null, expiresAt: null };
 
   const now = Date.now();
-  const user = entries.get("userId");
-  const userId = user && !(typeof user.expires === "number" && user.expires < now)
-    && typeof user.data === "string" && UUID_REGEX.test(user.data) ? user.data : null;
+  const userId = uuidEntry(entries, "userId", now);
+  // Set alongside userId at login (see login-action.ts) — the tenant the session is signed in to.
+  const tenantId = uuidEntry(entries, "tenantId", now);
+  // The root-site sign-in this session belongs to (see sessions.login_id in db/schema.ts).
+  const loginId = uuidEntry(entries, "loginId", now);
 
   // The row is dead once its last entry expires; any entry without a ttl keeps it alive forever.
   let latest = 0;
   for (const entry of entries.values()) {
-    if (typeof entry.expires !== "number") return { userId, expiresAt: null };
+    if (typeof entry.expires !== "number") return { userId, tenantId, loginId, expiresAt: null };
     latest = Math.max(latest, entry.expires);
   }
-  return { userId, expiresAt: latest ? new Date(latest) : null };
+  return { userId, tenantId, loginId, expiresAt: latest ? new Date(latest) : null };
 }
 
 export default function sessionDriver() {
@@ -48,13 +61,13 @@ export default function sessionDriver() {
     },
 
     async setItem(id: string, value: string): Promise<void> {
-      const { userId, expiresAt } = describe(value);
+      const { userId, tenantId, loginId, expiresAt } = describe(value);
       await getDb()
         .insert(sessions)
-        .values({ id, data: value, userId, expiresAt })
+        .values({ id, data: value, userId, tenantId, loginId, expiresAt })
         .onConflictDoUpdate({
           target: sessions.id,
-          set: { data: value, userId, expiresAt, updatedAt: new Date() },
+          set: { data: value, userId, tenantId, loginId, expiresAt, updatedAt: new Date() },
         });
     },
 

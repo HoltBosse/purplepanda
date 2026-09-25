@@ -4,6 +4,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { RateLimiterPostgres } from "rate-limiter-flexible";
 import * as z from "zod";
 import { addAlertToSession, alertType, createAlert } from "../../../../alert/index.js";
+import { isActiveMemberOfCurrentTenant } from "../../../../auth/accounts.js";
 import { getDb } from "../../../../db/db.js";
 import { sendMail } from "../../../../db/mail.js";
 import { resolvePagePathById } from "../../../../db/page-path.js";
@@ -135,7 +136,8 @@ async function notifyFormSubmission(
   const recipients = await db
     .select({ email: users.email })
     .from(users)
-    .where(and(eq(users.state, 1), inArray(users.id, notifyUserIds)));
+    // Accounts are shared across tenants: only members enabled on this tenant can be notified.
+    .where(and(eq(users.state, 1), inArray(users.id, notifyUserIds), isActiveMemberOfCurrentTenant()));
 
   const to = recipients.map((row) => row.email);
   if (to.length === 0) return;

@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import * as z from "zod";
+import { isActiveMemberOfCurrentTenant } from "../../auth/accounts.js";
 import { getContentTypeById } from "../../db/content-types.js";
 import { getDb } from "../../db/db.js";
 import { pages, tags, users } from "../../db/schema.js";
@@ -12,7 +13,7 @@ export async function getUserOptions(): Promise<SelectOption[]> {
   const rows = await db
     .select({ id: users.id, fname: users.fname, lname: users.lname, email: users.email })
     .from(users)
-    .where(eq(users.state, 1));
+    .where(and(eq(users.state, 1), isActiveMemberOfCurrentTenant()));
 
   return rows.map((row) => ({
     label: `${row.fname} ${row.lname}`.trim() || row.email,
@@ -63,7 +64,7 @@ export async function isUserOptionValid(value: string): Promise<boolean> {
   const rows = await db
     .select({ id: users.id })
     .from(users)
-    .where(and(eq(users.state, 1), eq(users.id, value)))
+    .where(and(eq(users.state, 1), eq(users.id, value), isActiveMemberOfCurrentTenant()))
     .limit(1);
   return rows.length > 0;
 }

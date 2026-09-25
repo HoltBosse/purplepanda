@@ -1,11 +1,7 @@
 import type { APIContext } from "astro";
-import { emit } from "../../hooks/index.js";
+import { signOut } from "../../auth/index.js";
 
 export async function POST(context: APIContext): Promise<Response> {
-  const userId = await context.session?.get("userId");
-  context.session?.destroy();
-  if (userId) {
-    await emit("auth:logout", { userId });
-  }
+  await signOut(context.session);
   return context.redirect("/admin/login");
 }

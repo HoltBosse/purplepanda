@@ -1,6 +1,25 @@
 ---
 // Editing a user is the same page as creating one: ../new.astro branches on Astro.params.id,
 // which only this route supplies.
+import { and, eq } from 'drizzle-orm';
+import * as z from 'zod';
+import { isMemberOfCurrentTenant } from '../../../../auth/accounts.js';
+import { getDb } from '../../../../db/db.js';
+import { users } from '../../../../db/schema.js';
 import UserForm from '../new.astro';
+
+// Checked here, in the page itself, because only a page can answer with a rewrite — ../new.astro
+// renders as a child component on this route.
+const id = z.uuid().safeParse(Astro.params.id);
+const [member] = id.success
+	? await getDb()
+		.select({ id: users.id })
+		.from(users)
+		.where(and(eq(users.id, id.data), isMemberOfCurrentTenant()))
+		.limit(1)
+	: [];
+if (!member) {
+	return Astro.rewrite('/admin/404');
+}
 ---
 <UserForm />

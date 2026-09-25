@@ -1,0 +1,65 @@
+---
+import { Globe } from '@lucide/astro';
+import { and, asc, eq } from 'drizzle-orm';
+import { dashboardAccess } from '../../auth/dashboard.js';
+import { isTenantAdmin } from '../../auth/index.js';
+import { getDb } from '../../db/db.js';
+import { tenants, userTenants } from '../../db/schema.js';
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import { runWithTenant } from '../../tenant/context.js';
+
+// Root site only: every site the signed-in account can administer, each opening that site's admin
+// already signed in (via /sso/[tenantId] — see auth/sso.ts).
+const access = await dashboardAccess(Astro);
+if (access.response) {
+	return access.response;
+}
+const { user } = access;
+
+const db = getDb();
+// Super admins can administer every enabled site; anyone else, the enabled sites they belong to —
+// then narrowed to those where they actually hold admin access, by the same rule each site's
+// admin applies (which needs that site's context, since roles are row-level-secured).
+const candidates = user.superAdmin
+	? await db.select().from(tenants).where(eq(tenants.state, 1)).orderBy(asc(tenants.name))
+	: await db
+		.select({ id: tenants.id, state: tenants.state, name: tenants.name, createdAt: tenants.createdAt })
+		.from(tenants)
+		.innerJoin(userTenants, eq(userTenants.tenantId, tenants.id))
+		.where(and(eq(tenants.state, 1), eq(userTenants.userId, user.id)))
+		.orderBy(asc(tenants.name));
+
+const rootTenantId = Astro.locals.tenant.id;
+const sites = [];
+for (const tenant of candidates) {
+	const context = { id: tenant.id, name: tenant.name, isRoot: tenant.id === rootTenantId };
+	if (await runWithTenant(context, () => isTenantAdmin(user))) sites.push(tenant);
+}
+---
+
+<PortalLayout user={user} title="Your sites">
+	<div class="flex flex-wrap items-center justify-between gap-3 align-middle border-b border-base-300 pt-2 pb-2 sticky top-0 z-10 bg-base-200">
+		<h1 class="text-2xl font-semibold">Your sites</h1>
+	</div>
+
+	{sites.length === 0 && (
+		<div class="text-center text-base-content/60 py-8 mt-6 bg-base-100 rounded-lg">
+			You don't have admin access to any site yet.
+		</div>
+	)}
+
+	{sites.length > 0 && (
+		<div class="grid grid-cols-1 gap-4 pt-6 sm:grid-cols-2 lg:grid-cols-3">
+			{sites.map((site) => (
+				<a href={`/sso/${site.id}`} class="card bg-base-100 rounded-lg shadow-sm hover:shadow-md hover:bg-base-300/40 transition">
+					<div class="card-body flex-row items-center gap-4">
+						<div class="flex items-center justify-center rounded-lg bg-primary/10 text-primary w-12 h-12 shrink-0">
+							<Globe size={24} />
+						</div>
+						<h2 class="card-title text-base">{site.name}</h2>
+					</div>
+				</a>
+			))}
+		</div>
+	)}
+</PortalLayout>

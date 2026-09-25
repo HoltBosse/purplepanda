@@ -12,7 +12,8 @@ import { parseSearchQuery } from '../../../search/parser.js';
 import SearchBar from '../../../search/SearchBar';
 import type { SearchFieldSpec } from '../../../search/types.js';
 
-type Tag = InferSelectModel<typeof tags>;
+// The listing never needs the owning tenant: row-level security already limits it to this one.
+type Tag = Omit<InferSelectModel<typeof tags>, 'tenantId'>;
 
 const db = getDb();
 

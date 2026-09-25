@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { addAlertToSession, alertType, createAlert } from "../../../../alert/index.js";
 import { getDb } from "../../../../db/db.js";
 import { forms } from "../../../../db/schema.js";
+import { sameOriginReferer } from "../../../../http/referer.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -23,12 +24,9 @@ export async function POST(context: APIContext): Promise<Response> {
     const alert = createAlert(alertType.success, newState === 1 ? "Form enabled." : "Form disabled.");
     await addAlertToSession(context.session, alert);
 
-    const referer = context.request.headers.get("referer");
-    if (referer) {
-        const refererUrl = new URL(referer);
-        if (refererUrl.origin === context.url.origin) {
-            return context.redirect(referer);
-        }
+    const back = sameOriginReferer(context);
+    if (back) {
+        return context.redirect(back);
     }
 
     return context.redirect("/admin/forms");

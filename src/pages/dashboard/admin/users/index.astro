@@ -1,0 +1,184 @@
+---
+import { CircleCheck, CircleX } from '@lucide/astro';
+import { desc, ilike, inArray, or, sql } from 'drizzle-orm';
+import { z } from 'zod';
+import { dashboardAccess } from '../../../../auth/dashboard.js';
+import Pagination from '../../../../components/Pagination.astro';
+import { getDb } from '../../../../db/db.js';
+import { tenants, users, userTenants } from '../../../../db/schema.js';
+import PortalLayout from '../../../../layouts/PortalLayout.astro';
+import AdminTabs from '../_tabs.astro';
+
+// Every account on the install, whichever sites it belongs to (or none) — users isn't tenant-scoped,
+// so nothing narrows this listing — with the sites it's a member of. The account is enabled or
+// disabled on every site at once from here (a site's own admin only does so for that site), and
+// super admin granted or revoked. Each account's own page ([id]/index.astro) adds it to or removes
+// it from sites; everything else about an account is managed from each site's own admin.
+const access = await dashboardAccess(Astro, { superAdmin: true });
+if (access.response) {
+	return access.response;
+}
+const { user } = access;
+
+const db = getDb();
+const q = z.string().trim().max(255).catch('').parse(Astro.url.searchParams.get('q') ?? '');
+// Matched literally: the LIKE wildcards (and the escape character itself) are escaped.
+const pattern = `%${q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+const where = q
+	? or(ilike(users.email, pattern), ilike(sql`${users.fname} || ' ' || ${users.lname}`, pattern))
+	: undefined;
+
+const itemsPerPage = 25;
+const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get('page') ?? 1);
+const page = pageData.success ? pageData.data : 1;
+
+const [rows, total] = await Promise.all([
+	db
+		.select({ id: users.id, state: users.state, fname: users.fname, lname: users.lname, email: users.email, superAdmin: users.superAdmin })
+		.from(users)
+		.where(where)
+		.orderBy(desc(users.superAdmin), users.lname, users.fname)
+		.limit(itemsPerPage)
+		.offset((page - 1) * itemsPerPage),
+	db.select({ count: sql<number>`count(*)::int` }).from(users).where(where).then((r) => r[0]?.count ?? 0),
+]);
+const totalPages = Math.max(1, Math.ceil(total / itemsPerPage));
+
+const memberships = rows.length > 0
+	? await db
+		.select({ userId: userTenants.userId, name: tenants.name, state: userTenants.state })
+		.from(userTenants)
+		.innerJoin(tenants, sql`${tenants.id} = ${userTenants.tenantId}`)
+		.where(inArray(userTenants.userId, rows.map((row) => row.id)))
+		.orderBy(tenants.name)
+	: [];
+const sitesByUser = new Map<string, { name: string; enabled: boolean }[]>();
+for (const row of memberships) {
+	sitesByUser.set(row.userId, [...(sitesByUser.get(row.userId) ?? []), { name: row.name, enabled: row.state >= 1 }]);
+}
+
+const stateTitle = (row: { id: string; state: number }) => {
+	if (row.id === user.id) return 'You can’t disable your own account';
+	if (row.state === 1) return 'Disable on every site';
+	return row.state === 0 ? 'Enable on every site' : 'Deleted — enable to restore';
+};
+---
+
+<PortalLayout user={user} title="Users">
+	<div class="flex flex-wrap items-center justify-between gap-3 align-middle border-b border-base-300 pt-2 sticky top-0 z-10 bg-base-200">
+		<h1 class="text-2xl font-semibold">Admin</h1>
+	</div>
+	<AdminTabs active="users" />
+
+	<form method="GET" class="pt-4 pb-4">
+		<input type="search" name="q" value={q} placeholder="Search name or email" class="input input-bordered w-full" />
+	</form>
+	<form id="bulk-form" method="POST"></form>
+
+	<p class="text-sm text-base-content/60 pb-2">{total} account(s){q ? ` matching “${q}”` : ''}</p>
+
+	{rows.length === 0 && (
+		<div class="text-center text-base-content/60 py-8 bg-base-100 rounded-lg">No accounts found.</div>
+	)}
+	{rows.length > 0 && (
+		<div class="overflow-x-auto bg-base-100 rounded-lg">
+			<table class="table">
+				<thead>
+					<tr class="hidden [table:has(.row-select:checked)_&]:table-row">
+						<th class="w-px whitespace-nowrap">
+							<label>
+								<input type="checkbox" class="checkbox select-all" />
+							</label>
+						</th>
+						<th colspan="4">
+							<div class="flex items-center gap-2">
+								<button form="bulk-form" type="submit" formaction="/dashboard/admin/users/bulk/enable" class="btn btn-xs btn-outline btn-accent">Enable</button>
+								<button form="bulk-form" type="submit" formaction="/dashboard/admin/users/bulk/disable" class="btn btn-xs btn-outline btn-warning">Disable</button>
+								<button form="bulk-form" type="submit" formaction="/dashboard/admin/users/bulk/delete" class="btn btn-xs btn-error">Delete</button>
+								<span class="text-sm text-base-content/60">On every site</span>
+							</div>
+						</th>
+					</tr>
+					<tr class="[table:has(.row-select:checked)_&]:hidden">
+						<th class="w-px whitespace-nowrap">
+							<label>
+								<input type="checkbox" class="checkbox select-all" />
+							</label>
+						</th>
+						<th class="w-px whitespace-nowrap">State</th>
+						<th>User</th>
+						<th>Sites</th>
+						<th class="w-px whitespace-nowrap">Super admin</th>
+					</tr>
+				</thead>
+				<tbody>
+					{rows.map((row) => (
+						<tr>
+							<td>
+								<label>
+									<input
+										form="bulk-form"
+										type="checkbox"
+										class="checkbox row-select"
+										name="selected[]"
+										value={row.id}
+										disabled={row.id === user.id}
+										title={row.id === user.id ? 'You can’t change your own account from here' : undefined}
+									/>
+								</label>
+							</td>
+							<td class="w-px whitespace-nowrap">
+								<form action={`/dashboard/admin/users/state/${row.id}`} method="POST">
+									<button type="submit" class="btn btn-square" disabled={row.id === user.id} title={stateTitle(row)}>
+										{row.state === 1 ? <CircleCheck size={20} class="text-green-500" /> : <CircleX size={20} class="text-red-500" />}
+									</button>
+								</form>
+							</td>
+							<td>
+								<div class="flex items-center gap-3">
+									<div class="avatar avatar-placeholder">
+										<div class="bg-neutral text-neutral-content rounded-full w-9">
+											<span class="text-xs font-semibold">{row.fname[0]?.toUpperCase()}{row.lname[0]?.toUpperCase()}</span>
+										</div>
+									</div>
+									<div class="min-w-0">
+										<a href={`/dashboard/admin/users/${row.id}`} class="font-bold link link-info link-hover">{row.fname} {row.lname}</a>
+										<div class="text-sm opacity-60 truncate">{row.email}</div>
+										{row.state < 0 && <span class="badge badge-error badge-sm mt-1">Deleted</span>}
+									</div>
+								</div>
+							</td>
+							<td>
+								<div class="flex flex-wrap gap-1">
+									{(sitesByUser.get(row.id) ?? []).map((site) => site.enabled
+										? <span class="badge badge-ghost badge-sm">{site.name}</span>
+										: <span class="badge badge-warning badge-sm" title="Disabled on this site by its admin">{site.name} (disabled)</span>)}
+									{!sitesByUser.has(row.id) && <span class="text-sm opacity-50">None</span>}
+								</div>
+							</td>
+							<td class="whitespace-nowrap">
+								<form action={`/dashboard/admin/users/super-admin/${row.id}`} method="POST" class="flex items-center gap-2">
+									<input
+										type="checkbox"
+										class="toggle toggle-primary toggle-sm"
+										checked={row.superAdmin}
+										disabled={row.id === user.id}
+										title={row.id === user.id ? 'You can’t change your own super admin access' : row.superAdmin ? 'Revoke super admin' : 'Grant super admin'}
+										onchange="this.form.requestSubmit()"
+									/>
+								</form>
+							</td>
+						</tr>
+					))}
+				</tbody>
+			</table>
+		</div>
+	)}
+
+	{totalPages > 1 && (
+		<div class="pt-6 pb-6 flex items-center justify-center">
+			<Pagination currentPage={page} totalPages={totalPages} basePath="/dashboard/admin/users" params={{ q }} />
+		</div>
+	)}
+	<script>import '../../../../scripts/select-all'</script>
+</PortalLayout>

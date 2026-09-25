@@ -1,5 +1,7 @@
 ---
-import { eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
+import { and, eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
+import { canManageAccount, isMemberOfCurrentTenant } from '../../../auth/accounts.js';
+import { getSessionUser } from '../../../auth/index.js';
 import { getDb } from '../../../db/db.js';
 import { roles, userRoles, users } from '../../../db/schema.js';
 import Form from '../../../form/Form.astro';
@@ -10,20 +12,20 @@ import { getProfileForm } from '../profile/_form.js';
 
 const db = getDb();
 
-//const userId = await Astro.session?.get('userId');
-/* const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-
-if(!user) {
-	throw new Error('User not found');
-} */
 //get [id] from url
 const { id } = Astro.params;
 
+const editor = await getSessionUser(Astro.session);
+if (!editor) {
+	return Astro.redirect('/admin/login');
+}
+
 let user: InferSelectModel<typeof users> | undefined;
 if(id) {
-	[user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+	// Only this tenant's members are editable here, however the id was arrived at.
+	[user] = await db.select().from(users).where(and(eq(users.id, id), isMemberOfCurrentTenant())).limit(1);
 	if(!user) {
-		throw new Error('User not found');
+		return Astro.rewrite('/admin/404');
 	}
 } else {
 	user = Object.fromEntries(
@@ -38,6 +40,7 @@ if(id) {
 	) as InferSelectModel<typeof users>;
 }
 
+// roles and user_roles are row-level-secured, so these are this tenant's roles only.
 const allRoles = await db.select().from(roles);
 const roleOptions = allRoles.map(role => ({ value: role.id, label: role.title }));
 
@@ -45,19 +48,26 @@ const selectedRoleIds = id
 	? (await db.select({ roleId: userRoles.roleId }).from(userRoles).where(eq(userRoles.userId, id))).map(r => r.roleId)
 	: [];
 
+const identityLocked = id ? !(await canManageAccount(editor, user)) : false;
+
 const fields = getAllFields();
 const formFlash = createFormFlashSession(Astro.session);
 const flash = await formFlash.get('profile') ?? {};
 await formFlash.delete('profile');
 const url = id ? `/admin/users/update/${id}` : '/admin/users/update';
-const form = getProfileForm(user, fields, url, flash, false, roleOptions, selectedRoleIds);
+const form = getProfileForm(user, fields, url, flash, false, roleOptions, selectedRoleIds, { identityLocked });
 ---
 
 <AdminLayout>
 	<Form form={form} fields={fields}>
 		<div slot="before-fields" class="flex items-center justify-between align-middle pt-2">
-			<h1 class="text-2xl font-semibold">New User</h1>
+			<h1 class="text-2xl font-semibold">{id ? 'Edit User' : 'New User'}</h1>
 			<button class="btn btn-primary">Save</button>
 		</div>
+		{!id && editor.superAdmin && (
+			<p slot="before-fields" class="text-sm opacity-70">
+				As a super admin, entering the email of an account that already exists on another site adds that account to this one as-is: its name and password stay unchanged.
+			</p>
+		)}
 	</Form>
 </AdminLayout>

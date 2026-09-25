@@ -1,0 +1,25 @@
+---
+// Editing a tenant is the same page as creating one: ../new.astro branches on Astro.params.id,
+// which only this route supplies.
+import { eq } from 'drizzle-orm';
+import * as z from 'zod';
+import { dashboardAccess } from '../../../../../auth/dashboard.js';
+import { getDb } from '../../../../../db/db.js';
+import { tenants } from '../../../../../db/schema.js';
+import TenantForm from '../new.astro';
+
+// Checked here, in the page itself, because only a page can answer with a rewrite — ../new.astro
+// renders as a child component on this route.
+const id = z.uuid().safeParse(Astro.params.id);
+const access = await dashboardAccess(Astro, { superAdmin: true });
+if (access.response) {
+	return access.response;
+}
+const [tenant] = id.success
+	? await getDb().select({ id: tenants.id }).from(tenants).where(eq(tenants.id, id.data)).limit(1)
+	: [];
+if (!tenant) {
+	return Astro.rewrite('/404');
+}
+---
+<TenantForm />

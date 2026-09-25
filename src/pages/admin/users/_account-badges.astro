@@ -1,0 +1,19 @@
+---
+// What a site's Users list can't change about an account but should show next to it: the per-site
+// toggle beside it doesn't override any of these.
+interface Props {
+	user: { accountState: number; superAdmin: boolean };
+}
+const { user } = Astro.props;
+---
+{(user.accountState !== 1 || user.superAdmin) && (
+	<div class="flex flex-wrap gap-1 mt-1">
+		{user.accountState === 0 && (
+			<span class="badge badge-warning badge-sm" title="The account is disabled on every site. Only a global admin can re-enable it.">Globally disabled</span>
+		)}
+		{user.accountState < 0 && <span class="badge badge-error badge-sm">Deleted</span>}
+		{user.superAdmin && (
+			<span class="badge badge-primary badge-sm" title="Global admins can open every site's admin, whether or not they're enabled here.">Global admin</span>
+		)}
+	</div>
+)}

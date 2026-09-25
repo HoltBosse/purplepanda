@@ -14,10 +14,6 @@ const VIRTUAL_ISLANDS_ID = "virtual:purplepanda/islands";
 const RESOLVED_VIRTUAL_ISLANDS_ID = `\0${VIRTUAL_ISLANDS_ID}`;
 const PUCK_CONFIG_MODULE = new URL("./src/puck.config.tsx", import.meta.url).pathname;
 
-// Public hostname the site is served on (e.g. example.com). Optional: when unset, only localhost
-// requests are accepted by the dev server and no forwarded-host domain is trusted.
-const SITE_HOSTNAME = process.env.SITE_HOSTNAME?.trim() || undefined;
-
 // https://astro.build/config
 export default defineConfig({
   server: {
@@ -26,8 +22,10 @@ export default defineConfig({
   },
 
   vite: {
+    // Any hostname: which ones are served is decided per request by the tenants' domains (see
+    // src/tenant/index.ts), not here — an unregistered hostname gets a 404 from the middleware.
     server: {
-      allowedHosts: SITE_HOSTNAME ? [SITE_HOSTNAME] : [],
+      allowedHosts: true,
     },
     plugins: [
       tailwindcss(),
@@ -92,8 +90,12 @@ export default defineConfig({
 
   integrations: [react()],
 
+  // A pattern with no hostname matches every host. Astro only takes a request's hostname from its
+  // Host (or a proxy's X-Forwarded-Host) header when it matches one of these — otherwise every
+  // request would look like it came to `localhost` — and the middleware resolves the request's
+  // tenant from exactly that hostname.
   security: {
-    allowedDomains: SITE_HOSTNAME ? [{ hostname: SITE_HOSTNAME }] : [],
+    allowedDomains: [{}],
   },
 
   // Sessions live in Postgres (the `sessions` table) so they're shared across PM2 cluster workers

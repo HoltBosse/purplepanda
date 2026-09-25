@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { RateLimiterPostgres } from "rate-limiter-flexible";
 import { getDb } from "../../db/db.js";
 import { settings } from "../../db/schema.js";
+import { requireTenant } from "../../tenant/context.js";
 
 const CSRF_SECRET_KEY = "form-csrf-secret";
 // Long enough that a slow human filling out the form doesn't get bounced, short enough to
@@ -14,13 +15,17 @@ export const CSRF_FIELD_NAME = "_pp_csrf";
 // fields that look like real ones (email/url) both get caught.
 export const HONEYPOT_FIELD_NAMES = ["_pp_hp", "_pp_hp_email"] as const;
 
-let cachedSecret: string | null = null;
+// Per tenant, like the settings row it caches — so a token issued by one tenant's form never
+// verifies against another's.
+const cachedSecrets = new Map<string, string>();
 
 // Lazily created and persisted in the `settings` table (rather than an env var) so the
 // integration keeps working with only the `db` option — no extra config surface, and the
 // secret survives restarts and is shared across processes.
 async function getCsrfSecret(): Promise<string> {
-  if (cachedSecret) return cachedSecret;
+  const tenantId = requireTenant().id;
+  const cached = cachedSecrets.get(tenantId);
+  if (cached) return cached;
 
   const db = getDb();
   const [existing] = await db
@@ -29,8 +34,8 @@ async function getCsrfSecret(): Promise<string> {
     .where(eq(settings.key, CSRF_SECRET_KEY))
     .limit(1);
   if (existing) {
-    cachedSecret = existing.value as string;
-    return cachedSecret;
+    cachedSecrets.set(tenantId, existing.value as string);
+    return existing.value as string;
   }
 
   const generated = randomBytes(32).toString("base64url");
@@ -38,8 +43,9 @@ async function getCsrfSecret(): Promise<string> {
   // process converge on whichever secret actually landed in the row, not its own guess.
   await db.insert(settings).values({ key: CSRF_SECRET_KEY, value: generated }).onConflictDoNothing();
   const [row] = await db.select({ value: settings.value }).from(settings).where(eq(settings.key, CSRF_SECRET_KEY)).limit(1);
-  cachedSecret = (row?.value as string | undefined) ?? generated;
-  return cachedSecret;
+  const secret = (row?.value as string | undefined) ?? generated;
+  cachedSecrets.set(tenantId, secret);
+  return secret;
 }
 
 export async function createCsrfToken(formId: string): Promise<string> {
