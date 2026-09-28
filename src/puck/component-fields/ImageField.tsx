@@ -4,7 +4,9 @@ import type { CustomField } from "@puckeditor/core";
 import type Cropper from "cropperjs";
 import type { CropperImage } from "cropperjs";
 import Search from "lucide-react/dist/esm/icons/search.mjs";
+import Upload from "lucide-react/dist/esm/icons/upload.mjs";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toDefaultImageText } from "../../media/default-text.js";
 
 /*
   TODO:
@@ -14,6 +16,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export type MediaRef = { id: string; title: string; alt: string };
 
 export type MediaFolder = { id: string; name: string };
+
+// A file chosen for upload from the picker, with the title/alt being filled in for it.
+type PendingUpload = { file: File; previewUrl: string; title: string; alt: string };
 
 // One entry in the picker's folder breadcrumb trail; the root has a null id.
 type FolderCrumb = { id: string | null; name: string };
@@ -169,6 +174,12 @@ function ImagePickerField({
 
   const currentFolderId = folderPath[folderPath.length - 1]?.id ?? null;
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Non-null while the picker shows the upload form in place of the image grid.
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[] | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   const focusDialogRef = useRef<HTMLDialogElement>(null);
   const focusAreaRef = useRef<HTMLDivElement>(null);
   const [focusPos, setFocusPos] = useState({ x: 50, y: 50 });
@@ -203,14 +214,27 @@ function ImagePickerField({
     setFetching(false);
   }, []);
 
+  // Leaves the upload form, freeing its preview object URLs. Functional update so it's safe to
+  // call from the dialog's close listener below, which only captures the first render's state.
+  const clearPendingUploads = useCallback(() => {
+    setPendingUploads((pending) => {
+      for (const upload of pending ?? []) URL.revokeObjectURL(upload.previewUrl);
+      return null;
+    });
+    setUploadError(null);
+  }, []);
+
   // Listen for native dialog close (Escape key or form method="dialog")
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    const onClose = () => setIsOpen(false);
+    const onClose = () => {
+      setIsOpen(false);
+      clearPendingUploads();
+    };
     dialog.addEventListener("close", onClose);
     return () => dialog.removeEventListener("close", onClose);
-  }, []);
+  }, [clearPendingUploads]);
 
   // Determine the image's natural pixel dimensions (used to bound the sizing sliders and for the
   // crop dialog's coordinate math). This image is never displayed, only measured, so request the
@@ -270,6 +294,65 @@ function ImagePickerField({
   const select = (img: MediaRef) => {
     onChange({ ...img, width: null, height: null, objectPosition: null, crop: null });
     dialogRef.current?.close();
+  };
+
+  const onFilesChosen = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    clearPendingUploads();
+    setPendingUploads(
+      Array.from(files).map((file) => ({
+        file,
+        previewUrl: URL.createObjectURL(file),
+        title: toDefaultImageText(file.name),
+        alt: toDefaultImageText(file.name),
+      })),
+    );
+  };
+
+  const updatePendingUpload = (index: number, changes: Partial<Pick<PendingUpload, "title" | "alt">>) => {
+    setPendingUploads((pending) => pending?.map((upload, i) => (i === index ? { ...upload, ...changes } : upload)) ?? null);
+  };
+
+  // Uploads into the folder being browsed. A single upload is selected straight away (that's
+  // almost always why it was uploaded from here); several go back to the refreshed grid to pick from.
+  const submitUploads = async () => {
+    if (!pendingUploads || uploading) return;
+    if (pendingUploads.some((upload) => !upload.title.trim() || !upload.alt.trim())) {
+      setUploadError("Each image needs a title and alt text.");
+      return;
+    }
+
+    const body = new FormData();
+    for (const upload of pendingUploads) {
+      body.append("file[]", upload.file);
+      body.append("title[]", upload.title);
+      body.append("alt[]", upload.alt);
+    }
+    if (currentFolderId) body.append("folder", currentFolderId);
+
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const res = await fetch("/admin/media/api/upload", { method: "POST", body, credentials: "same-origin" });
+      const data = (await res.json().catch(() => ({}))) as { images?: MediaRef[]; error?: string };
+      if (!res.ok || !data.images) {
+        setUploadError(data.error ?? "Upload failed. Please try again.");
+        return;
+      }
+
+      clearPendingUploads();
+      if (data.images.length === 1) {
+        select(data.images[0]!);
+        return;
+      }
+      setQuery("");
+      setPage(1);
+      await fetchImages("", currentFolderId, 1);
+    } catch {
+      setUploadError("Upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const setWidthAuto = (auto: boolean) => {
@@ -531,151 +614,235 @@ function ImagePickerField({
 
       <dialog ref={dialogRef} className="modal">
         <div className="modal-box w-11/12 max-w-4xl">
-          <h3 className="font-bold text-lg mb-4">Select Image</h3>
-
-          <input
-            type="search"
-            placeholder="Search images..."
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            className="input input-bordered w-full mb-4"
-            autoFocus
-          />
-
-          {!query && folderPath.length > 1 && (
-            <div className="flex flex-wrap items-center gap-1 text-sm text-base-content/70 mb-3">
-              {folderPath.map((crumb, index) => (
-                <div key={crumb.id ?? "root"} className="flex items-center gap-1">
-                  {index > 0 && <span aria-hidden="true" className="text-base-content/40">&gt;</span>}
-                  <button
-                    type="button"
-                    onClick={() => goToCrumb(index)}
-                    className={`hover:text-primary ${
-                      index === folderPath.length - 1 ? "font-semibold text-base-content" : ""
-                    }`}
-                  >
-                    {crumb.name}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="min-h-48 max-h-[60vh] overflow-y-auto">
-            {fetching ? (
-              <div className="flex items-center justify-center py-12">
-                <span className="loading loading-spinner loading-lg" />
-              </div>
-            ) : folders.length === 0 && images.length === 0 ? (
-              <p className="text-center text-base-content/50 py-12">No images found</p>
-            ) : (
-              <>
-                {folders.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-                    {folders.map((folder) => (
-                      <button
-                        key={folder.id}
-                        type="button"
-                        onClick={() => openFolder(folder)}
-                        className="flex items-center gap-3 rounded-lg border border-base-300 bg-base-100 p-3 text-left transition-colors hover:border-primary hover:bg-base-200 focus:outline-none focus:border-primary"
-                      >
-                        <div className="flex items-center justify-center rounded bg-info p-2 text-white shrink-0">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="size-4"
-                            aria-hidden="true"
-                          >
-                            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
-                          </svg>
-                        </div>
-                        <span className="min-w-0 break-words text-sm font-medium">{folder.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {images.length > 0 && (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                    {images.map((img) => (
-                      // The zoom button is a sibling of the select button, not a child, since
-                      // buttons can't nest.
-                      <div key={img.id} className="relative">
-                        <button
-                          type="button"
-                          onClick={() => select(img)}
-                          className={`group relative w-full rounded-lg overflow-hidden border-2 transition-colors hover:border-primary focus:outline-none focus:border-primary ${
-                            value?.id === img.id ? "border-primary" : "border-base-300"
-                          }`}
-                        >
-                          <img
-                            src={`/image/${img.id}?fmt=webp&w=100&q=80`}
-                            alt={img.alt}
-                            className="w-full h-28 object-cover"
-                          />
-                          <div className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-white text-xs truncate text-left">
-                            {img.title || img.id}
-                          </div>
-                          {value?.id === img.id && (
-                            <div className="absolute top-1.5 right-1.5 bg-primary text-primary-content rounded-full p-0.5">
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-3" aria-hidden="true">
-                                <path fillRule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
-                              </svg>
-                            </div>
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setZoomImage(img);
-                            zoomDialogRef.current?.showModal();
-                          }}
-                          className="btn btn-ghost btn-circle btn-xs absolute top-1.5 left-1.5 text-base-content/40 hover:text-base-content"
-                          aria-label={`View ${img.title || img.id} full size`}
-                          title="View full size"
-                        >
-                          <Search className="size-3" aria-hidden="true" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className="font-bold text-lg">{pendingUploads ? "Upload Images" : "Select Image"}</h3>
+            {!pendingUploads && (
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="size-4" aria-hidden="true" />
+                Upload
+              </button>
             )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                onFilesChosen(e.target.files);
+                // Reset so choosing the same file again still fires onChange.
+                e.target.value = "";
+              }}
+            />
           </div>
 
-          {!fetching && totalPages > 1 && (
-            <div className="flex items-center justify-center gap-3 mt-4">
-              <button
-                type="button"
-                className="btn btn-sm btn-outline"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Prev
-              </button>
-              <span className="text-sm text-base-content/70">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                Next
-              </button>
+          {pendingUploads ? (
+            <div className="max-h-[60vh] space-y-3 overflow-y-auto">
+              <p className="text-sm text-base-content/70">
+                Uploading to <span className="font-semibold text-base-content">{folderPath[folderPath.length - 1]?.name ?? "Root"}</span>
+              </p>
+              {pendingUploads.map((upload, index) => (
+                <div
+                  key={upload.previewUrl}
+                  className="flex flex-col gap-3 rounded-lg border border-base-300 bg-base-100 p-3 sm:flex-row sm:items-center"
+                >
+                  <img
+                    src={upload.previewUrl}
+                    alt=""
+                    className="h-28 w-full shrink-0 rounded border border-base-300 object-contain sm:w-40"
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <label className="flex flex-col gap-1 text-sm">
+                      Title
+                      <input
+                        type="text"
+                        className="input input-bordered input-sm w-full"
+                        value={upload.title}
+                        maxLength={255}
+                        required
+                        onChange={(e) => updatePendingUpload(index, { title: e.target.value })}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm">
+                      Alt
+                      <input
+                        type="text"
+                        className="input input-bordered input-sm w-full"
+                        value={upload.alt}
+                        maxLength={255}
+                        required
+                        onChange={(e) => updatePendingUpload(index, { alt: e.target.value })}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ))}
+              {uploadError && (
+                <div role="alert" className="alert alert-error text-sm">
+                  {uploadError}
+                </div>
+              )}
             </div>
+          ) : (
+            <>
+            <input
+              type="search"
+              placeholder="Search images..."
+              value={query}
+              onChange={(e) => onQueryChange(e.target.value)}
+              className="input input-bordered w-full mb-4"
+              autoFocus
+            />
+
+            {!query && folderPath.length > 1 && (
+              <div className="flex flex-wrap items-center gap-1 text-sm text-base-content/70 mb-3">
+                {folderPath.map((crumb, index) => (
+                  <div key={crumb.id ?? "root"} className="flex items-center gap-1">
+                    {index > 0 && <span aria-hidden="true" className="text-base-content/40">&gt;</span>}
+                    <button
+                      type="button"
+                      onClick={() => goToCrumb(index)}
+                      className={`hover:text-primary ${
+                        index === folderPath.length - 1 ? "font-semibold text-base-content" : ""
+                      }`}
+                    >
+                      {crumb.name}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="min-h-48 max-h-[60vh] overflow-y-auto">
+              {fetching ? (
+                <div className="flex items-center justify-center py-12">
+                  <span className="loading loading-spinner loading-lg" />
+                </div>
+              ) : folders.length === 0 && images.length === 0 ? (
+                <p className="text-center text-base-content/50 py-12">No images found</p>
+              ) : (
+                <>
+                  {folders.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                      {folders.map((folder) => (
+                        <button
+                          key={folder.id}
+                          type="button"
+                          onClick={() => openFolder(folder)}
+                          className="flex items-center gap-3 rounded-lg border border-base-300 bg-base-100 p-3 text-left transition-colors hover:border-primary hover:bg-base-200 focus:outline-none focus:border-primary"
+                        >
+                          <div className="flex items-center justify-center rounded bg-info p-2 text-white shrink-0">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="size-4"
+                              aria-hidden="true"
+                            >
+                              <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+                            </svg>
+                          </div>
+                          <span className="min-w-0 break-words text-sm font-medium">{folder.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {images.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                      {images.map((img) => (
+                        // The zoom button is a sibling of the select button, not a child, since
+                        // buttons can't nest.
+                        <div key={img.id} className="relative">
+                          <button
+                            type="button"
+                            onClick={() => select(img)}
+                            className={`group relative w-full rounded-lg overflow-hidden border-2 transition-colors hover:border-primary focus:outline-none focus:border-primary ${
+                              value?.id === img.id ? "border-primary" : "border-base-300"
+                            }`}
+                          >
+                            <img
+                              src={`/image/${img.id}?fmt=webp&w=100&q=80`}
+                              alt={img.alt}
+                              className="w-full h-28 object-cover"
+                            />
+                            <div className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-white text-xs truncate text-left">
+                              {img.title || img.id}
+                            </div>
+                            {value?.id === img.id && (
+                              <div className="absolute top-1.5 right-1.5 bg-primary text-primary-content rounded-full p-0.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-3" aria-hidden="true">
+                                  <path fillRule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setZoomImage(img);
+                              zoomDialogRef.current?.showModal();
+                            }}
+                            className="btn btn-ghost btn-circle btn-xs absolute top-1.5 left-1.5 text-base-content/40 hover:text-base-content"
+                            aria-label={`View ${img.title || img.id} full size`}
+                            title="View full size"
+                          >
+                            <Search className="size-3" aria-hidden="true" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {!fetching && totalPages > 1 && (
+              <div className="flex items-center justify-center gap-3 mt-4">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Prev
+                </button>
+                <span className="text-sm text-base-content/70">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+
+            </>
           )}
 
           <div className="modal-action">
-            <button type="button" className="btn" onClick={() => dialogRef.current?.close()}>
-              Cancel
-            </button>
+            {pendingUploads ? (
+              <>
+                <button type="button" className="btn" onClick={clearPendingUploads} disabled={uploading}>
+                  Back
+                </button>
+                <button type="button" className="btn btn-primary" onClick={submitUploads} disabled={uploading}>
+                  {uploading && <span className="loading loading-spinner loading-sm" />}
+                  Upload {pendingUploads.length === 1 ? "image" : `${pendingUploads.length} images`}
+                </button>
+              </>
+            ) : (
+              <button type="button" className="btn" onClick={() => dialogRef.current?.close()}>
+                Cancel
+              </button>
+            )}
           </div>
         </div>
         <button

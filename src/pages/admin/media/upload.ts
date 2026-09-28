@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import type { APIContext } from "astro";
 import { eq, inArray } from 'drizzle-orm';
 import * as z from "zod";
@@ -6,9 +5,7 @@ import { addAlertToSession, alertType, createAlert } from "../../../alert/index.
 import { addAction } from "../../../audit/index.js";
 import { getDb } from "../../../db/db.js";
 import { media, mediafolders } from "../../../db/schema.js";
-import { getMediaPath } from "../../../media/media.js";
-
-const MAX_UPLOAD_BYTES = 512 * 1024 * 1024; // 512MB
+import { createMedia, MAX_UPLOAD_BYTES, type NewMedia } from "../../../media/upload.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
@@ -55,10 +52,9 @@ export async function POST(context: APIContext): Promise<Response> {
     //console.log("Inserting media into database starting soon...");
     //console.log(file);
 
-    const uploadedIds: string[] = [];
     const updatedIds: string[] = [];
+    const newMedia: NewMedia[] = [];
 
-    //loop over files, insert into media table. take the returned uuid from the db and save the file to the mediaPath with the uuid split into /cc/cc/cccc-cc..... format, making the folders if they dont exist
     for(let i = 0; i < file.data.length; i++) {
         if(id?.success && id.data?.[i]) {
             //update alt and title of existing media
@@ -79,48 +75,15 @@ export async function POST(context: APIContext): Promise<Response> {
             continue;
         }
 
-        //console.log("Inserting media into database...");
-        const [insertedMedia] = await db.insert(media).values({
+        newMedia.push({
+            file: file.data[i]!,
             title: title.data[i]!,
             alt: alt.data[i]!,
             folder: folder.data ? folder.data[i] ?? null : null,
-        }).returning({ id: media.id });
-
-        if(!insertedMedia) {
-            const message = "Failed to insert media into database.";
-            const alert = createAlert(alertType.error, message);
-            await addAlertToSession(context.session, alert);
-            return context.redirect(`/admin/media${redirectFolderId ? `/${redirectFolderId}` : ""}`);
-        }
-
-        const mediaId = insertedMedia.id;
-        uploadedIds.push(mediaId);
-        const mediaPath = getMediaPath();
-        const mediaIdPath = `${mediaId.slice(0, 2)}/${mediaId.slice(2, 4)}/${mediaId}`;
-        const fullMediaPath = `${mediaPath}/${mediaIdPath}`;
-        const mediaDir = fullMediaPath.substring(0, fullMediaPath.lastIndexOf("/"));
-        
-        //make sure mediaDir exists
-        await fs.promises.mkdir(mediaDir, { recursive: true });
-        //save file to disk
-        const buffer = await file.data[i]!.arrayBuffer();
-        await fs.promises.writeFile(fullMediaPath, Buffer.from(buffer));
+        });
     }
 
     const userId = await context.session?.get("userId");
-    if(uploadedIds.length > 0) {
-        await addAction(
-            "media:upload",
-            { ids: uploadedIds },
-            userId,
-            {
-                message: "Media {ids} was uploaded",
-                placeholders: {
-                    ids: { lookupColumn: media.id, displayColumn: media.title },
-                },
-            },
-        );
-    }
     if(updatedIds.length > 0) {
         await addAction(
             "media:update",
@@ -133,6 +96,15 @@ export async function POST(context: APIContext): Promise<Response> {
                 },
             },
         );
+    }
+
+    try {
+        await createMedia(newMedia, userId);
+    } catch {
+        const message = "Failed to insert media into database.";
+        const alert = createAlert(alertType.error, message);
+        await addAlertToSession(context.session, alert);
+        return context.redirect(`/admin/media${redirectFolderId ? `/${redirectFolderId}` : ""}`);
     }
 
     const message = "Media uploaded successfully.";

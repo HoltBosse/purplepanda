@@ -146,3 +146,71 @@ describe('imageField dialog', () => {
         expect(onChange).not.toHaveBeenCalled();
     });
 });
+
+describe('imageField upload', () => {
+    /** Serves the lookup like stubLookup, and answers the upload endpoint with `uploadResponse`. */
+    function stubLookupAndUpload(uploadResponse: () => Response) {
+        const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) =>
+            String(input).includes('/admin/media/api/upload')
+                ? uploadResponse()
+                : new Response(JSON.stringify({ images: mediaItems, folders: [], totalPages: 1 }), { status: 200 }),
+        );
+        vi.stubGlobal('fetch', fetchMock);
+        return fetchMock;
+    }
+
+    async function openAndChooseFile(s: Awaited<ReturnType<typeof render>>, name = 'my-new_photo.png') {
+        await s.container.querySelector('button')?.click();
+        await expect.element(s.getByRole('button', { name: 'Upload', exact: true })).toBeInTheDocument();
+
+        const input = s.container.querySelector('input[type="file"]') as HTMLInputElement;
+        const transfer = new DataTransfer();
+        transfer.items.add(new File(['png'], name, { type: 'image/png' }));
+        input.files = transfer.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    it('prefills title and alt from the chosen file name', async () => {
+        stubLookupAndUpload(() => new Response('{}', { status: 500 }));
+        const { screen } = renderPicker();
+        const s = await screen;
+
+        await openAndChooseFile(s);
+
+        await expect.element(s.getByLabelText('Title')).toHaveValue('my new photo');
+        await expect.element(s.getByLabelText('Alt')).toHaveValue('my new photo');
+    });
+
+    it('uploads a single image and selects it', async () => {
+        const fetchMock = stubLookupAndUpload(
+            () => new Response(JSON.stringify({ images: [{ id: 'img-new', title: 'my new photo', alt: 'my new photo' }] }), { status: 201 }),
+        );
+        const { onChange, screen } = renderPicker();
+        const s = await screen;
+
+        await openAndChooseFile(s);
+        await s.getByRole('button', { name: 'Upload image' }).click();
+
+        await expect.poll(() => onChange.mock.calls.length).toBeGreaterThan(0);
+        expect(onChange.mock.calls[0]?.[0]).toMatchObject({ id: 'img-new', title: 'my new photo' });
+
+        const uploadCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/admin/media/api/upload'));
+        const body = uploadCall?.[1]?.body as FormData;
+        expect(uploadCall?.[1]?.method).toBe('POST');
+        expect(body.getAll('title[]')).toEqual(['my new photo']);
+        expect((body.get('file[]') as File).name).toBe('my-new_photo.png');
+    });
+
+    it('shows the server error and keeps the form when the upload fails', async () => {
+        stubLookupAndUpload(() => new Response(JSON.stringify({ error: 'Only image files can be uploaded.' }), { status: 400 }));
+        const { onChange, screen } = renderPicker();
+        const s = await screen;
+
+        await openAndChooseFile(s);
+        await s.getByRole('button', { name: 'Upload image' }).click();
+
+        await expect.element(s.getByRole('alert')).toHaveTextContent('Only image files can be uploaded.');
+        await expect.element(s.getByLabelText('Title')).toBeInTheDocument();
+        expect(onChange).not.toHaveBeenCalled();
+    });
+});

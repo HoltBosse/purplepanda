@@ -1,4 +1,5 @@
 import { DragDropManager, Draggable, Droppable, defaultPreset, Feedback } from "@dnd-kit/dom";
+import { toDefaultImageText } from "../../../media/default-text.js";
 
 document.body.dataset.mediaSelectMode = "false";
 
@@ -94,14 +95,6 @@ const clearImageConfigurations = () => {
     }
 };
 
-const toDefaultImageText = (filename: string) => {
-    const withoutExtension = filename.replace(/\.[^/.]+$/, "");
-    return withoutExtension
-        .replace(/[-_]+/g, " ")
-        .replace(/\s*\(\d+\)$/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-};
 
 const createImageConfigurationRows = (files: FileList | null) => {
     if (!newImagesList || !newImageItemTemplate || !newImagesForm) {
