@@ -66,8 +66,10 @@ function withStubsForUnknownTypes(config: Config, data: Data): Config {
 }
 
 // Sanitizes every component's richtext props throughout a Puck data tree (slots included), plus
-// the root's.
-export function sanitizeRichtextData(config: Config, data: Data, sanitize: (html: string) => string): Data {
+// the root's. Stored content can be partial (e.g. `{}` for a page never saved), and walkTree
+// dereferences `root` and `content` unconditionally, so those get empty defaults first.
+export function sanitizeRichtextData(config: Config, rawData: Data, sanitize: (html: string) => string): Data {
+  const data = { ...rawData, root: rawData.root ?? { props: {} }, content: rawData.content ?? [] } as Data;
   const walked = walkTree(data, withStubsForUnknownTypes(config, data), (content) =>
     content.map((item) => {
       const fields = config.components?.[item.type]?.fields as Fields | undefined;

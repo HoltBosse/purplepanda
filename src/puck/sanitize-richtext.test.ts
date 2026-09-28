@@ -88,4 +88,10 @@ describe('sanitizeRichtextData', () => {
 
         expect(propsAt(result).content).toEqual(doc);
     });
+
+    it('accepts partial stored data with no root or content', () => {
+        const result = sanitizeRichtextData(config, {} as Data, sanitizeHtml);
+
+        expect(result.content).toEqual([]);
+    });
 });
