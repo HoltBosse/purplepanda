@@ -60,6 +60,27 @@ describe('sanitizeRichtextData', () => {
         expect((result.root.props as Record<string, string>).intro).not.toMatch(/onerror|<script/);
     });
 
+    it('tolerates slot children whose type is not in the config (e.g. a nested TemplateSlot)', () => {
+        const data = page([
+            {
+                type: 'Box',
+                props: {
+                    id: 'b',
+                    children: [
+                        { type: 'TemplateSlot', props: { id: 'slot-1' } },
+                        { type: 'Rich', props: { id: 'a', content: evil } },
+                    ],
+                },
+            },
+        ]);
+
+        const result = sanitizeRichtextData(config, data, sanitizeHtml);
+
+        const [slot, rich] = propsAt(result).children;
+        expect(slot).toEqual({ type: 'TemplateSlot', props: { id: 'slot-1' } });
+        expect(rich.props.content).not.toMatch(/onerror|<script/);
+    });
+
     it('leaves non-string (tiptap JSON) richtext values untouched', () => {
         const doc = { type: 'doc', content: [] };
 

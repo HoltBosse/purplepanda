@@ -41,10 +41,34 @@ export function sanitizeRichtextProps(
   return out ?? props;
 }
 
+function collectComponentTypes(value: unknown, types: Set<string>): Set<string> {
+  if (Array.isArray(value)) {
+    for (const item of value) collectComponentTypes(item, types);
+  } else if (isObject(value)) {
+    if (typeof value.type === "string" && isObject(value.props)) types.add(value.type);
+    for (const item of Object.values(value)) collectComponentTypes(item, types);
+  }
+  return types;
+}
+
+// walkTree throws on any slot child whose type isn't in config.components. Stored data can hold
+// types the caller's config doesn't know — the TemplateSlot marker (only PageRenderer and the
+// template editor register it) or a component since removed from puck.config — so those get a
+// field-less stub for the walk. Unknown types have no known richtext fields to sanitize anyway.
+function withStubsForUnknownTypes(config: Config, data: Data): Config {
+  const components = config.components ?? {};
+  const missing = [...collectComponentTypes(data, new Set())].filter((type) => !(type in components));
+  if (missing.length === 0) return config;
+  return {
+    ...config,
+    components: { ...components, ...Object.fromEntries(missing.map((type) => [type, { render: () => null }])) },
+  } as Config;
+}
+
 // Sanitizes every component's richtext props throughout a Puck data tree (slots included), plus
 // the root's.
 export function sanitizeRichtextData(config: Config, data: Data, sanitize: (html: string) => string): Data {
-  const walked = walkTree(data, config, (content) =>
+  const walked = walkTree(data, withStubsForUnknownTypes(config, data), (content) =>
     content.map((item) => {
       const fields = config.components?.[item.type]?.fields as Fields | undefined;
       return { ...item, props: sanitizeRichtextProps(fields, item.props as JsonObject, sanitize) } as typeof item;
