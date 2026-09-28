@@ -4,10 +4,11 @@ import { eq } from 'drizzle-orm';
 import * as z from "zod";
 import { addAction } from '../audit/index.js';
 import { loginDestination, parseLoginTarget } from "../auth/login-target.js";
+import { clearLoginAttempts, recordLoginAttempt, verifyPasswordThrottled } from "../auth/login-throttle.js";
 import { getDb } from "../db/db.js";
 import {users} from "../db/schema.js";
 import { emit } from "../hooks/index.js";
-import { hash, verify } from '../password/index.js';
+import { hash } from '../password/index.js';
 
 // A hash() of a random, unguessable password, computed once per process and reused —
 // used only as verify()'s target when no user was found, so a nonexistent email still
@@ -44,8 +45,8 @@ export async function POST(context: APIContext): Promise<Response> {
     password: formData.get("password"),
   });
   const target = parseLoginTarget(formData);
-  const failed = () => {
-    const params = new URLSearchParams({ error: "invalid", ...target });
+  const failed = (error: "invalid" | "throttled" = "invalid") => {
+    const params = new URLSearchParams({ error, ...target });
     return context.redirect(`/login?${params}`);
   };
 
@@ -54,16 +55,26 @@ export async function POST(context: APIContext): Promise<Response> {
   }
   const { username, password } = credentials.data;
 
+  // Counted before anything else, and refused outright once exhausted, so guessing never reaches
+  // the (deliberately expensive) password check. See auth/login-throttle.ts.
+  if (!(await recordLoginAttempt(username, context.clientAddress))) {
+    return failed("throttled");
+  }
+
   const [user] = await db.select().from(users).where(eq(users.email, username)).limit(1);
 
   // Always run verify(), even for an unknown user, so a nonexistent email costs the same
   // scrypt time as a wrong password for a real one — otherwise the response-time gap
   // between the two leaks which emails have accounts.
-  const isValid = await verify(password, user?.password ?? await getDummyHash());
+  const isValid = await verifyPasswordThrottled(password, user?.password ?? await getDummyHash());
+  if (isValid === undefined) {
+    return failed("throttled");
+  }
   if (!user || !isValid || user.state < 1) {
     await emit("auth:loginFailed", { username, tenantId: context.locals.tenant.id });
     return failed();
   }
+  await clearLoginAttempts(username, context.clientAddress);
 
   // A fresh session id on every sign-in, so an id planted in the browser beforehand (e.g. a cookie
   // set from a sibling tenant subdomain) can't become a signed-in session.

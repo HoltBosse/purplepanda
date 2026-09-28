@@ -2,6 +2,7 @@
 import { and, eq, gt, or } from 'drizzle-orm';
 import type { DagNodeData } from '../../../../components/HistoryView';
 import HistoryView from '../../../../components/HistoryView';
+import { entityKindFilter } from '../../../../db/content-types.js';
 import { getDb } from '../../../../db/db.js';
 import { dagNodes, pages } from '../../../../db/schema.js';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
@@ -11,7 +12,7 @@ const { id } = Astro.params;
 
 if (!id) return Astro.redirect('/admin/pages');
 
-const [page] = await db.select().from(pages).where(eq(pages.id, id)).limit(1);
+const [page] = await db.select().from(pages).where(and(eq(pages.id, id), entityKindFilter(null))).limit(1);
 if (!page) return Astro.redirect('/admin/pages');
 
 const allNodes = await db

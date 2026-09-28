@@ -1,9 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, type SQL } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { ContentTypeInput, ContentTypeRecord } from "../puck/content-types.js";
 import { findBaseUrlOwner, normalizeBaseUrl, parseContentTypeFields, parseJsonLdConfig } from "../puck/content-types.js";
 import { getContentTypeRows, invalidateContentTypesCache, invalidatePagesCache } from "./content-cache.js";
-import { contentTypes } from "./schema.js";
+import { contentTypes, pages } from "./schema.js";
 
 type Db = NodePgDatabase<Record<string, unknown>>;
 
@@ -25,6 +25,14 @@ function toRecord(row: {
     fields: parseContentTypeFields(row.fields),
     jsonLd: parseJsonLdConfig(row.jsonld),
   };
+}
+
+// Pages and content items share the `pages` table, told apart by `contentType` (null for a plain
+// page). Every route that acts on one by id adds this to its query so an id of the other kind — or
+// of another content type — is simply not found, rather than edited through the wrong route (and
+// validated against the wrong type's rules).
+export function entityKindFilter(contentTypeId: string | null): SQL {
+  return contentTypeId ? eq(pages.contentType, contentTypeId) : isNull(pages.contentType);
 }
 
 export async function listContentTypes(db: Db): Promise<ContentTypeRecord[]> {

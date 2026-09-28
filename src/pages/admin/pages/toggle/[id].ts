@@ -1,7 +1,8 @@
 import type { APIContext } from "astro";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { addAlertToSession, alertType, createAlert } from "../../../../alert/index.js";
 import { invalidatePagesCache } from "../../../../db/content-cache.js";
+import { entityKindFilter } from "../../../../db/content-types.js";
 import { getDb } from "../../../../db/db.js";
 import { pages } from "../../../../db/schema.js";
 import { sameOriginReferer } from "../../../../http/referer.js";
@@ -14,7 +15,7 @@ export async function POST(context: APIContext): Promise<Response> {
         return new Response("Missing page id", { status: 400 });
     }
 
-    const [page] = await db.select().from(pages).where(eq(pages.id, id)).limit(1);
+    const [page] = await db.select().from(pages).where(and(eq(pages.id, id), entityKindFilter(null))).limit(1);
     if (!page) {
         return new Response("Page not found", { status: 404 });
     }

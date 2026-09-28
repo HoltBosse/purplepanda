@@ -43,7 +43,10 @@ export async function POST(context: APIContext): Promise<Response> {
         const [entity] = await db.select().from(pages).where(eq(pages.id, entityId)).limit(1);
         // Content whose type has been deleted is treated as gone, same as the item itself.
         const contentTypeGone = entityType === "content" && !(await getContentTypeById(db, entity?.contentType ?? undefined));
-        if (!entity || contentTypeGone) {
+        // A page draft of a content item (or the reverse) would be edited and published through
+        // the wrong routes, against the wrong type's rules.
+        const wrongKind = entity && (entityType === "page") !== (entity.contentType === null);
+        if (!entity || contentTypeGone || wrongKind) {
             const alert = createAlert(alertType.error, entityType === "page" ? "Page not found." : "Content not found.");
             await addAlertToSession(context.session, alert);
             return context.redirect(entityType === "page" ? "/admin/pages" : "/admin/content");

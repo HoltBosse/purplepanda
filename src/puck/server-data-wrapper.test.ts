@@ -59,6 +59,32 @@ describe('resolveDataForSSR', () => {
         expect(propsOf(result)).toEqual({ id: 'a', items: ['kept'] });
     });
 
+    // `_`-prefixed props are resolver output (e.g. FormEmbed's `_html`); a stored one was injected.
+    it('drops stored resolver-owned props, even when the resolver fails', async () => {
+        const input = data([{ type: 'Feed', props: { id: 'a', _html: '<script>x</script>' } }]);
+
+        const result = await resolveDataForSSR(
+            config({
+                Feed: {
+                    data: async () => {
+                        throw new Error('db down');
+                    },
+                },
+            }),
+            input,
+        );
+
+        expect(propsOf(result)).toEqual({ id: 'a' });
+    });
+
+    it('lets a resolver supply its own resolver-owned props', async () => {
+        const input = data([{ type: 'Feed', props: { id: 'a', _html: 'stored' } }]);
+
+        const result = await resolveDataForSSR(config({ Feed: { data: async () => ({ _html: 'resolved' }) } }), input);
+
+        expect(propsOf(result)).toEqual({ id: 'a', _html: 'resolved' });
+    });
+
     it('ignores a resolver that returns a non-object', async () => {
         const input = data([{ type: 'Feed', props: { id: 'a' } }]);
 

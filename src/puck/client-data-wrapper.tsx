@@ -1,6 +1,7 @@
 import type { Config } from "@puckeditor/core";
 import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { stripResolverOwnedProps } from "./resolver-props.js";
 
 type JsonObject = Record<string, unknown>;
 
@@ -58,7 +59,14 @@ export function toSerializableObject(value: unknown): JsonObject {
   return isObject(safeValue) ? safeValue : {};
 }
 
-export function ClientComponentDataWrapper({ componentName, fields, render, endpoint }: ClientComponentDataWrapperProps) {
+export function ClientComponentDataWrapper({ componentName, fields: rawFields, render, endpoint }: ClientComponentDataWrapperProps) {
+  // During SSR the fields arrive already resolved by resolveDataForSSR (which stripped any stored
+  // resolver-owned props itself), so they're kept. In the browser they're the stored content, so
+  // resolver-owned props are dropped until the endpoint below supplies the real values.
+  const fields = useMemo(
+    () => (import.meta.env.SSR ? rawFields : stripResolverOwnedProps(rawFields)),
+    [rawFields],
+  );
   const requestFields = useMemo(() => toSerializableObject(fields), [fields]);
   const cacheKey = useMemo(() => `${componentName}:${JSON.stringify(requestFields)}`, [componentName, requestFields]);
 

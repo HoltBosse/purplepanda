@@ -4,8 +4,9 @@ import * as z from "zod";
 import { addAlertToSession, alertType, createAlert } from "../../../../alert/index.js";
 import { addAction } from "../../../../audit/index.js";
 import { invalidatePagesCache } from "../../../../db/content-cache.js";
+import { entityKindFilter } from "../../../../db/content-types.js";
 import { getDb } from "../../../../db/db.js";
-import { dagNodes, pages } from "../../../../db/schema.js";
+import { dagNodes, pages, templates } from "../../../../db/schema.js";
 import { runOverride } from "../../../../hooks/index.js";
 import { pageRootPropsSchema } from "../../../../puck/page-root-schema.js";
 import { contentValidationErrorsSchema, formatValidationErrors, validateContentTree } from "../../../../puck/validate-content.js";
@@ -19,7 +20,7 @@ export async function POST(context: APIContext): Promise<Response> {
     let page: InferSelectModel<typeof pages> | undefined;
 
     if (pageId) {
-        [page] = await db.select().from(pages).where(eq(pages.id, pageId)).limit(1);
+        [page] = await db.select().from(pages).where(and(eq(pages.id, pageId), entityKindFilter(null))).limit(1);
         if (!page) {
             return new Response("Page not found", { status: 404 });
         }
@@ -78,8 +79,16 @@ export async function POST(context: APIContext): Promise<Response> {
         // index.astro, new.astro, PagePuckEditor's appendTemplateFields) — absent for the plain
         // New button, which leaves both at their column defaults (null/false = inherit the
         // resolved default template, same as before this feature existed).
+        // Looked up rather than trusted: foreign-key checks ignore row-level security, so an
+        // unchecked id could pin another tenant's template (or fail the insert outright).
         const templateIdField = formData.get("templateId");
-        if (typeof templateIdField === "string") page.templateId = templateIdField || null;
+        if (typeof templateIdField === "string") {
+            const [pinned] = z.uuid().safeParse(templateIdField).success
+                ? await db.select({ id: templates.id }).from(templates)
+                    .where(and(eq(templates.id, templateIdField), eq(templates.state, 1))).limit(1)
+                : [];
+            page.templateId = pinned?.id ?? null;
+        }
         const noTemplateField = formData.get("noTemplate");
         if (typeof noTemplateField === "string") page.noTemplate = noTemplateField === "true";
         // `page` is synthesized from the table's column defaults above, so `page.id` is drizzle's

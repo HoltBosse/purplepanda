@@ -1,7 +1,9 @@
 import type { APIContext } from "astro";
 import { and, eq } from "drizzle-orm";
+import * as z from "zod";
 import { addAlertToSession, alertType, createAlert } from "../../../../alert/index.js";
 import { invalidatePagesCache } from "../../../../db/content-cache.js";
+import { entityKindFilter } from "../../../../db/content-types.js";
 import { getDb } from "../../../../db/db.js";
 import { pages, templates } from "../../../../db/schema.js";
 
@@ -13,7 +15,7 @@ export async function POST(context: APIContext): Promise<Response> {
         return new Response("Missing page id", { status: 400 });
     }
 
-    const [page] = await db.select({ id: pages.id }).from(pages).where(eq(pages.id, id)).limit(1);
+    const [page] = await db.select({ id: pages.id }).from(pages).where(and(eq(pages.id, id), entityKindFilter(null))).limit(1);
     if (!page) {
         return new Response("Page not found", { status: 404 });
     }
@@ -27,7 +29,7 @@ export async function POST(context: APIContext): Promise<Response> {
         return context.redirect("/admin/pages");
     }
 
-    const [template] = await db
+    const [template] = !z.uuid().safeParse(templateId).success ? [] : await db
         .select({ id: templates.id })
         .from(templates)
         .where(and(eq(templates.id, templateId), eq(templates.state, 1)))

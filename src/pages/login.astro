@@ -53,6 +53,9 @@ const pandaSVGInline = pandaSVGRaw
           {error === "invalid" && (
             <p class="text-error text-sm mb-2">Invalid password. Please try again.</p>
           )}
+          {error === "throttled" && (
+            <p class="text-error text-sm mb-2">Too many sign-in attempts. Please wait a few minutes and try again.</p>
+          )}
           {error === "sso" && (
             <p class="text-error text-sm mb-2">That sign-in link has expired. Please sign in again.</p>
           )}

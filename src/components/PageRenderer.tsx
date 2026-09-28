@@ -1,12 +1,15 @@
 import type { Config, Data } from "@puckeditor/core";
 import { Render, walkTree } from "@puckeditor/core";
 import type { ReactElement } from "react";
+import { useMemo } from "react";
 import {
   IslandRenderContext,
   wrapConfigWithClientDataResolvers,
   wrapConfigWithDataBinding,
   wrapConfigWithIslands,
 } from "../puck/index.js";
+import { sanitizeHtml } from "../puck/sanitize-html.js";
+import { sanitizeRichtextData } from "../puck/sanitize-richtext.js";
 import externalPuckConfig from "../puck.config.js";
 
 // Island wrapping is applied first (innermost) so the props captured in each island marker are the
@@ -47,7 +50,22 @@ interface PageRendererProps {
   renderIsolatedIsland?: (element: ReactElement) => string;
 }
 
-export default function PageRenderer({ pageData, templateData, renderIsolatedIsland }: PageRendererProps) {
+export default function PageRenderer({ pageData: rawPageData, templateData: rawTemplateData, renderIsolatedIsland }: PageRendererProps) {
+  // Server renders get data already sanitized by resolveDataForSSR. In the browser (e.g.
+  // HistoryView) the data is stored content straight from the database, so its rich text is
+  // sanitized here before Puck's richtext fallback can inject it (see sanitize-richtext.ts).
+  const pageData = useMemo(
+    () => (import.meta.env.SSR ? rawPageData : sanitizeRichtextData(renderConfig, rawPageData, sanitizeHtml)),
+    [rawPageData],
+  );
+  const templateData = useMemo(
+    () =>
+      import.meta.env.SSR || !rawTemplateData
+        ? rawTemplateData
+        : sanitizeRichtextData(renderConfig, rawTemplateData, sanitizeHtml),
+    [rawTemplateData],
+  );
+
   if (!templateData) {
     return (
       <IslandRenderContext.Provider value={renderIsolatedIsland}>

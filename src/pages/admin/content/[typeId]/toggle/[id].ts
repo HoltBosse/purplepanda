@@ -1,8 +1,8 @@
 import type { APIContext } from "astro";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { addAlertToSession, alertType, createAlert } from "../../../../../alert/index.js";
 import { invalidatePagesCache } from "../../../../../db/content-cache.js";
-import { getContentTypeById } from "../../../../../db/content-types.js";
+import { entityKindFilter, getContentTypeById } from "../../../../../db/content-types.js";
 import { getDb } from "../../../../../db/db.js";
 import { pages } from "../../../../../db/schema.js";
 import { sameOriginReferer } from "../../../../../http/referer.js";
@@ -23,7 +23,7 @@ export async function POST(context: APIContext): Promise<Response> {
         return new Response("Content type not found", { status: 404 });
     }
 
-    const [page] = await db.select().from(pages).where(eq(pages.id, id)).limit(1);
+    const [page] = await db.select().from(pages).where(and(eq(pages.id, id), entityKindFilter(typeId))).limit(1);
     if (!page) {
         return new Response("Content not found", { status: 404 });
     }

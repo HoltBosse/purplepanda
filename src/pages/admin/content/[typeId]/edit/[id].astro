@@ -5,13 +5,22 @@
 // The unknown-content-type guard is repeated here rather than left to ../new.astro alone: a
 // Response returned from a nested component is discarded by the renderer (only a page's own
 // frontmatter can short-circuit), so an unrecognised typeId has to 404 from this route itself.
-import { getContentTypeById } from '../../../../../db/content-types.js';
+// Likewise an id that isn't an item of this type (a page, another type's item, or no row at all).
+import { and, eq } from 'drizzle-orm';
+import { entityKindFilter, getContentTypeById } from '../../../../../db/content-types.js';
 import { getDb } from '../../../../../db/db.js';
+import { pages } from '../../../../../db/schema.js';
 import ContentEditor from '../new.astro';
 
-const { typeId } = Astro.params;
+const { typeId, id } = Astro.params;
+const db = getDb();
 
-if (!typeId || !(await getContentTypeById(getDb(), typeId))) {
+if (!typeId || !id || !(await getContentTypeById(db, typeId))) {
+    return Astro.rewrite('/admin/__not-found');
+}
+
+const [item] = await db.select({ id: pages.id }).from(pages).where(and(eq(pages.id, id), entityKindFilter(typeId))).limit(1);
+if (!item) {
     return Astro.rewrite('/admin/__not-found');
 }
 ---

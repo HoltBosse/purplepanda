@@ -1,6 +1,6 @@
 import { stringify } from 'devalue';
 import { describe, expect, it } from 'vitest';
-import { describe as describeSession } from './driver';
+import { describe as describeSession, isSessionLive, SESSION_ABSOLUTE_TIMEOUT_MS, SESSION_IDLE_TIMEOUT_MS } from './driver';
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const TENANT = '22222222-2222-4222-8222-222222222222';
@@ -35,5 +35,27 @@ describe('session driver describe()', () => {
 
     it('treats unparseable data as an empty session', () => {
         expect(describeSession('not devalue')).toEqual({ userId: null, tenantId: null, loginId: null, expiresAt: null });
+    });
+});
+
+describe('session driver isSessionLive()', () => {
+    const now = Date.UTC(2026, 0, 10);
+    const ago = (ms: number) => new Date(now - ms);
+    const HOUR = 60 * 60 * 1000;
+
+    it('keeps a recently used session', () => {
+        expect(isSessionLive({ createdAt: ago(HOUR), updatedAt: ago(HOUR), expiresAt: null }, now)).toBe(true);
+    });
+
+    it('ends a session idle for longer than the idle timeout', () => {
+        expect(isSessionLive({ createdAt: ago(HOUR), updatedAt: ago(SESSION_IDLE_TIMEOUT_MS + 1), expiresAt: null }, now)).toBe(false);
+    });
+
+    it('ends an active session past the absolute timeout', () => {
+        expect(isSessionLive({ createdAt: ago(SESSION_ABSOLUTE_TIMEOUT_MS + 1), updatedAt: ago(0), expiresAt: null }, now)).toBe(false);
+    });
+
+    it('ends a session whose entries have all expired', () => {
+        expect(isSessionLive({ createdAt: ago(HOUR), updatedAt: ago(0), expiresAt: ago(1) }, now)).toBe(false);
     });
 });

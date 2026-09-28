@@ -18,9 +18,10 @@ import { parseSearchQuery } from '../../../../search/parser.js';
 import { searchConfig } from './_search-config.js';
 
 function csvCell(value: string): string {
-    // Spreadsheet apps treat a leading =, +, -, or @ as a formula; prefix with a quote to
+    // Spreadsheet apps treat a leading =, +, -, or @ as a formula (some after trimming leading
+    // whitespace), and a leading tab or carriage return can start one too; prefix with a quote to
     // force those apps to treat the cell as text and neutralize CSV/formula injection.
-    const safe = /^[=+\-@]/.test(value) ? `'${value}` : value;
+    const safe = /^(?:[\t\r]|\s*[=+\-@])/.test(value) ? `'${value}` : value;
     return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 

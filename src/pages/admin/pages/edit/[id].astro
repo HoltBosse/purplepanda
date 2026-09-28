@@ -1,6 +1,24 @@
 ---
 // Editing a page is the same page as creating one: ../new.astro branches on Astro.params.id,
 // which only this route supplies.
+//
+// The existence check is made here rather than left to ../new.astro alone: a Response returned
+// from a nested component is discarded by the renderer (only a page's own frontmatter can
+// short-circuit), so an id that isn't a page (a content item, or no row at all) has to 404 from
+// this route itself.
+import { and, eq } from 'drizzle-orm';
+import { entityKindFilter } from '../../../../db/content-types.js';
+import { getDb } from '../../../../db/db.js';
+import { pages } from '../../../../db/schema.js';
 import PageEditor from '../new.astro';
+
+const { id } = Astro.params;
+
+const [page] = id
+    ? await getDb().select({ id: pages.id }).from(pages).where(and(eq(pages.id, id), entityKindFilter(null))).limit(1)
+    : [];
+if (!page) {
+    return Astro.rewrite('/admin/__not-found');
+}
 ---
 <PageEditor />

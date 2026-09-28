@@ -1,8 +1,8 @@
 import type { APIContext } from "astro";
-import { inArray } from "drizzle-orm";
+import { and, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { invalidatePagesCache } from "../../../../../db/content-cache.js";
-import { getContentTypeById } from "../../../../../db/content-types.js";
+import { entityKindFilter, getContentTypeById } from "../../../../../db/content-types.js";
 import { getDb } from "../../../../../db/db.js";
 import { pages } from "../../../../../db/schema.js";
 
@@ -37,7 +37,8 @@ export async function POST(context: APIContext): Promise<Response> {
         return new Response("Invalid IDs", { status: 400 });
     }
 
-    await db.update(pages).set({ state: stateMap[action as Action] }).where(inArray(pages.id, result.data));
+    // Only this type's items: ids of pages or other types' items in the batch are left alone.
+    await db.update(pages).set({ state: stateMap[action as Action] }).where(and(inArray(pages.id, result.data), entityKindFilter(typeId!)));
     invalidatePagesCache(db);
 
     return context.redirect(`/admin/content/${typeId}`);

@@ -14,7 +14,7 @@ export type FormEmbedProps = {
 function toPropsSchema() {
   return z
     .object({
-      form: z.object({ id: z.string(), name: z.string() }, "Select a form"),
+      form: z.object({ id: z.uuid(), name: z.string() }, "Select a form"),
     })
     .loose();
 }
@@ -64,9 +64,12 @@ const FormEmbed: ComponentConfig<FormEmbedProps> = {
     form: null,
   },
   data: async ({ form }: FormEmbedProps) => {
-    if (!import.meta.env.SSR || !form?.id) return {};
+    if (!import.meta.env.SSR) return {};
+    // Always returns `_html` so the resolved value replaces anything else under that key, even
+    // when there's no usable form id to render.
+    if (!form?.id || !z.uuid().safeParse(form.id).success) return { _html: undefined };
     const { getFormHtml } = await import("./FormEmbed.server.js");
-    return { _html: await getFormHtml(form.id) };
+    return { _html: (await getFormHtml(form.id)) ?? undefined };
   },
   render: ({ form, _html }: FormEmbedProps) => {
     if (_html) {

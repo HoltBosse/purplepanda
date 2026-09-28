@@ -1,5 +1,5 @@
 import type { APIContext } from "astro";
-import { inArray } from "drizzle-orm";
+import { and, inArray, type SQL } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { addAlertToSession, alertType, createAlert } from "../alert/index.js";
@@ -23,7 +23,9 @@ const idsSchema = z.array(z.uuid()).min(1);
 // to allow it.
 export type BulkGuard = (ids: string[], action: "unpublish" | "delete") => Promise<string | null | undefined> | string | null | undefined;
 
-export function createBulkHandler(table: PgTable & { id: any; state: any }, redirectTo: string, guard?: BulkGuard) {
+// `scope`, when given, further restricts which rows the batch may touch (e.g. pages only, not
+// content items sharing the same table); selected ids outside it are left alone.
+export function createBulkHandler(table: PgTable & { id: any; state: any }, redirectTo: string, guard?: BulkGuard, scope?: SQL) {
     return async function POST(context: APIContext): Promise<Response> {
         if (!ACTIONS.includes(context.params.action as Action)) {
             return context.rewrite("/admin/404");
@@ -47,7 +49,7 @@ export function createBulkHandler(table: PgTable & { id: any; state: any }, redi
         }
 
         const db = getDb();
-        await db.update(table).set({ state: stateMap[action] }).where(inArray(table.id, result.data));
+        await db.update(table).set({ state: stateMap[action] }).where(and(inArray(table.id, result.data), scope));
 
         if (table === pages) invalidatePagesCache(db);
         else if (table === templates) invalidateTemplatesCache(db);

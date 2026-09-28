@@ -9,6 +9,8 @@ import { createPortal } from "react-dom";
 import type * as z from "zod";
 import { extractFamilyFromLink } from "../form/fields/font-utils.js";
 import { ChevronDown, Save } from "../puck/icons.js";
+import { sanitizeHtml } from "../puck/sanitize-html.js";
+import { sanitizeRichtextData } from "../puck/sanitize-richtext.js";
 import { validateContentTree } from "../puck/validate-content.js";
 import { ensureTemplateSlot } from "./template-slot.js";
 
@@ -561,11 +563,17 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
     [config, guardedOnSave, headingFontLink, bodyFontLink, rootPropsSchema, isNew, guardedOnCommit, markEditorReady],
   );
 
+  // Puck's richtext field shows stored HTML raw until its tiptap editor chunk loads, so the
+  // content being edited is sanitized too — see sanitize-richtext.ts.
+  const safeData = useMemo(() => sanitizeRichtextData(config, data, sanitizeHtml), [config, data]);
+
   // Memoized because it feeds the root render below: a fresh object each render would rebuild the
   // root component's identity and remount the whole canvas on every keystroke.
   const normalizedTemplateData = useMemo(
-    () => (templateData ? ensureTemplateSlot(templateData) : undefined),
-    [templateData],
+    // The template is drawn with Puck's read-only <Render>, whose richtext fallback injects stored
+    // HTML raw — see sanitize-richtext.ts.
+    () => (templateData ? sanitizeRichtextData(config, ensureTemplateSlot(templateData), sanitizeHtml) : undefined),
+    [templateData, config],
   );
 
   // Config used to draw the template itself: same host config, plus the TemplateSlot placeholder
@@ -663,7 +671,7 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
       >
         <img src="/admin/assets/favicon.svg" alt="Admin" style={{ height: "28px", width: "28px" }} />
       </a>
-      <Puck config={configCopy} data={data} onPublish={guardedOnPublish} overrides={overrides} {...(dictionary ? { dictionary } : {})} />
+      <Puck config={configCopy} data={safeData} onPublish={guardedOnPublish} overrides={overrides} {...(dictionary ? { dictionary } : {})} />
     </div>
   );
 }

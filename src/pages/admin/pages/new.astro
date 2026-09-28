@@ -1,7 +1,9 @@
 ---
 import type { Data } from '@puckeditor/core';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
+import * as z from 'zod';
 import PagePuckEditor from '../../../components/PagePuckEditor';
+import { entityKindFilter } from '../../../db/content-types.js';
 import { getDb } from '../../../db/db.js';
 import { resolveFontSettings } from '../../../db/fonts.js';
 import { resolvePrefabSetting } from '../../../db/prefabs.js';
@@ -22,7 +24,8 @@ if (id) {
 // ?templateId=<uuid> / ?blank=1 (see index.astro's split button + dialog). They only apply
 // when creating a page — an existing page's own templateId/noTemplate (set once at creation,
 // see update.ts) is what governs it from then on, same as its front-end rendering in page.astro.
-const templateIdParam = Astro.url.searchParams.get('templateId');
+const rawTemplateIdParam = Astro.url.searchParams.get('templateId');
+const templateIdParam = rawTemplateIdParam && z.uuid().safeParse(rawTemplateIdParam).success ? rawTemplateIdParam : null;
 const isBlank = Astro.url.searchParams.get('blank') === '1';
 // The prefab is the plain-New-button starting point — picking "Blank" or a specific template is
 // an explicit request to start from that instead, so neither should also pull in the prefab.
@@ -37,7 +40,7 @@ const [allPages, existingPage, prefabSetting, fontSettings] = await Promise.all(
         .from(pages)
         .where(eq(pages.state, 1)),
     id
-        ? db.select().from(pages).where(eq(pages.id, id)).limit(1).then(rows => rows[0])
+        ? db.select().from(pages).where(and(eq(pages.id, id), entityKindFilter(null))).limit(1).then(rows => rows[0])
         : Promise.resolve(undefined),
     usesDefaultTemplate ? resolvePrefabSetting(db) : Promise.resolve(undefined),
     resolveFontSettings(db),

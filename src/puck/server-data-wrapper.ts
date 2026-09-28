@@ -1,4 +1,7 @@
 import type { Config, Data } from "@puckeditor/core";
+import { stripResolverOwnedProps } from "./resolver-props.js";
+import { sanitizeHtml } from "./sanitize-html.server.js";
+import { sanitizeRichtextData } from "./sanitize-richtext.js";
 
 type JsonObject = Record<string, unknown>;
 
@@ -22,6 +25,7 @@ async function resolveItemForSSR(config: Partial<Config>, item: JsonObject, cont
   let props = (item.props as JsonObject) ?? {};
 
   if (hasDataResolver(componentConfig)) {
+    props = stripResolverOwnedProps(props);
     try {
       const resolved = await componentConfig.data(props, context);
       if (isObject(resolved)) props = { ...props, ...resolved };
@@ -48,5 +52,7 @@ export async function resolveDataForSSR(config: Partial<Config>, data: Data, con
   const resolvedContent = await Promise.all(
     (data.content ?? []).map((item) => resolveItemForSSR(config, item as JsonObject, context))
   );
-  return { ...data, content: resolvedContent as Data["content"] };
+  // Every server render of stored Puck data comes through here, so this is also where stored rich
+  // text gets sanitized (see sanitize-richtext.ts for why Puck's own renderer isn't enough).
+  return sanitizeRichtextData(config as Config, { ...data, content: resolvedContent as Data["content"] }, sanitizeHtml);
 }

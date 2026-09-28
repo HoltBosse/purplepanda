@@ -1,9 +1,10 @@
 import type { APIContext } from "astro";
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import * as z from "zod";
 import { addAlertToSession, alertType, createAlert } from "../../../../../alert/index.js";
 import { addAction } from "../../../../../audit/index.js";
 import { invalidatePagesCache } from "../../../../../db/content-cache.js";
+import { entityKindFilter } from "../../../../../db/content-types.js";
 import { getDb } from "../../../../../db/db.js";
 import { dagNodes, pages } from "../../../../../db/schema.js";
 import { runOverride } from "../../../../../hooks/index.js";
@@ -20,7 +21,7 @@ export async function POST(context: APIContext): Promise<Response> {
         return new Response("Draft not found", { status: 404 });
     }
 
-    const [page] = await db.select().from(pages).where(eq(pages.id, draft.entityId)).limit(1);
+    const [page] = await db.select().from(pages).where(and(eq(pages.id, draft.entityId), entityKindFilter(null))).limit(1);
     if (!page) {
         return new Response("Page not found", { status: 404 });
     }

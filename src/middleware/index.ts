@@ -1,4 +1,5 @@
 import { defineMiddleware } from "astro/middleware";
+import * as z from "zod";
 import { clearAlertsFromSession, getAlertsFromSession } from "../alert/index.js";
 import { isAdminSession } from "../auth/index.js";
 import { getDb } from "../db/db.js";
@@ -7,6 +8,21 @@ import { getPrimaryDomain, normalizeDomain, resolveTenantForHostname, urlOnDomai
 
 // Paths that do not require authentication
 const PUBLIC_PATHS = ["/admin/login", "/admin/sso"];
+
+// Route params that name a row by its id (`[id]`, `[...id]`, `[draftId]`, `[uuid]`, `[typeId]`,
+// `[tenantId]`). Every table's id is a uuid, so any other value can't name a row — and handed to
+// Postgres as-is it raises "invalid input syntax for type uuid", a 500 rather than the 404 an
+// unknown id gets. Checked here once so every route answers the same way. An absent rest param
+// (e.g. `update/[...id]` creating a new row) is left to the route.
+const ID_PARAMS = ["id", "draftId", "uuid", "typeId", "tenantId"];
+const uuidSchema = z.uuid();
+
+function hasMalformedIdParam(params: Record<string, string | undefined>): boolean {
+  return ID_PARAMS.some((name) => {
+    const value = params[name];
+    return value !== undefined && value !== "" && !uuidSchema.safeParse(value).success;
+  });
+}
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const db = getDb();
@@ -36,6 +52,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
     // Only protect /admin routes, but flash alerts are consumed on public pages too
     // (e.g. by the Puck "Alerts" prefab), so populate/clear them here regardless.
     if (!pathname.startsWith("/admin")) {
+      if (hasMalformedIdParam(context.params)) {
+        return context.rewrite("/404");
+      }
       const alerts = await getAlertsFromSession(context.session);
       context.locals.alerts = alerts;
       // Every session.set() forces a read-modify-write of the whole session snapshot back to
@@ -57,6 +76,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
     if (!(await isAdminSession(context.session))) {
       return context.redirect("/admin/login");
+    }
+
+    // Rendered by the admin catch-all ([...path].astro), the admin's own 404 page.
+    if (hasMalformedIdParam(context.params)) {
+      return context.rewrite("/admin/not-found");
     }
 
     // Read and clear flash alerts before the response is committed
