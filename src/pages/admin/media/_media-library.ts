@@ -132,7 +132,6 @@ const createImageConfigurationRows = (files: FileList | null) => {
             const idInput = section.querySelector('input[name="id[]"]') as HTMLInputElement | null;
             const fileInput = section.querySelector("[data-image-file]") as HTMLInputElement | null;
             const imagePreview = section.querySelector("[data-image-preview]") as HTMLImageElement | null;
-            const imageName = section.querySelector("[data-image-name]") as HTMLElement | null;
             const titleLabel = section.querySelector('label[for="image-title-template"]') as HTMLLabelElement | null;
             const altLabel = section.querySelector('label[for="image-alt-template"]') as HTMLLabelElement | null;
 
@@ -169,10 +168,6 @@ const createImageConfigurationRows = (files: FileList | null) => {
                 const objectUrl = URL.createObjectURL(file);
                 previewObjectUrls.push(objectUrl);
                 imagePreview.src = objectUrl;
-            }
-
-            if (imageName) {
-                imageName.textContent = file.name;
             }
 
             newImagesList.append(section);

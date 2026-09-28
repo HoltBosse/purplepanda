@@ -239,8 +239,7 @@ if(id && !isSearching) {
                             {id ? <input type="hidden" name="folder[]" value={id} /> : null}
                         </div>
                         <div class="md:w-1/2">
-                            <img data-image-preview alt="Selected image preview" class="h-48 w-full rounded-lg border border-base-300 object-cover md:h-56" />
-                            <p data-image-name class="mt-2 truncate text-sm text-base-content/70"></p>
+                            <img data-image-preview alt="Selected image preview" class="h-48 w-full rounded-lg border border-base-300 object-contain md:h-56" />
                         </div>
                     </div>
                 </section>
