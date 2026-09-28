@@ -1,12 +1,16 @@
 ---
 import { CircleCheck, CircleX } from '@lucide/astro';
-import { desc, ilike, inArray, or, sql } from 'drizzle-orm';
+import { desc, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { dashboardAccess } from '../../../../auth/dashboard.js';
 import Pagination from '../../../../components/Pagination.astro';
 import { getDb } from '../../../../db/db.js';
 import { tenants, users, userTenants } from '../../../../db/schema.js';
 import PortalLayout from '../../../../layouts/PortalLayout.astro';
+import { buildSearchWhere, type DrizzleSearchConfig } from '../../../../search/drizzle.js';
+import { parseSearchQuery } from '../../../../search/parser.js';
+import SearchBar from '../../../../search/SearchBar';
+import type { SearchFieldSpec } from '../../../../search/types.js';
 import AdminTabs from '../_tabs.astro';
 
 // Every account on the install, whichever sites it belongs to (or none) — users isn't tenant-scoped,
@@ -21,12 +25,44 @@ if (access.response) {
 const { user } = access;
 
 const db = getDb();
-const q = z.string().trim().max(255).catch('').parse(Astro.url.searchParams.get('q') ?? '');
-// Matched literally: the LIKE wildcards (and the escape character itself) are escaped.
-const pattern = `%${q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
-const where = q
-	? or(ilike(users.email, pattern), ilike(sql`${users.fname} || ' ' || ${users.lname}`, pattern))
-	: undefined;
+// Matches the display name the table renders, so `name:"john reese"` behaves the way it reads.
+const fullNameExpr = sql`${users.fname} || ' ' || ${users.lname}`;
+
+// Client-safe field descriptions passed to <SearchBar>: drive its validation, github-style
+// valid/invalid highlighting, and the qualifier/value autocomplete dropdown. State here is the
+// account's own (users.state), not any one site's membership.
+const searchFields: SearchFieldSpec[] = [
+	{
+		name: 'state',
+		type: 'enum',
+		enumValues: ['enabled', 'disabled', 'deleted'],
+		label: 'State',
+		description: 'Account state on every site',
+	},
+	{ name: 'name', type: 'text', label: 'Name', description: 'First/last name contains' },
+	{ name: 'email', type: 'text', label: 'Email', description: 'Email address' },
+	{ name: 'superadmin', type: 'boolean', label: 'Super admin', description: 'Is a super admin' },
+];
+
+const searchConfig: DrizzleSearchConfig = {
+	fields: [
+		{
+			name: 'state',
+			type: 'enum',
+			enumValues: ['enabled', 'disabled', 'deleted'],
+			column: users.state,
+			valueMap: { enabled: 1, disabled: 0, deleted: -1 },
+		},
+		{ name: 'name', type: 'text', column: fullNameExpr, matchMode: 'contains' },
+		{ name: 'email', type: 'text', column: users.email, matchMode: 'exact' },
+		{ name: 'superadmin', type: 'boolean', column: users.superAdmin },
+	],
+	// A bare term searches name and email together.
+	fulltext: { columns: [users.fname, users.lname, users.email] },
+};
+
+const q = Astro.url.searchParams.get('q') ?? '';
+const where = buildSearchWhere(parseSearchQuery(q), searchConfig);
 
 const itemsPerPage = 25;
 const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get('page') ?? 1);
@@ -70,9 +106,9 @@ const stateTitle = (row: { id: string; state: number }) => {
 	</div>
 	<AdminTabs active="users" />
 
-	<form method="GET" class="pt-4 pb-4">
-		<input type="search" name="q" value={q} placeholder="Search name or email" class="input input-bordered w-full" />
-	</form>
+	<div class="pt-4 pb-4">
+		<SearchBar client:load fields={searchFields} defaultValue={q} className="w-full" />
+	</div>
 	<form id="bulk-form" method="POST"></form>
 
 	<p class="text-sm text-base-content/60 pb-2">{total} account(s){q ? ` matching “${q}”` : ''}</p>
