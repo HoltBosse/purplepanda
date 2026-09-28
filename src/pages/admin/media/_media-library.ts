@@ -609,7 +609,44 @@ window.addEventListener("pagehide", () => {
     dragDropManager.destroy();
 }, { once: true });
 
+const imageZoomDialog = document.querySelector("#image-zoom-dialog") as HTMLDialogElement | null;
+const imageZoomImg = imageZoomDialog?.querySelector("img") as HTMLImageElement | null;
+const imageZoomSpinner = imageZoomDialog?.querySelector(".loading") as HTMLElement | null;
+
+const showZoomImage = (loaded: boolean) => {
+    imageZoomImg?.classList.toggle("hidden", !loaded);
+    imageZoomSpinner?.classList.toggle("hidden", loaded);
+};
+imageZoomImg?.addEventListener("load", () => showZoomImage(true));
+imageZoomImg?.addEventListener("error", () => imageZoomSpinner?.classList.add("hidden"));
+
+// Clicking anywhere in the zoom view (image included) dismisses it; Escape/backdrop via closedby.
+imageZoomDialog?.addEventListener("click", () => imageZoomDialog.close());
+
 document.querySelectorAll(".media-item").forEach((item) => {
+    const zoomButton = item.querySelector(".media-zoom") as HTMLButtonElement | null;
+    // Keep the card's draggable from treating a press on the zoom button as a drag start.
+    zoomButton?.addEventListener("pointerdown", (event) => {
+        event.stopPropagation();
+    });
+    zoomButton?.addEventListener("click", (event) => {
+        // Stop the card's own click handler from opening the title/alt dialog.
+        event.preventDefault();
+        event.stopPropagation();
+
+        const id = item.getAttribute("data-id");
+        if (!id || !imageZoomDialog || !imageZoomImg) {
+            return;
+        }
+
+        // Hide the previous image until the new one loads, so it doesn't flash up first.
+        showZoomImage(false);
+        imageZoomImg.removeAttribute("src");
+        imageZoomImg.src = `/image/${id}?fmt=webp`;
+        imageZoomImg.alt = item.getAttribute("data-alt") || "";
+        imageZoomDialog.showModal();
+    });
+
     item.addEventListener("click", async (event) => {
         if (dragActive) {
             return;

@@ -3,6 +3,7 @@ import type { CustomField } from "@puckeditor/core";
 // scope, which throws under SSR. It must only ever be loaded via dynamic import in the browser.
 import type Cropper from "cropperjs";
 import type { CropperImage } from "cropperjs";
+import Search from "lucide-react/dist/esm/icons/search.mjs";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /*
@@ -125,6 +126,24 @@ function fillCropCanvas(cropperImage: CropperImage, dispWidth: number) {
   cropperImage.translatable = wasTranslatable;
 }
 
+// Keyed by image id at the call site, so each image starts in the loading state.
+function ZoomImage({ image }: { image: MediaRef }) {
+  const [loading, setLoading] = useState(true);
+
+  return (
+    <>
+      {loading && <span className="loading loading-spinner loading-xl text-white" />}
+      <img
+        src={`/image/${image.id}?fmt=webp`}
+        alt={image.alt}
+        className={`max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] object-contain ${loading ? "hidden" : ""}`}
+        onLoad={() => setLoading(false)}
+        onError={() => setLoading(false)}
+      />
+    </>
+  );
+}
+
 function ImagePickerField({
   value,
   onChange,
@@ -153,6 +172,9 @@ function ImagePickerField({
   const focusDialogRef = useRef<HTMLDialogElement>(null);
   const focusAreaRef = useRef<HTMLDivElement>(null);
   const [focusPos, setFocusPos] = useState({ x: 50, y: 50 });
+
+  const zoomDialogRef = useRef<HTMLDialogElement>(null);
+  const [zoomImage, setZoomImage] = useState<MediaRef | null>(null);
 
   const cropDialogRef = useRef<HTMLDialogElement>(null);
   const cropContainerRef = useRef<HTMLDivElement>(null);
@@ -580,30 +602,45 @@ function ImagePickerField({
                 {images.length > 0 && (
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                     {images.map((img) => (
-                      <button
-                        key={img.id}
-                        type="button"
-                        onClick={() => select(img)}
-                        className={`group relative rounded-lg overflow-hidden border-2 transition-colors hover:border-primary focus:outline-none focus:border-primary ${
-                          value?.id === img.id ? "border-primary" : "border-base-300"
-                        }`}
-                      >
-                        <img
-                          src={`/image/${img.id}?fmt=webp&w=100&q=80`}
-                          alt={img.alt}
-                          className="w-full h-28 object-cover"
-                        />
-                        <div className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-white text-xs truncate text-left">
-                          {img.title || img.id}
-                        </div>
-                        {value?.id === img.id && (
-                          <div className="absolute top-1.5 right-1.5 bg-primary text-primary-content rounded-full p-0.5">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-3" aria-hidden="true">
-                              <path fillRule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
-                            </svg>
+                      // The zoom button is a sibling of the select button, not a child, since
+                      // buttons can't nest.
+                      <div key={img.id} className="relative">
+                        <button
+                          type="button"
+                          onClick={() => select(img)}
+                          className={`group relative w-full rounded-lg overflow-hidden border-2 transition-colors hover:border-primary focus:outline-none focus:border-primary ${
+                            value?.id === img.id ? "border-primary" : "border-base-300"
+                          }`}
+                        >
+                          <img
+                            src={`/image/${img.id}?fmt=webp&w=100&q=80`}
+                            alt={img.alt}
+                            className="w-full h-28 object-cover"
+                          />
+                          <div className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-white text-xs truncate text-left">
+                            {img.title || img.id}
                           </div>
-                        )}
-                      </button>
+                          {value?.id === img.id && (
+                            <div className="absolute top-1.5 right-1.5 bg-primary text-primary-content rounded-full p-0.5">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-3" aria-hidden="true">
+                                <path fillRule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setZoomImage(img);
+                            zoomDialogRef.current?.showModal();
+                          }}
+                          className="btn btn-ghost btn-circle btn-xs absolute top-1.5 left-1.5 text-base-content/40 hover:text-base-content"
+                          aria-label={`View ${img.title || img.id} full size`}
+                          title="View full size"
+                        >
+                          <Search className="size-3" aria-hidden="true" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -734,6 +771,18 @@ function ImagePickerField({
           </div>
         </div>
         <button type="button" className="modal-backdrop" onClick={closeCropDialog} aria-label="Close" />
+      </dialog>
+
+      {/* Opened on top of the picker dialog; clicking anywhere (image included) or Escape closes
+          just this one, leaving the picker open. */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Escape closes the dialog natively */}
+      <dialog
+        ref={zoomDialogRef}
+        className="m-auto max-h-none max-w-none bg-transparent p-0 backdrop:bg-black/80"
+        onClick={() => zoomDialogRef.current?.close()}
+        onClose={() => setZoomImage(null)}
+      >
+        {zoomImage && <ZoomImage key={zoomImage.id} image={zoomImage} />}
       </dialog>
     </>
   );

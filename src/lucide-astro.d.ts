@@ -64,3 +64,4 @@ export declare const SquareArrowOutUpRight: AstroComponent;
 export declare const SquarePen: AstroComponent;
 export declare const Timer: AstroComponent;
 export declare const MessageSquare: AstroComponent;
+export declare const Search: AstroComponent;
