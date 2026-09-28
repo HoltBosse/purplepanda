@@ -2,7 +2,7 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { Eye, EyeOff, Folder, Search } from '@lucide/astro';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import sharp from 'sharp';
 import { z } from 'zod';
 import Pagination from '../../../components/Pagination.astro';
@@ -65,7 +65,10 @@ const mediaWhere = isSearching
     ? and(eq(media.state, 1), searchWhere)
     : and(id ? eq(media.folder, id) : isNull(media.folder), eq(media.state, 1));
 
-const mediaItems = await db.select().from(media).where(mediaWhere).limit(itemsPerPage).offset(offset);
+// id is the tiebreaker so paging stays stable within an upload batch.
+const mediaItems = await db.select().from(media).where(mediaWhere)
+    .orderBy(desc(media.createdAt), desc(media.id))
+    .limit(itemsPerPage).offset(offset);
 const totalMediaItems = await db.select({ count: sql<number>`COUNT(*)` }).from(media).where(mediaWhere).then(result => result[0]?.count ?? 0);
 const totalPages = Math.ceil(totalMediaItems / itemsPerPage);
 

@@ -2,6 +2,7 @@ import type { APIContext } from "astro";
 import { inArray } from 'drizzle-orm';
 import * as z from "zod";
 import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
+import { addAction } from "../../../audit/index.js";
 import { getDb } from "../../../db/db.js";
 import { media, mediafolders } from "../../../db/schema.js";
 
@@ -67,6 +68,27 @@ export async function POST(context: APIContext): Promise<Response> {
     // Soft-delete all affected folders (roots + descendants)
     if (allFolderIds.length > 0) {
         await db.update(mediafolders).set({ state: 0 }).where(inArray(mediafolders.id, allFolderIds));
+    }
+
+    // Only the directly selected items are logged; media and subfolders swept up inside a
+    // deleted folder are covered by that folder's entry. Rows are soft-deleted, so the titles and
+    // names still resolve when the log is displayed.
+    const userId = await context.session?.get("userId");
+    if (mediaIds.length > 0) {
+        await addAction("media:delete", { ids: mediaIds }, userId, {
+            message: "Media {ids} was deleted",
+            placeholders: {
+                ids: { lookupColumn: media.id, displayColumn: media.title },
+            },
+        });
+    }
+    if (folderIds.length > 0) {
+        await addAction("media-folder:delete", { ids: folderIds }, userId, {
+            message: "Media folder {ids} was deleted, along with its contents",
+            placeholders: {
+                ids: { lookupColumn: mediafolders.id, displayColumn: mediafolders.name },
+            },
+        });
     }
 
     // If the current folder was among those deleted, redirect to root

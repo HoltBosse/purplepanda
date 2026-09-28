@@ -2,6 +2,7 @@ import type { APIContext } from "astro";
 import { and, eq } from 'drizzle-orm';
 import * as z from "zod";
 import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
+import { addAction } from "../../../audit/index.js";
 import { getDb } from "../../../db/db.js";
 import { mediafolders } from "../../../db/schema.js";
 
@@ -37,10 +38,20 @@ export async function POST(context: APIContext): Promise<Response> {
     }
 
     //now insert the folder, with the optional parent
-    await db.insert(mediafolders).values({
+    const [createdFolder] = await db.insert(mediafolders).values({
         name: name.data,
         parent: parent.data || null
-    });
+    }).returning({ id: mediafolders.id });
+
+    if (createdFolder) {
+        const userId = await context.session?.get("userId");
+        await addAction("media-folder:create", { id: createdFolder.id }, userId, {
+            message: "Media folder {id} was created",
+            placeholders: {
+                id: { lookupColumn: mediafolders.id, displayColumn: mediafolders.name },
+            },
+        });
+    }
 
     const message = "Folder created successfully.";
 

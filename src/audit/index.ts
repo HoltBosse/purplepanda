@@ -1,4 +1,4 @@
-import { eq, getTableColumns, getTableName, is, sql } from "drizzle-orm";
+import { eq, getTableColumns, getTableName, inArray, is, sql } from "drizzle-orm";
 import { type AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { getDb } from "../db/db.js";
 import * as dbSchema from "../db/schema.js";
@@ -123,7 +123,27 @@ export async function describeAction(action: { type: string; data: unknown }): P
     const lookupColumn = placeholder && resolveColumn(placeholder.table, placeholder.lookupColumn);
     const displayColumn = placeholder && resolveColumn(placeholder.table, placeholder.displayColumn);
 
-    if (lookupColumn && displayColumn && value != null) {
+    if (lookupColumn && displayColumn && Array.isArray(value)) {
+      // A list of ids (e.g. several media uploaded at once) resolves each one, keeping the
+      // payload's order and falling back to the raw id for any that no longer exist.
+      const rows = value.length === 0 ? [] : await db
+        .select({
+          lookup: lookupColumn,
+          display: buildDisplayField(displayColumn, placeholder.displayPath),
+        })
+        .from(lookupColumn.table)
+        .where(inArray(lookupColumn, value));
+      const displayByLookup = new Map(rows.map((row) => [String(row.lookup), row.display]));
+      resolved.set(
+        key!,
+        value
+          .map((item) => {
+            const display = displayByLookup.get(String(item));
+            return display != null ? String(display) : String(item);
+          })
+          .join(", "),
+      );
+    } else if (lookupColumn && displayColumn && value != null) {
       const [row] = await db
         .select({ display: buildDisplayField(displayColumn, placeholder.displayPath) })
         .from(lookupColumn.table)

@@ -1,6 +1,7 @@
 import type { APIContext } from "astro";
 import { eq } from "drizzle-orm";
 import { addAlertToSession, alertType, createAlert } from "../../../../alert/index.js";
+import { addAction } from "../../../../audit/index.js";
 import { getDb } from "../../../../db/db.js";
 import { mediafolders } from "../../../../db/schema.js";
 import { sameOriginReferer } from "../../../../http/referer.js";
@@ -20,6 +21,15 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const newVisibility = folder.visibility === -1 ? 1 : -1;
     await db.update(mediafolders).set({ visibility: newVisibility }).where(eq(mediafolders.id, id));
+
+    const userId = await context.session?.get("userId");
+    const hidden = newVisibility === -1;
+    await addAction(hidden ? "media-folder:hide" : "media-folder:show", { id }, userId, {
+        message: hidden ? "Media folder {id} was hidden" : "Media folder {id} was made visible",
+        placeholders: {
+            id: { lookupColumn: mediafolders.id, displayColumn: mediafolders.name },
+        },
+    });
 
     const alert = createAlert(alertType.success, newVisibility === -1 ? "Folder hidden." : "Folder visible.");
     await addAlertToSession(context.session, alert);

@@ -115,6 +115,9 @@ export async function POST(context: APIContext): Promise<Response> {
             userId,
             {
                 message: "Media {ids} was uploaded",
+                placeholders: {
+                    ids: { lookupColumn: media.id, displayColumn: media.title },
+                },
             },
         );
     }
@@ -125,6 +128,9 @@ export async function POST(context: APIContext): Promise<Response> {
             userId,
             {
                 message: "Media {ids} was updated",
+                placeholders: {
+                    ids: { lookupColumn: media.id, displayColumn: media.title },
+                },
             },
         );
     }

@@ -113,6 +113,7 @@ export const media = pgTable("media", {
   title: varchar("title", { length: 255 }).notNull(),
   alt: varchar("alt", { length: 255 }).notNull(),
   folder: uuid("folder").references(() => mediafolders.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
   index("media_tenant_id_idx").on(t.tenantId),
   tenantIsolationPolicy(),
@@ -257,6 +258,7 @@ export const userActions = pgTable("user_actions", {
   data: jsonb("data").notNull(),
 }, (t) => [
   index("user_actions_tenant_id_idx").on(t.tenantId),
+  index("user_actions_type_idx").on(t.type),
   tenantIsolationPolicy(),
 ]);
 
