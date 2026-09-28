@@ -99,11 +99,40 @@ describe('SearchBar clear button', () => {
     });
 
     it('empties the query when clicked', async () => {
-        const screen = await renderBar({ defaultValue: 'author:jane' });
+        const screen = await renderBar();
 
+        await input(screen).fill('author:jane');
         await screen.getByRole('button', { name: 'Clear search' }).click();
 
         await expect.element(input(screen)).toHaveValue('');
+    });
+
+    it('does not submit when the query was never submitted', async () => {
+        const screen = await renderBar();
+        const submitted: string[] = [];
+        screen.container.querySelector('form')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            submitted.push(new FormData(e.target as HTMLFormElement).get('q') as string);
+        });
+
+        await input(screen).fill('author:jane');
+        await screen.getByRole('button', { name: 'Clear search' }).click();
+
+        expect(submitted).toEqual([]);
+    });
+
+    // A submitted query means results are showing; clearing should reload them unfiltered.
+    it('submits an empty query when clearing a submitted search', async () => {
+        const screen = await renderBar({ defaultValue: 'author:jane' });
+        const submitted: string[] = [];
+        screen.container.querySelector('form')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            submitted.push(new FormData(e.target as HTMLFormElement).get('q') as string);
+        });
+
+        await screen.getByRole('button', { name: 'Clear search' }).click();
+
+        await expect.poll(() => submitted).toEqual(['']);
     });
 });
 

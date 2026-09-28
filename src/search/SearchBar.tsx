@@ -1,5 +1,6 @@
 import { CircleX } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { parseSearchQuery } from "./parser.js";
 import { buildSuggestions, type Suggestion } from "./suggestions.js";
 import type { SearchFieldSpec, ValidatedSearchAst } from "./types.js";
@@ -118,10 +119,19 @@ export default function SearchBar({
   };
 
   const clear = () => {
-    setValue("");
-    setCaret(0);
-    setScrollLeft(0);
-    setOpen(false);
+    // flushSync so the controlled input's DOM value is already empty if we submit below.
+    flushSync(() => {
+      setValue("");
+      setCaret(0);
+      setScrollLeft(0);
+      setOpen(false);
+    });
+    // The page is currently showing results filtered by a submitted query, so clearing should also
+    // drop the filter rather than leave stale results under an empty box.
+    if (defaultValue !== "") {
+      formRef.current?.requestSubmit();
+      return;
+    }
     inputRef.current?.focus();
   };
 
