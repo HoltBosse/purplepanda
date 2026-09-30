@@ -5,6 +5,7 @@ import { aliasField } from "../puck/component-fields/AliasField.js";
 import { dateTimeField } from "../puck/component-fields/DateTimeField.js";
 import { notesField } from "../puck/component-fields/NotesField.js";
 import { ogField } from "../puck/component-fields/OpenGraphField.js";
+import { parentPageField } from "../puck/component-fields/ParentPageField.js";
 import { filterConfigByLocation, wrapConfigWithDataBinding } from "../puck/index.js";
 import { pageRootPropsSchema } from "../puck/page-root-schema.js";
 import externalPuckConfig from "../puck.config.js";
@@ -42,11 +43,6 @@ const config = wrapConfigWithClientDataResolvers(wrapConfigWithDataBinding(filte
 
 const defaultInitialData: Data = { content: [], root: { props: {} } };
 
-export interface PageOption {
-  id: string;
-  title: string;
-}
-
 interface PagePuckEditorProps {
   initialData?: Data;
   templateData?: Data;
@@ -59,7 +55,8 @@ interface PagePuckEditorProps {
   onCommit?: (data: Data) => void;
   isDraft?: boolean;
   isNew?: boolean;
-  pages?: PageOption[];
+  // The page being edited (omitted for a new page) — kept out of its own parent picker.
+  pageId?: string;
   rootConfig?: { label?: string; fields?: Fields; defaultProps?: Record<string, unknown> };
   headingFontLink?: string;
   bodyFontLink?: string;
@@ -69,7 +66,7 @@ interface PagePuckEditorProps {
   rootPropsSchema?: PuckEditorProps["rootPropsSchema"];
 }
 
-export default function PagePuckEditor({ initialData, templateData, templateId, noTemplate, saveUrl = "/admin/pages/update", draftPublishUrl, onPublish, onSave, onCommit, isDraft = false, isNew = false, pages = [], rootConfig, headingFontLink, bodyFontLink, dictionary, rootPropsSchema = pageRootPropsSchema }: PagePuckEditorProps = {}) {
+export default function PagePuckEditor({ initialData, templateData, templateId, noTemplate, saveUrl = "/admin/pages/update", draftPublishUrl, onPublish, onSave, onCommit, isDraft = false, isNew = false, pageId, rootConfig, headingFontLink, bodyFontLink, dictionary, rootPropsSchema = pageRootPropsSchema }: PagePuckEditorProps = {}) {
   // templateId/noTemplate are only passed in for a brand-new page (see new.astro) — an existing
   // page's template is set once at creation and never resent, so these are omitted there and
   // this appends nothing.
@@ -182,14 +179,7 @@ export default function PagePuckEditor({ initialData, templateData, templateId, 
         fields: {
           title: { type: "text" as const, label: "Title" },
           alias: aliasField,
-          parentPage: {
-            type: "select" as const,
-            label: "Parent Page",
-            options: [
-              { label: "None", value: "" },
-              ...pages.map((p) => ({ label: p.title || p.id, value: p.id })),
-            ],
-          },
+          parentPage: parentPageField(pageId),
           start: { ...dateTimeField, label: "Start" },
           end: { ...dateTimeField, label: "End" },
           notes: notesField,
@@ -206,7 +196,7 @@ export default function PagePuckEditor({ initialData, templateData, templateId, 
         },
       },
     };
-  }, [pages, rootConfig]);
+  }, [pageId, rootConfig]);
 
   const optionalProps = {
     ...(templateData ? { templateData } : {}),

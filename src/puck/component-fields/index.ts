@@ -10,3 +10,4 @@ export { notesField } from "./NotesField.js";
 export type { UserOption } from "./NotifyUsersField.js";
 export { notifyUsersField } from "./NotifyUsersField.js";
 export { ogField } from "./OpenGraphField.js";
+export { parentPageField } from "./ParentPageField.js";

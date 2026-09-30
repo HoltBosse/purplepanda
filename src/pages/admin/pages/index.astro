@@ -8,6 +8,7 @@ import Pagination from '../../../components/Pagination.astro';
 import PublishStateIcon from '../../../components/PublishStateIcon.astro';
 import { getDb } from '../../../db/db.js';
 import { resolvePagePathById } from '../../../db/page-path.js';
+import { flattenTree, groupByParent } from '../../../db/page-tree.js';
 import { dagNodes, pages, templates, userActions, users } from '../../../db/schema.js';
 import Select from '../../../form/fields/Select.astro';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
@@ -167,27 +168,8 @@ if (isSearching) {
         draftsQuery(),
     ]);
 
-    const childrenByParent = new Map<string, Page[]>();
-    for (const candidate of everyPage) {
-        const parentPage = (candidate.content as any)?.root?.props?.parentPage;
-        if (!parentPage) continue;
-        if (!childrenByParent.has(parentPage)) childrenByParent.set(parentPage, []);
-        childrenByParent.get(parentPage)!.push(candidate);
-    }
-
-    // `visited` guards against a parent cycle, which nothing in the content document prevents.
-    function addChildren(parentId: string, depth: number, visited: Set<string>) {
-        for (const child of childrenByParent.get(parentId) ?? []) {
-            if (visited.has(child.id)) continue;
-            orderedPages.push({ page: child, depth });
-            addChildren(child.id, depth + 1, new Set(visited).add(child.id));
-        }
-    }
-
-    for (const root of rootPage) {
-        orderedPages.push({ page: root, depth: 1 });
-        addChildren(root.id, 2, new Set([root.id]));
-    }
+    const childrenByParent = groupByParent(everyPage, candidate => (candidate.content as any)?.root?.props?.parentPage);
+    orderedPages = flattenTree(rootPage, childrenByParent);
     totalItems = totalRoots;
     allDrafts = drafts;
 }

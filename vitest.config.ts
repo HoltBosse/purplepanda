@@ -25,6 +25,7 @@ const lucideIconEntries = [
   'chevron-up',
   'circle-check-big',
   'circle-x',
+  'corner-down-right',
   'info',
   'link',
   'monitor',
@@ -34,6 +35,7 @@ const lucideIconEntries = [
   'superscript',
   'tablet',
   'triangle-alert',
+  'x',
 ].map((icon) => `lucide-react/dist/esm/icons/${icon}.mjs`);
 
 export default getViteConfig({

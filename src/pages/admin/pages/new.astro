@@ -1,6 +1,6 @@
 ---
 import type { Data } from '@puckeditor/core';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import * as z from 'zod';
 import PagePuckEditor from '../../../components/PagePuckEditor';
 import { entityKindFilter } from '../../../db/content-types.js';
@@ -31,14 +31,7 @@ const isBlank = Astro.url.searchParams.get('blank') === '1';
 // an explicit request to start from that instead, so neither should also pull in the prefab.
 const usesDefaultTemplate = !id && !isBlank && !templateIdParam;
 
-const [allPages, existingPage, prefabSetting, fontSettings] = await Promise.all([
-    db
-        .select({
-            id: pages.id,
-            title: sql<string>`(${pages.content}->'root'->'props'->>'title')`,
-        })
-        .from(pages)
-        .where(eq(pages.state, 1)),
+const [existingPage, prefabSetting, fontSettings] = await Promise.all([
     id
         ? db.select().from(pages).where(and(eq(pages.id, id), entityKindFilter(null))).limit(1).then(rows => rows[0])
         : Promise.resolve(undefined),
@@ -71,9 +64,7 @@ const editorProps = {
     ...(fontSettings.bodyFontLink ? { bodyFontLink: fontSettings.bodyFontLink } : {}),
 };
 
-const pageOptions = allPages.map(p => ({ id: p.id, title: p.title ?? '' }));
-
 ---
 <AdminBareLayout showLoadingPanda>
-    <PagePuckEditor client:only="react" saveUrl={saveUrl} isNew={!existingPage} {...editorProps} pages={pageOptions} />
+    <PagePuckEditor client:only="react" saveUrl={saveUrl} isNew={!existingPage} {...editorProps} {...(existingPage ? { pageId: existingPage.id } : {})} />
 </AdminBareLayout>

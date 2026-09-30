@@ -1,6 +1,6 @@
 ---
 import type { Data } from '@puckeditor/core';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import PagePuckEditor from '../../../../../components/PagePuckEditor';
 import { getDb } from '../../../../../db/db.js';
 import { resolveFontSettings } from '../../../../../db/fonts.js';
@@ -21,15 +21,8 @@ const draftPublishUrl = `/admin/pages/drafts/publish/${draftId}`;
 
 // The draft edits a working copy of `page`'s content, but the template it previews under is
 // whatever was pinned on that page at creation (see update.ts) — same as page.astro/preview.
-const [page, allPages, fontSettings] = await Promise.all([
+const [page, fontSettings] = await Promise.all([
     db.select().from(pages).where(eq(pages.id, draft.entityId)).limit(1).then(rows => rows[0]),
-    db
-        .select({
-            id: pages.id,
-            title: sql<string>`(${pages.content}->'root'->'props'->>'title')`,
-        })
-        .from(pages)
-        .where(eq(pages.state, 1)),
     resolveFontSettings(db),
 ]);
 
@@ -38,7 +31,6 @@ const templateSetting = await resolveTemplateSetting(db, page?.contentType ?? un
     noTemplate: page?.noTemplate ?? false,
 });
 const templateData = templateSetting?.templates?.content as Data | undefined;
-const pageOptions = allPages.map(p => ({ id: p.id, title: p.title ?? '' }));
 ---
 <AdminBareLayout showLoadingPanda>
     <PagePuckEditor
@@ -46,7 +38,7 @@ const pageOptions = allPages.map(p => ({ id: p.id, title: p.title ?? '' }));
         saveUrl={saveUrl}
         draftPublishUrl={draftPublishUrl}
         initialData={draft.content as Data}
-        pages={pageOptions}
+        pageId={draft.entityId}
         isDraft
         {...(templateData ? { templateData } : {})}
         {...(fontSettings.headingFontLink ? { headingFontLink: fontSettings.headingFontLink } : {})}
