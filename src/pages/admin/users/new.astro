@@ -55,7 +55,7 @@ const formFlash = createFormFlashSession(Astro.session);
 const flash = await formFlash.get('profile') ?? {};
 await formFlash.delete('profile');
 const url = id ? `/admin/users/update/${id}` : '/admin/users/update';
-const form = getProfileForm(user, fields, url, flash, false, roleOptions, selectedRoleIds, { identityLocked });
+const form = getProfileForm(user, fields, url, flash, false, roleOptions, selectedRoleIds, { identityLocked, hideTheme: true });
 ---
 
 <AdminLayout>

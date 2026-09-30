@@ -28,6 +28,9 @@ export interface ProfileFormOptions {
 	// change its roles here — see canManageAccount() in auth/accounts.ts. Its profile and password
 	// sections are replaced with a note saying so.
 	identityLocked?: boolean;
+	// Omit the theme picker: theme is a personal preference, so only the account's owner sets it from
+	// their profile — not an admin creating or editing the user.
+	hideTheme?: boolean;
 }
 
 export function getProfileForm(user: User, fields: Record<string, any>, redirectUrl: string, flash: Record<string, string> = {}, showCurrentPassword: boolean = false, roleOptions: { value: string; label: string }[] = [], selectedRoleIds: string[] = [], options: ProfileFormOptions = {}): FormSection {
@@ -89,7 +92,7 @@ export function getProfileForm(user: User, fields: Record<string, any>, redirect
 								required: true,
 								validator: z.email("Invalid email address"),
 							},
-							{
+							...(options.hideTheme ? [] : [{
 								id: 'theme',
 								name: 'theme',
 								label: 'Theme',
@@ -100,7 +103,7 @@ export function getProfileForm(user: User, fields: Record<string, any>, redirect
 								value: flash.theme ?? user.theme,
 								required: true,
 								validator: z.enum(THEME_VALUES, { message: "Invalid theme" }),
-							}
+							}]),
 						],
 					}
 				]

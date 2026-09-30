@@ -64,7 +64,7 @@ export async function POST(context: APIContext): Promise<Response> {
         false,
         [],
         [],
-        { identityLocked },
+        { identityLocked, hideTheme: true },
     );
     const formData = await context.request.formData();
     const formFlash = createFormFlashSession(context.session);
@@ -84,7 +84,6 @@ export async function POST(context: APIContext): Promise<Response> {
     const fname = getFieldByName(form, 'fname')?.value ?? user.fname;
     const lname = getFieldByName(form, 'lname')?.value ?? user.lname;
     const email = getFieldByName(form, 'email')?.value ?? user.email;
-    const theme = getFieldByName(form, 'theme')?.value ?? user.theme;
     const password = getFieldByName(form, 'new-password')?.value;
     const confirmPassword = getFieldByName(form, 'confirm-new-password')?.value;
 
@@ -124,7 +123,6 @@ export async function POST(context: APIContext): Promise<Response> {
             user.email = email;
             user.fname = fname;
             user.lname = lname;
-            user.theme = theme;
             user.state = 1;
 
             // `user` is synthesized from the table's column defaults above, so `user.id` is drizzle's
@@ -137,7 +135,7 @@ export async function POST(context: APIContext): Promise<Response> {
             message = "User created successfully.";
         } else {
             if (!identityLocked) {
-                await db.update(users).set({ fname, lname, email, theme, password: user.password }).where(eq(users.id, user.id));
+                await db.update(users).set({ fname, lname, email, password: user.password }).where(eq(users.id, user.id));
             }
             message = "User updated successfully.";
         }
