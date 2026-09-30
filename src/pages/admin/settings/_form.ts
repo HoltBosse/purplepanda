@@ -5,13 +5,10 @@ import { getAllFields } from '../../../form/index.js';
 import { FormEncType, FormMethod, type FormSection } from '../../../form/types.js';
 import type { ContentTypeRecord } from '../../../puck/content-types.js';
 
-const db = getDb();
-const allTemplatesOptions = await db.select().from(templates);
-
 const inputClassList = "w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200 bg-base-100";
 const fields = getAllFields();
 
-export function getSettingsForm(
+export async function getSettingsForm(
     defaultTemplateId?: string,
     turnstileSiteKey?: string,
     turnstileSecretKey?: string,
@@ -25,7 +22,10 @@ export function getSettingsForm(
     emailHost?: string,
     emailAddress?: string,
     emailPassword?: string,
-): FormSection {
+): Promise<FormSection> {
+    // Queried per call, not at module load — a module-level result is cached for the life of the
+    // process (so new templates never appear) and runs outside the request's tenant context.
+    const allTemplatesOptions = await getDb().select().from(templates);
     const siteNameValue = flash['site-name'] ?? siteName;
     const dtOptionValue = flash['dt-option'] ?? defaultTemplateId;
     const turnstileSiteKeyValue = flash['turnstile-site-key'] ?? turnstileSiteKey;

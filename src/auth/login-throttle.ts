@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { RateLimiterPostgres, RateLimiterRes } from "rate-limiter-flexible";
 import { getDb } from "../db/db.js";
-import { verify } from "../password/index.js";
+import { hash, verify } from "../password/index.js";
 
 // Sign-in throttling. Backed by Postgres (like the form limiter in purplepanda/forms/[id]/submit.ts)
 // so every PM2 worker shares one count. Three limits, each counting attempts within its window:
@@ -13,7 +13,8 @@ import { verify } from "../password/index.js";
 // linger.
 const WINDOW_SECONDS = 15 * 60;
 
-function limiter(keyPrefix: string, points: number, duration: number) {
+// Also used by the password-reset limits (auth/password-reset.ts), which share the table.
+export function limiter(keyPrefix: string, points: number, duration: number) {
   return new RateLimiterPostgres({
     storeClient: getDb().$client,
     storeType: "pool",
@@ -32,7 +33,7 @@ const perAccount = limiter("login_account", 50, 60 * 60);
 // Emails aren't case-normalized in storage, but one person typing different cases is still one
 // target, so the counters are. Hashed because the limiter's key column is varchar(255) and a
 // username may be up to 255 characters before the address is appended.
-const accountKey = (username: string) => createHash("sha256").update(username.toLowerCase()).digest("base64url");
+export const accountKey = (username: string) => createHash("sha256").update(username.toLowerCase()).digest("base64url");
 
 // Records a sign-in attempt against every limit. Resolves false when any of them is exhausted, in
 // which case the attempt must be refused without checking the password at all.
@@ -57,8 +58,8 @@ export async function clearLoginAttempts(username: string, address: string): Pro
   await Promise.all([perAccountAddress.delete(`${account}|${address}`), perAccount.delete(account)]);
 }
 
-// Each verify() runs scrypt with 128MB of working memory on a libuv threadpool thread, so a burst of
-// sign-in POSTs — even ones the limits above let through, from many addresses — could exhaust
+// Each verify() (and hash()) runs scrypt with 128MB of working memory on a libuv threadpool thread,
+// so a burst of sign-in POSTs — even ones the limits above let through, from many addresses — could exhaust
 // memory and starve every other threadpool user (fs, dns, other crypto). Caps how many run at once
 // in this process and how many may wait; past that the attempt is refused as busy.
 const MAX_CONCURRENT_VERIFIES = 2;
@@ -66,8 +67,8 @@ const MAX_QUEUED_VERIFIES = 16;
 let activeVerifies = 0;
 const verifyQueue: (() => void)[] = [];
 
-// Resolves undefined, without verifying, when too many verifications are already queued.
-export async function verifyPasswordThrottled(password: string, hash: string): Promise<boolean | undefined> {
+// Resolves undefined, without running `fn`, when too many scrypt calls are already queued.
+async function withScryptSlot<T>(fn: () => Promise<T>): Promise<T | undefined> {
   if (activeVerifies >= MAX_CONCURRENT_VERIFIES) {
     if (verifyQueue.length >= MAX_QUEUED_VERIFIES) return undefined;
     await new Promise<void>((resolve) => verifyQueue.push(resolve));
@@ -75,11 +76,21 @@ export async function verifyPasswordThrottled(password: string, hash: string): P
     activeVerifies++;
   }
   try {
-    return await verify(password, hash);
+    return await fn();
   } finally {
     // Hands the slot straight to the next waiter (activeVerifies stays the same) or frees it.
     const next = verifyQueue.shift();
     if (next) next();
     else activeVerifies--;
   }
+}
+
+// Resolves undefined, without verifying, when too many verifications are already queued.
+export function verifyPasswordThrottled(password: string, hashed: string): Promise<boolean | undefined> {
+  return withScryptSlot(() => verify(password, hashed));
+}
+
+// Resolves undefined, without hashing, when too many scrypt calls are already queued.
+export function hashPasswordThrottled(password: string): Promise<string | undefined> {
+  return withScryptSlot(() => hash(password));
 }

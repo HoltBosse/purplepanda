@@ -109,7 +109,7 @@ export async function signOut(session: AstroSession | undefined): Promise<void> 
 
 // Signs the account out of every sign-in it has, on every site, in every browser and on every
 // device: all its sessions and any unredeemed handoff tokens. For an account that may be
-// compromised, or after a password change. Not wired to anything yet.
+// compromised, or after a password change (see reset-password-action.ts).
 export async function signOutEverywhere(userId: string): Promise<void> {
   await getDb().delete(sessions).where(eq(sessions.userId, userId));
   await getDb().delete(ssoTokens).where(eq(ssoTokens.userId, userId));

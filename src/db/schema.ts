@@ -301,6 +301,18 @@ export const ssoTokens = pgTable("sso_tokens", {
   index("sso_tokens_expires_at_idx").on(t.expiresAt),
 ]);
 
+// One-time tokens for resetting a forgotten password (auth/password-reset.ts): emailed as a link from
+// the root site's /forgot-password and redeemed once, within the hour, at /reset-password. Accounts
+// are shared across tenants, so these aren't tenant-scoped either. Only a hash of the token is stored.
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  tokenHash: varchar("token_hash", { length: 64 }).primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at").notNull(),
+}, (t) => [
+  index("password_reset_tokens_user_id_idx").on(t.userId),
+  index("password_reset_tokens_expires_at_idx").on(t.expiresAt),
+]);
+
 // Astro session storage (see session/driver.ts). `data` is Astro's own devalue-serialized session
 // map and is opaque to us; `userId`, `tenantId`, `loginId` and `expiresAt` are derived from it on
 // every write so sessions can be listed and revoked per user, tenant or sign-in without

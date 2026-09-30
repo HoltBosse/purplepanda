@@ -1,7 +1,8 @@
 ---
 import '../styles/global.css';
+import * as z from 'zod';
 import { getSessionUser } from '../auth/index.js';
-import { loginDestination, parseLoginTarget } from '../auth/login-target.js';
+import { loginDestination, parseLoginTarget, withLoginTarget } from '../auth/login-target.js';
 import pandaSVGRaw from '../components/LoginPanda.svg?raw';
 
 // The one sign-in for every site, served only on the root site (see auth/sso.ts). Any site's
@@ -16,7 +17,9 @@ if (await getSessionUser(Astro.session)) {
   return Astro.redirect(loginDestination(target));
 }
 
-const error = Astro.url.searchParams.get("error");
+const error = z.enum(["invalid", "throttled", "sso"]).safeParse(Astro.url.searchParams.get("error")).data;
+const notice = z.enum(["reset"]).safeParse(Astro.url.searchParams.get("notice")).data;
+const forgotHref = withLoginTarget('/forgot-password', target);
 
 // Extract the SVGator script from the SVG so we can run it on demand
 const scriptMatch = pandaSVGRaw.match(/\x3cscript[^>]*>([\s\S]*?)\x3c\/script>/);
@@ -50,6 +53,9 @@ const pandaSVGInline = pandaSVGRaw
       <div class="card bg-base-100 shadow-md w-full">
         <div class="card-body">
           <h1 class="card-title text-2xl mb-2">Sign in</h1>
+          {notice === "reset" && (
+            <p class="text-success text-sm mb-2">Your password has been reset. Please sign in with your new password.</p>
+          )}
           {error === "invalid" && (
             <p class="text-error text-sm mb-2">Invalid password. Please try again.</p>
           )}
@@ -87,6 +93,7 @@ const pandaSVGInline = pandaSVGRaw
             </label>
             <button type="submit" class="btn btn-primary w-full">Login</button>
           </form>
+          <a href={forgotHref} class="link link-hover text-sm mt-2">Forgot your password?</a>
         </div>
       </div>
     </div>

@@ -11,7 +11,7 @@ import { getSettingsForm } from "./_form.js";
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
     const contentTypes = await listContentTypes(db);
-    const form = getSettingsForm(undefined, undefined, undefined, {}, contentTypes);
+    const form = await getSettingsForm(undefined, undefined, undefined, {}, contentTypes);
     const formData = await context.request.formData();
     const formFlash = createFormFlashSession(context.session);
     const result = validateForm(form, formData);

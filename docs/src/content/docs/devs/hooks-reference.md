@@ -14,6 +14,7 @@ Logged via [`addAction`](/devs/actions-api) - persisted to the audit log (`/admi
 | Name | Payload | Fired from |
 | --- | --- | --- |
 | `auth:login` | `{ method: "password" \| "sso" }` | Sign-in on the root site's `/login` (`password`), or a site's admin being entered through it (`sso`) |
+| `auth:passwordReset` | `{}` | A forgotten password reset from an emailed link on the root site's `/reset-password` (which also signs the account out everywhere) |
 | `content:create` | `{ id: string, version: string \| null }` | New content item saved |
 | `content:update` | `{ id: string, version: string \| null }` | Existing content item saved |
 | `content:publish` | `{ id: string, draftId: string, version: string \| null }` | Content draft published |

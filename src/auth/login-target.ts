@@ -29,3 +29,10 @@ export function loginDestination(target: LoginTarget): string {
     ? `/sso/${target.site}?host=${encodeURIComponent(target.host)}`
     : `/sso/${target.site}`;
 }
+
+// `path` with the target carried along as its query, for links between the sign-in pages (/login,
+// /forgot-password) that should keep sending someone back to the same place.
+export function withLoginTarget(path: string, target: LoginTarget): string {
+  const query = new URLSearchParams({ ...target }).toString();
+  return query ? `${path}?${query}` : path;
+}
