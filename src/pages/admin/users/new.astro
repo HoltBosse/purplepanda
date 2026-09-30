@@ -1,5 +1,5 @@
 ---
-import { and, eq, getTableColumns, type InferSelectModel } from 'drizzle-orm';
+import { and, eq, type InferSelectModel } from 'drizzle-orm';
 import { canManageAccount, isMemberOfCurrentTenant } from '../../../auth/accounts.js';
 import { getSessionUser } from '../../../auth/index.js';
 import { getDb } from '../../../db/db.js';
@@ -8,7 +8,7 @@ import Form from '../../../form/Form.astro';
 import { getAllFields } from '../../../form/index.js';
 import { createFormFlashSession } from '../../../form/session.js';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
-import { getProfileForm } from '../profile/_form.js';
+import { getEditUserForm, getInviteForm } from './_form.js';
 
 const db = getDb();
 
@@ -27,17 +27,6 @@ if(id) {
 	if(!user) {
 		return Astro.rewrite('/admin/404');
 	}
-} else {
-	user = Object.fromEntries(
-		Object.entries(getTableColumns(users)).map(([key, col]: [string, any]) => {
-			let value: unknown;
-			if (col.defaultFn !== undefined) value = col.defaultFn();
-			else if (col.default !== undefined) value = col.default;
-			else if (col.dataType === 'number') value = 0;
-			else value = '';
-			return [key, value];
-		})
-	) as InferSelectModel<typeof users>;
 }
 
 // roles and user_roles are row-level-secured, so these are this tenant's roles only.
@@ -48,26 +37,23 @@ const selectedRoleIds = id
 	? (await db.select({ roleId: userRoles.roleId }).from(userRoles).where(eq(userRoles.userId, id))).map(r => r.roleId)
 	: [];
 
-const identityLocked = id ? !(await canManageAccount(editor, user)) : false;
-
 const fields = getAllFields();
 const formFlash = createFormFlashSession(Astro.session);
-const flash = await formFlash.get('profile') ?? {};
-await formFlash.delete('profile');
-const url = id ? `/admin/users/update/${id}` : '/admin/users/update';
-const form = getProfileForm(user, fields, url, flash, false, roleOptions, selectedRoleIds, { identityLocked, hideTheme: true });
+const flash = await formFlash.get('user') ?? {};
+await formFlash.delete('user');
+const form = user
+	? getEditUserForm(user, fields, `/admin/users/update/${user.id}`, flash, roleOptions, selectedRoleIds, {
+		identityLocked: !(await canManageAccount(editor, user)),
+		resetAction: `/admin/users/send-reset/${user.id}`,
+	})
+	: getInviteForm(fields, '/admin/users/update', flash, roleOptions);
 ---
 
 <AdminLayout>
 	<Form form={form} fields={fields}>
 		<div slot="before-fields" class="flex items-center justify-between align-middle pt-2">
-			<h1 class="text-2xl font-semibold">{id ? 'Edit User' : 'New User'}</h1>
-			<button class="btn btn-primary">Save</button>
+			<h1 class="text-2xl font-semibold">{user ? 'Edit User' : 'Invite User'}</h1>
+			<button class="btn btn-primary">{user ? 'Save' : 'Send invite'}</button>
 		</div>
-		{!id && editor.superAdmin && (
-			<p slot="before-fields" class="text-sm opacity-70">
-				As a super admin, entering the email of an account that already exists on another site adds that account to this one as-is: its name and password stay unchanged.
-			</p>
-		)}
 	</Form>
 </AdminLayout>

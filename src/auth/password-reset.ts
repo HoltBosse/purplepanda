@@ -8,11 +8,15 @@ import { accountKey, limiter } from "./login-throttle.js";
 
 // Resetting a forgotten password, on the root site alongside the one sign-in (see login.astro):
 // /forgot-password emails a one-time link to the account's address, and /reset-password redeems it
-// to set a new password. Like the sign-in handoff tokens (auth/sso.ts), only a hash is stored, and
+// to set a new password. The same links set up an invited account's first password, and a site's
+// admin can send one to a member (see auth/account-mail.ts). Like the sign-in handoff tokens (auth/sso.ts), only a hash is stored, and
 // redeeming deletes the row in the same statement, so a link works once.
 
 // Long enough to find the email and act on it; single-use regardless.
 export const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+// An invitation to set up a new account's first password (admin/users/update) waits longer: nobody
+// asked for it, so it may sit in an inbox for days.
+export const INVITE_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 // 32 random bytes, base64url-encoded — exactly what createPasswordResetToken() issues.
 export const resetTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
@@ -33,6 +37,9 @@ export const resetPasswordSchema = z.object({
   message: "Passwords don't match",
   path: ["confirmPassword"],
 });
+
+// Marks a link as an invited account's first password, not a reset — wording only.
+export const welcomeSchema = z.literal("1");
 
 // Errors each page reports back to itself through `?error=`, parsed rather than trusted.
 export const forgotPasswordErrorSchema = z.enum(["invalid", "throttled"]);
@@ -64,7 +71,7 @@ export async function recordResetRequest(email: string, address: string): Promis
 
 // Issues a fresh link for an account, replacing any it already had outstanding, so only the most
 // recent email works.
-export async function createPasswordResetToken(userId: string): Promise<string> {
+export async function createPasswordResetToken(userId: string, ttlMs = RESET_TOKEN_TTL_MS): Promise<string> {
   const db = getDb();
   const token = randomBytes(32).toString("base64url");
   // Expired tokens have no other reason to be cleared, so each issue sweeps them.
@@ -73,7 +80,7 @@ export async function createPasswordResetToken(userId: string): Promise<string> 
   await db.insert(passwordResetTokens).values({
     tokenHash: hashToken(token),
     userId,
-    expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+    expiresAt: new Date(Date.now() + ttlMs),
   });
   return token;
 }

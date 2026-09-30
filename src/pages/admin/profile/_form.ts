@@ -6,7 +6,7 @@ import { capitalize } from '../../../string/index.js';
 
 type User = InferSelectModel<typeof users>;
 
-const inputClassList = "w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200";
+export const inputClassList = "w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200";
 
 const DAISYUI_THEMES = [
 	'light', 'dark', 'cupcake', 'bumblebee', 'emerald', 'corporate', 'synthwave', 'retro',
@@ -23,25 +23,9 @@ const THEME_OPTIONS = [
 
 const THEME_VALUES = THEME_OPTIONS.map((option) => option.value) as [string, ...string[]];
 
-export interface ProfileFormOptions {
-	// The account is shared with other tenants (or is a super admin's), so the editing admin may only
-	// change its roles here — see canManageAccount() in auth/accounts.ts. Its profile and password
-	// sections are replaced with a note saying so.
-	identityLocked?: boolean;
-	// Omit the theme picker: theme is a personal preference, so only the account's owner sets it from
-	// their profile — not an admin creating or editing the user.
-	hideTheme?: boolean;
-}
-
-export function getProfileForm(user: User, fields: Record<string, any>, redirectUrl: string, flash: Record<string, string> = {}, showCurrentPassword: boolean = false, roleOptions: { value: string; label: string }[] = [], selectedRoleIds: string[] = [], options: ProfileFormOptions = {}): FormSection {
-	const identityFields = options.identityLocked ? [
-			{
-				id: 'identity-locked-wrapper',
-				name: 'identity-locked-wrapper',
-				type: 'Html',
-				markup: '<div class="p-6 bg-base-100 rounded-lg"><h2 class="text-lg font-medium">Profile</h2><p class="mt-2 text-sm opacity-70">This account also has access to other sites, so its name, email and password can only be changed by its owner (from their profile) or by a super admin. You can still change its roles on this site.</p></div>',
-			},
-		] : [
+// The signed-in account's own profile. Admins editing other accounts use ../users/_form.ts instead.
+export function getProfileForm(user: User, fields: Record<string, any>, redirectUrl: string, flash: Record<string, string> = {}, showCurrentPassword: boolean = false): FormSection {
+	const identityFields = [
 			{
 				id: 'profile-group-wrapper',
 				name: 'profile-group-wrapper',
@@ -92,7 +76,7 @@ export function getProfileForm(user: User, fields: Record<string, any>, redirect
 								required: true,
 								validator: z.email("Invalid email address"),
 							},
-							...(options.hideTheme ? [] : [{
+							{
 								id: 'theme',
 								name: 'theme',
 								label: 'Theme',
@@ -103,7 +87,7 @@ export function getProfileForm(user: User, fields: Record<string, any>, redirect
 								value: flash.theme ?? user.theme,
 								required: true,
 								validator: z.enum(THEME_VALUES, { message: "Invalid theme" }),
-							}]),
+							},
 						],
 					}
 				]
@@ -176,33 +160,6 @@ export function getProfileForm(user: User, fields: Record<string, any>, redirect
 		classList: "space-y-6",
 		fields: [
 			...identityFields,
-			...(roleOptions.length > 0 ? [{
-				id: 'roles-group-wrapper',
-				name: 'roles-group-wrapper',
-				type: "Group",
-				fields: fields,
-				classList: "p-6 bg-base-100 rounded-lg",
-				groupFields: [
-					{
-						id: 'roles-group-header',
-						name: 'roles-group-header',
-						type: 'Html',
-						markup: '<h2 class="text-lg font-medium">Roles</h2>',
-					},
-					{
-						id: 'roles',
-						name: 'roles[]',
-						label: 'Roles',
-						type: 'Select',
-						classList: inputClassList,
-						optionsClassList: "bg-base-100 text-base-content",
-						options: roleOptions,
-						value: selectedRoleIds as unknown as string,
-						multiple: true,
-						description: 'Hold Ctrl (Windows) or Cmd (Mac) to select multiple roles.',
-					},
-				],
-			}] : []),
 		],
 		props: {
 			action: redirectUrl,

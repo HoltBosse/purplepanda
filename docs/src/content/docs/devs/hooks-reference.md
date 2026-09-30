@@ -45,6 +45,8 @@ Logged via [`addAction`](/devs/actions-api) - persisted to the audit log (`/admi
 | `user:enable` | `{ id: string }` | An account enabled on every site from Admin → Users (root site only) |
 | `user:disable` | `{ id: string }` | An account disabled on every site from Admin → Users (root site only) |
 | `user:delete` | `{ id: string }` | An account deleted (every site) with bulk delete in Admin → Users (root site only) |
+| `user:invite` | `{ id: string, existing: boolean }` | An account invited to a site from Admin → Users (`existing` when it already had an account, which was added as it is) |
+| `user:passwordResetSent` | `{ id: string }` | A password reset link emailed to a member from their edit page in Admin → Users |
 | `user:siteAdd` | `{ id: string, site: string }` | An account added to a site from Admin → Users (root site only) |
 | `user:siteRemove` | `{ id: string, site: string }` | An account removed from a site from Admin → Users (root site only) |
 

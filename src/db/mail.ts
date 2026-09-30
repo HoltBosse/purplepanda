@@ -32,12 +32,13 @@ export interface SendMailOptions {
 
 // Silently no-ops when SMTP hasn't been configured in Settings — notification email is a
 // best-effort side effect of form submission, not something that should block or fail a
-// visitor's submission just because the site hasn't set up outbound mail yet.
-export async function sendMail(db: NodePgDatabase<Record<string, unknown>>, options: SendMailOptions): Promise<void> {
-  if (options.to.length === 0) return;
+// visitor's submission just because the site hasn't set up outbound mail yet. Resolves whether it
+// sent anything, for callers that need to tell someone it didn't.
+export async function sendMail(db: NodePgDatabase<Record<string, unknown>>, options: SendMailOptions): Promise<boolean> {
+  if (options.to.length === 0) return false;
 
   const emailSettings = await resolveEmailSettings(db);
-  if (!emailSettings) return;
+  if (!emailSettings) return false;
 
   const { createTransport } = await import("nodemailer");
   const transporter = createTransport({
@@ -54,4 +55,5 @@ export async function sendMail(db: NodePgDatabase<Record<string, unknown>>, opti
     text: options.text,
     replyTo: options.replyTo,
   });
+  return true;
 }

@@ -18,7 +18,7 @@ if (await getSessionUser(Astro.session)) {
 }
 
 const error = z.enum(["invalid", "throttled", "sso"]).safeParse(Astro.url.searchParams.get("error")).data;
-const notice = z.enum(["reset"]).safeParse(Astro.url.searchParams.get("notice")).data;
+const notice = z.enum(["reset", "set"]).safeParse(Astro.url.searchParams.get("notice")).data;
 const forgotHref = withLoginTarget('/forgot-password', target);
 
 // Extract the SVGator script from the SVG so we can run it on demand
@@ -53,6 +53,9 @@ const pandaSVGInline = pandaSVGRaw
       <div class="card bg-base-100 shadow-md w-full">
         <div class="card-body">
           <h1 class="card-title text-2xl mb-2">Sign in</h1>
+          {notice === "set" && (
+            <p class="text-success text-sm mb-2">Your password is set. Please sign in to continue.</p>
+          )}
           {notice === "reset" && (
             <p class="text-success text-sm mb-2">Your password has been reset. Please sign in with your new password.</p>
           )}

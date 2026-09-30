@@ -77,6 +77,14 @@ export async function getRootDomain(db: Db): Promise<string | null> {
   return (map.rootTenantId && map.primaryByTenant.get(map.rootTenantId)) || map.rootDomain;
 }
 
+// The root site itself, for work that has to happen as the root site from another tenant's request
+// (e.g. sending account email with the root's mail settings).
+export async function getRootTenant(db: Db): Promise<TenantContext | null> {
+  const map = await getTenantDomainMap(db);
+  const entry = map.rootDomain ? map.byDomain.get(map.rootDomain) : undefined;
+  return map.rootTenantId && entry ? { id: map.rootTenantId, name: entry.tenantName, isRoot: true } : null;
+}
+
 // The hostname to send someone to when a tenant has several and none was asked for. A tenant's
 // marked primary is chosen by the caller before this; failing that, a real one over `localhost`,
 // then the shortest (so example.com over www.example.com), then alphabetically.

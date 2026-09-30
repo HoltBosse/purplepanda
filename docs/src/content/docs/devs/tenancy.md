@@ -52,10 +52,14 @@ subject to the site's own access check. Signing out on any site ends that sign-i
 that browser only; the account stays signed in wherever else it signed in separately.
 `/login` and `/dashboard` only exist on the root domain.
 
-In a site's **Users** admin, only its members are listed. Only a super admin can add an account
-that already exists elsewhere to a site (entering its email as a new user adds the existing account,
-leaving its name and password alone); a site's own admins get "email already in use". Otherwise one
-site's admin could create an account with a password they know and have another site adopt it.
+In a site's **Users** admin, only its members are listed, and new ones are **invited** by email.
+Nobody sets another account's password: inviting an email with no account creates one and emails
+it a link (valid for 7 days) to choose its own password; inviting an email that already has an
+account adds that account to the site as it is — name and password unchanged — and emails it to say
+so. Since no admin ever knows an invited account's password, any site's admins can invite an
+existing account. From a member's edit page an admin can also email them a password reset link,
+which changes nothing until they use it. Account email is sent with the site's own mail settings,
+or the root site's when it has none.
 
 An account is enabled or disabled at two levels. Each membership has its own state
 (`user_tenants.state`): a site's admin enables or disables an account **on that site** (the state
@@ -65,9 +69,9 @@ user pickers or form notifications; its other sites don't change. The account's 
 (`users.state`) applies everywhere: a disabled account can't sign in at all. Only **Admin → Users**
 on the root domain changes it, and disabling an account there also ends every sign-in it has.
 
-Because an account's name, email and password apply everywhere it's used, a site's admins can only
-change those for accounts that belong to their site alone; for a shared account they can change
-its roles on their site. Super admins can change any account. Bulk delete in a site's admin deletes
+Because an account's name applies everywhere it's used, a site's admins can only change it for
+accounts that belong to their site alone; for a shared account they can change its roles on their
+site. An account's email and password are only ever changed by its owner. Super admins can change any account's name. Bulk delete in a site's admin deletes
 an account only when it belongs to that site alone (and isn't a super admin's); any other account is
 removed from the site instead — its membership and roles there — whoever is deleting.
 

@@ -10,6 +10,7 @@ import {
   redeemPasswordResetToken,
   resetPasswordSchema,
   resetTokenSchema,
+  welcomeSchema,
 } from "../auth/password-reset.js";
 import { getDb } from "../db/db.js";
 import { users } from "../db/schema.js";
@@ -25,6 +26,9 @@ export async function POST(context: APIContext): Promise<Response> {
   const db = getDb();
   const formData = await context.request.formData();
   const target = parseLoginTarget(formData);
+  const welcome = welcomeSchema.safeParse(formData.get("welcome")).success;
+  // Carried on every redirect back to the form, so it keeps its wording.
+  const pageParams = { ...(welcome ? { welcome: "1" } : {}), ...target };
   const input = resetPasswordSchema.safeParse({
     token: formData.get("token"),
     password: formData.get("password"),
@@ -38,12 +42,12 @@ export async function POST(context: APIContext): Promise<Response> {
     const params = new URLSearchParams({
       ...(token.success ? { token: token.data } : {}),
       error: mismatch ? "mismatch" : "length",
-      ...target,
+      ...pageParams,
     });
     return context.redirect(`/reset-password?${params}`);
   }
   const { token, password } = input.data;
-  const expired = () => context.redirect(`/reset-password?${new URLSearchParams({ token, ...target })}`);
+  const expired = () => context.redirect(`/reset-password?${new URLSearchParams({ token, ...pageParams })}`);
 
   // Checked (cheaply) before hashing, so a made-up token never costs any scrypt time, and only used
   // up once the new password's hash is in hand, so a busy server doesn't burn the link.
@@ -52,7 +56,7 @@ export async function POST(context: APIContext): Promise<Response> {
   }
   const hashed = await hashPasswordThrottled(password);
   if (hashed === undefined) {
-    return context.redirect(`/reset-password?${new URLSearchParams({ token, error: "busy", ...target })}`);
+    return context.redirect(`/reset-password?${new URLSearchParams({ token, error: "busy", ...pageParams })}`);
   }
   const userId = await redeemPasswordResetToken(token);
   if (!userId) {
@@ -74,5 +78,5 @@ export async function POST(context: APIContext): Promise<Response> {
   context.session?.destroy();
   await addAction("auth:passwordReset", {}, user.id, { message: "Reset their password" });
 
-  return context.redirect(`/login?${new URLSearchParams({ notice: "reset", ...target })}`);
+  return context.redirect(`/login?${new URLSearchParams({ notice: welcome ? "set" : "reset", ...target })}`);
 }
