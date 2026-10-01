@@ -1,6 +1,17 @@
 import type { ComponentConfig } from "@puckeditor/core";
+import { type ComponentType, lazy, Suspense } from "react";
 import * as z from "zod";
-import VideoPlayer from "./VideoPlayer.js";
+import type { VideoPlayerProps } from "./VideoPlayer.js";
+
+// VideoPlayer drags in video.js and every provider embed (~270 KB), which a static import would put
+// on every editor load whether or not the page has a Video block. So the browser code-splits it.
+// The server keeps it eager: islands are rendered with renderToStaticMarkup, which can't wait on a
+// lazy component.
+const VideoPlayer: ComponentType<VideoPlayerProps> = import.meta.env.SSR
+  ? (await import("./VideoPlayer.js")).default
+  : lazy(() => import("./VideoPlayer.js"));
+
+const ASPECT_PLACEHOLDER = <div style={{ aspectRatio: "16 / 9" }} />;
 
 export type VideoProps = {
   url: string;
@@ -35,7 +46,7 @@ const Video: ComponentConfig<VideoProps> = {
     url: "",
     autoplay: false,
   },
-  render: ({ url, autoplay }) => {
+  render: ({ url, autoplay, puck }) => {
     if (!url) {
       return (
         <div className="rounded-lg border-2 border-dashed border-base-300 bg-base-200 p-6 text-center text-base-content/50">
@@ -44,7 +55,14 @@ const Video: ComponentConfig<VideoProps> = {
       );
     }
 
-    return <VideoPlayer url={url} autoplay={autoplay} />;
+    const player = <VideoPlayer url={url} autoplay={autoplay} />;
+
+    // Inside a live Puck tree (the editor canvas, HistoryView) the lazy player needs its own
+    // boundary, or its first load would suspend the whole editor. Island hydration renders without
+    // `puck` (see hydrate-islands.ts) and must match the server's boundary-less markup, so there
+    // it suspends the island's own root instead, which keeps the server HTML up until it's loaded.
+    if (import.meta.env.SSR || !puck) return player;
+    return <Suspense fallback={ASPECT_PLACEHOLDER}>{player}</Suspense>;
   },
 };
 

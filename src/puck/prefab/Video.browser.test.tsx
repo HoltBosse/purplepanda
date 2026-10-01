@@ -6,8 +6,12 @@ const puck = { renderDropZone: () => null, metadata: {}, isEditing: false, dragR
 
 const VideoRender = Video.render as (props: Record<string, unknown>) => React.JSX.Element;
 
-function renderVideo(props: Partial<VideoProps> = {}) {
-    return render(<VideoRender url="" autoplay={false} {...props} puck={puck} />);
+// The player is code-split (see Video.tsx), so a set URL first renders a placeholder — wait for
+// the real <video> rather than letting an assertion run against the fallback.
+async function renderVideo(props: Partial<VideoProps> = {}) {
+    const screen = await render(<VideoRender url="" autoplay={false} {...props} puck={puck} />);
+    if (props.url) await expect.poll(() => screen.container.querySelector('video')).not.toBeNull();
+    return screen;
 }
 
 describe('Video render', () => {
