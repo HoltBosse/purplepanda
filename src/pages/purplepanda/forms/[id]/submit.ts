@@ -1,13 +1,13 @@
 import type { Config, Data } from "@puckeditor/core";
 import type { APIContext, APIRoute } from "astro";
 import { and, eq, inArray } from "drizzle-orm";
-import { RateLimiterPostgres } from "rate-limiter-flexible";
 import * as z from "zod";
 import { addAlertToSession, alertType, createAlert } from "../../../../alert/index.js";
 import { isActiveMemberOfCurrentTenant } from "../../../../auth/accounts.js";
 import { getDb } from "../../../../db/db.js";
 import { sendMail } from "../../../../db/mail.js";
 import { resolvePagePathById } from "../../../../db/page-path.js";
+import { postgresLimiter } from "../../../../db/rate-limiter.js";
 import { formSubmissions, forms, users } from "../../../../db/schema.js";
 import { emit } from "../../../../hooks/index.js";
 import { buildFormSubmissionSchema, collectSubmissionFieldProcessors } from "../../../../puck/form/schema.js";
@@ -36,9 +36,7 @@ const uuidSchema = z.uuid();
 // in-memory counter is per-worker, so a submitter would effectively get `5 * workerCount` before
 // any single worker's copy of the limit kicked in. RateLimiterPostgres manages its own table
 // (CREATE TABLE IF NOT EXISTS, created lazily on first use) so no migration is needed here.
-const rateLimiter = new RateLimiterPostgres({
-  storeClient: getDb().$client,
-  storeType: "pool",
+const rateLimiter = postgresLimiter({
   tableName: "purplepanda_rate_limits",
   points: 5,
   duration: 60,

@@ -45,7 +45,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     // Once they've reset it and signed in, they land back on this site's admin.
     const host = normalizeDomain(context.url.hostname);
-    const sent = await sendPasswordResetEmail(context.url, user, context.locals.tenant.name, {
+    const sent = await sendPasswordResetEmail(user, context.locals.tenant.name, {
         site: context.locals.tenant.id,
         ...(host ? { host } : {}),
     });

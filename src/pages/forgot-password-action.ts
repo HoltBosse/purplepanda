@@ -37,7 +37,7 @@ export async function POST(context: APIContext): Promise<Response> {
     .limit(1);
 
   if (user) {
-    sendPasswordResetEmail(context.url, user, context.locals.tenant.name, target)
+    sendPasswordResetEmail(user, context.locals.tenant.name, target)
       .catch((err) => console.error("[purplepanda] failed to send password reset email", err));
   }
 

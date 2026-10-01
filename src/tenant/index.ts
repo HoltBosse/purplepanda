@@ -100,3 +100,11 @@ export function urlOnDomain(current: URL, domain: string, path: string): string 
   const port = current.port ? `:${current.port}` : "";
   return `${current.protocol}//${domain}${port}${path}`;
 }
+
+// An absolute URL for a link sent by email (password resets, invites). Always https on the standard
+// port, never the request's scheme or port: with every hostname allowed (astro.config.ts), Astro
+// takes those from X-Forwarded-Proto and the Host / X-Forwarded-Host port, so anyone could otherwise
+// have someone else's reset link sent as http:// or to some other port.
+export function linkUrlOnDomain(domain: string, path: string): string {
+  return `https://${domain}${path}`;
+}

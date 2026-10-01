@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { domainSchema, normalizeDomain, parseDomainInput, parseDomainList, pickPrimaryDomain, urlOnDomain } from './index';
+import { domainSchema, linkUrlOnDomain, normalizeDomain, parseDomainInput, parseDomainList, pickPrimaryDomain, urlOnDomain } from './index';
 
 describe('normalizeDomain', () => {
     it('lowercases and drops a fully-qualified trailing dot', () => {
@@ -59,6 +59,12 @@ describe('urlOnDomain', () => {
     it('keeps the current scheme and port', () => {
         expect(urlOnDomain(new URL('http://localhost:3012/login'), 'blog.localhost', '/admin')).toBe('http://blog.localhost:3012/admin');
         expect(urlOnDomain(new URL('https://example.com/login'), 'other.dev', '/admin/sso?token=x')).toBe('https://other.dev/admin/sso?token=x');
+    });
+});
+
+describe('linkUrlOnDomain', () => {
+    it('is always https on the standard port', () => {
+        expect(linkUrlOnDomain('example.com', '/reset-password?token=x')).toBe('https://example.com/reset-password?token=x');
     });
 });
 

@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { RateLimiterPostgres } from "rate-limiter-flexible";
 import { getDb } from "../../db/db.js";
+import { postgresLimiter } from "../../db/rate-limiter.js";
 import { settings } from "../../db/schema.js";
 import { requireTenant } from "../../tenant/context.js";
 
@@ -98,9 +98,7 @@ function decodeCsrfToken(token: unknown): DecodedCsrfToken | null {
 // -- a Map here would let a captured token be replayed once per worker before every worker's own
 // copy had seen it. Modeled as a rate limiter with `points: 1`: the first consume() for a token
 // succeeds (marks it used), any consume() within the same token's TTL after that fails (replay).
-const usedCsrfTokens = new RateLimiterPostgres({
-  storeClient: getDb().$client,
-  storeType: "pool",
+const usedCsrfTokens = postgresLimiter({
   tableName: "purplepanda_csrf_used_tokens",
   points: 1,
   duration: CSRF_TTL_MS / 1000,

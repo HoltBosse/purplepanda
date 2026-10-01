@@ -1,7 +1,7 @@
 import { getDb } from "../db/db.js";
 import { type SendMailOptions, sendMail } from "../db/mail.js";
 import { requireTenant, runWithTenant } from "../tenant/context.js";
-import { getRootDomain, getRootTenant, urlOnDomain } from "../tenant/index.js";
+import { getRootDomain, getRootTenant, linkUrlOnDomain } from "../tenant/index.js";
 import type { LoginTarget } from "./login-target.js";
 import { createPasswordResetToken, INVITE_TOKEN_TTL_MS, RESET_TOKEN_TTL_MS } from "./password-reset.js";
 
@@ -25,22 +25,23 @@ async function sendAccountMail(options: SendMailOptions): Promise<boolean> {
   return runWithTenant(root, () => sendMail(getDb(), options));
 }
 
-// A link to /reset-password on the root site. Built on its registered hostname, never from the
-// request's Host, so a forged Host header can't make an email point somewhere else. `welcome` only
+// A link to /reset-password on the root site. Built on its registered hostname over https
+// (linkUrlOnDomain), never from the request's headers, so a forged Host or X-Forwarded-* header
+// can't make an email point somewhere else, or at plain http://. `welcome` only
 // changes the page's wording, for an account setting its first password.
-async function passwordLink(current: URL, token: string, target: LoginTarget, welcome: boolean): Promise<string | null> {
+async function passwordLink(token: string, target: LoginTarget, welcome: boolean): Promise<string | null> {
   const rootDomain = await getRootDomain(getDb());
   if (!rootDomain) return null;
   const params = new URLSearchParams({ token, ...(welcome ? { welcome: "1" } : {}), ...target });
-  return urlOnDomain(current, rootDomain, `/reset-password?${params}`);
+  return linkUrlOnDomain(rootDomain, `/reset-password?${params}`);
 }
 
 // A reset link, whether the account's owner asked for one (/forgot-password) or a site's admin sent
 // it. Sending one changes nothing about the account: it stays signed in, with its password, until
 // the link is used.
-export async function sendPasswordResetEmail(current: URL, user: Recipient, siteName: string, target: LoginTarget): Promise<boolean> {
+export async function sendPasswordResetEmail(user: Recipient, siteName: string, target: LoginTarget): Promise<boolean> {
   const token = await createPasswordResetToken(user.id, RESET_TOKEN_TTL_MS);
-  const link = await passwordLink(current, token, target, false);
+  const link = await passwordLink(token, target, false);
   if (!link) return false;
   return sendAccountMail({
     to: [user.email],
@@ -59,9 +60,9 @@ export async function sendPasswordResetEmail(current: URL, user: Recipient, site
 
 // For an account just created by inviting it to a site: it has no usable password until its owner
 // sets one from this link.
-export async function sendInviteEmail(current: URL, user: Recipient, siteName: string, target: LoginTarget): Promise<boolean> {
+export async function sendInviteEmail(user: Recipient, siteName: string, target: LoginTarget): Promise<boolean> {
   const token = await createPasswordResetToken(user.id, INVITE_TOKEN_TTL_MS);
-  const link = await passwordLink(current, token, target, true);
+  const link = await passwordLink(token, target, true);
   if (!link) return false;
   return sendAccountMail({
     to: [user.email],

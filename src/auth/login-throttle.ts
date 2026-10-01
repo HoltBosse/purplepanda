@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { RateLimiterPostgres, RateLimiterRes } from "rate-limiter-flexible";
-import { getDb } from "../db/db.js";
+import { RateLimiterRes } from "rate-limiter-flexible";
+import { postgresLimiter } from "../db/rate-limiter.js";
 import { hash, verify } from "../password/index.js";
 
 // Sign-in throttling. Backed by Postgres (like the form limiter in purplepanda/forms/[id]/submit.ts)
@@ -15,9 +15,7 @@ const WINDOW_SECONDS = 15 * 60;
 
 // Also used by the password-reset limits (auth/password-reset.ts), which share the table.
 export function limiter(keyPrefix: string, points: number, duration: number) {
-  return new RateLimiterPostgres({
-    storeClient: getDb().$client,
-    storeType: "pool",
+  return postgresLimiter({
     tableName: "purplepanda_login_limits",
     keyPrefix,
     points,

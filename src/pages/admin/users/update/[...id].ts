@@ -12,7 +12,7 @@ import { roles, userRoles, users } from "../../../../db/schema.js";
 import { createUserAlertMessageFromArray, formDataToRecord, getAllFields, getFieldByName, validateForm } from "../../../../form/index.js";
 import { createFormFlashSession } from "../../../../form/session.js";
 import { hash } from "../../../../password/index.js";
-import { normalizeDomain, urlOnDomain } from "../../../../tenant/index.js";
+import { linkUrlOnDomain, normalizeDomain } from "../../../../tenant/index.js";
 import { getEditUserForm, getInviteForm } from "../_form.js";
 
 const roleIdsSchema = z.array(z.uuid());
@@ -95,7 +95,7 @@ export async function POST(context: APIContext): Promise<Response> {
             }
             user = existingUser;
             await addTenantMembership(user.id);
-            const adminUrl = urlOnDomain(context.url, normalizeDomain(context.url.hostname) ?? context.url.hostname, "/admin");
+            const adminUrl = linkUrlOnDomain(normalizeDomain(context.url.hostname) ?? context.url.hostname, "/admin");
             sent = await sendAddedToSiteEmail(user, siteName, adminUrl);
             message = sent
                 ? "An account with that email already existed, so it was added to this site and they've been emailed to let them know."
@@ -112,7 +112,7 @@ export async function POST(context: APIContext): Promise<Response> {
             await addTenantMembership(user.id);
             // Once they've set a password and signed in, they land back on this site's admin.
             const host = normalizeDomain(context.url.hostname);
-            sent = await sendInviteEmail(context.url, user, siteName, { site: context.locals.tenant.id, ...(host ? { host } : {}) });
+            sent = await sendInviteEmail(user, siteName, { site: context.locals.tenant.id, ...(host ? { host } : {}) });
             message = sent
                 ? "Invitation sent. They'll get an email with a link to set up their password."
                 : "User created, but no invitation could be sent because outgoing email isn't configured.";
