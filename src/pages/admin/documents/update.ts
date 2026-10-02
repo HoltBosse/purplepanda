@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import type { APIContext } from "astro";
 import { eq } from "drizzle-orm";
 import * as z from "zod";
@@ -6,7 +5,7 @@ import { addAlertToSession, alertType, createAlert } from "../../../alert/index.
 import { addAction } from "../../../audit/index.js";
 import { getDb } from "../../../db/db.js";
 import { documents } from "../../../db/schema.js";
-import { getDocumentPath } from "../../../document/document.js";
+import { getDocumentStorage, storageKey } from "../../../storage/index.js";
 
 const toSlug = (title: string) =>
     title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -36,11 +35,8 @@ export async function POST(context: APIContext): Promise<Response> {
     await db.update(documents).set({ title: title.data, slug: toSlug(title.data) }).where(eq(documents.id, id.data));
 
     if (hasFile) {
-        const documentPath = getDocumentPath();
-        const dir = `${documentPath}/${id.data.slice(0, 2)}/${id.data.slice(2, 4)}`;
-        await fs.promises.mkdir(dir, { recursive: true });
         const buffer = await (file as File).arrayBuffer();
-        await fs.promises.writeFile(`${dir}/${id.data}`, Buffer.from(buffer));
+        await getDocumentStorage().write(storageKey(id.data), Buffer.from(buffer));
     }
 
     const userId = await context.session?.get("userId");

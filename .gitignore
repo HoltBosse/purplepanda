@@ -11,8 +11,8 @@ out/
 .output/
 *.tsbuildinfo
 
-# Uploaded content. These are the runtime stores behind /image/[id] and /document/[slug]
-# (see src/media/media.ts and src/document/document.ts) -- user data, not source.
+# Uploaded content under the default filesystem storage driver: the stores behind /image/[id] and
+# /document/[slug] (see src/storage/index.ts) -- user data, not source.
 /media/
 /documents/
 

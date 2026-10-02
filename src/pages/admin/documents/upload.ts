@@ -1,11 +1,10 @@
-import fs from "node:fs";
 import type { APIContext } from "astro";
 import * as z from "zod";
 import { addAlertToSession, alertType, createAlert } from "../../../alert/index.js";
 import { addAction } from "../../../audit/index.js";
 import { getDb } from "../../../db/db.js";
 import { documents } from "../../../db/schema.js";
-import { getDocumentPath } from "../../../document/document.js";
+import { getDocumentStorage, storageKey } from "../../../storage/index.js";
 
 const MAX_UPLOAD_BYTES = 512 * 1024 * 1024; // 512MB
 
@@ -57,13 +56,8 @@ export async function POST(context: APIContext): Promise<Response> {
                 },
             },
         );
-        const documentPath = getDocumentPath();
-        const dir = `${documentPath}/${docId.slice(0, 2)}/${docId.slice(2, 4)}`;
-
-        await fs.promises.mkdir(dir, { recursive: true });
-
         const buffer = await file.data[i]!.arrayBuffer();
-        await fs.promises.writeFile(`${dir}/${docId}`, Buffer.from(buffer));
+        await getDocumentStorage().write(storageKey(docId), Buffer.from(buffer));
     }
 
     const alert = createAlert(alertType.success, "Document uploaded successfully.");

@@ -1,10 +1,8 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { APIRoute } from "astro";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../db/db.js";
 import { documents } from "../../db/schema.js";
-import { getDocumentPath } from "../../document/document.js";
+import { getDocumentStorage, storageKey } from "../../storage/index.js";
 
 function getMimeType(buffer: Buffer): string {
     // PDF
@@ -34,12 +32,9 @@ export const GET: APIRoute = async ({ params, rewrite }) => {
         return rewrite('/404');
     }
 
-    const documentPath = getDocumentPath();
-    const filePath = join(documentPath, doc.id.slice(0, 2), doc.id.slice(2, 4), doc.id);
-
     let fileBuffer: Buffer;
     try {
-        fileBuffer = await readFile(filePath);
+        fileBuffer = await getDocumentStorage().readToBuffer(storageKey(doc.id));
     } catch {
         return rewrite('/404');
     }

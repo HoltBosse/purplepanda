@@ -2,9 +2,11 @@
 import node from "@astrojs/node";
 import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
+import type { AstroIntegration } from "astro";
 import { defineConfig } from "astro/config";
 import "dotenv/config";
 import { generateIslandsManifest } from "./src/islands-manifest.js";
+import { logStorageBanner } from "./src/storage/index.js";
 
 // Per-component lazy loaders for front-end islands, derived at build time from the Puck config so
 // only the island(s) present on a page load — not the whole config, and not every editor-only
@@ -13,6 +15,35 @@ import { generateIslandsManifest } from "./src/islands-manifest.js";
 const VIRTUAL_ISLANDS_ID = "virtual:purplepanda/islands";
 const RESOLVED_VIRTUAL_ISLANDS_ID = `\0${VIRTUAL_ISLANDS_ID}`;
 const PUCK_CONFIG_MODULE = new URL("./src/puck.config.tsx", import.meta.url).pathname;
+
+// Reports which storage driver uploads go to (and shouts if it's the in-memory one) when the server
+// starts, rather than on the first request -- the middleware and routes are only imported lazily.
+// `astro dev` has a hook for that; the built server doesn't run integration hooks at all, so there
+// the call is prepended to the node adapter's server entry instead, which runs as each process
+// (each PM2 worker) boots.
+const STORAGE_MODULE = new URL("./src/storage/index.ts", import.meta.url).pathname;
+const storageBanner: AstroIntegration = {
+  name: "purple-panda-storage-banner",
+  hooks: {
+    "astro:server:start": () => logStorageBanner(),
+    "astro:config:setup": ({ command, updateConfig }) => {
+      if (command !== "build") return;
+      updateConfig({
+        vite: {
+          plugins: [
+            {
+              name: "purple-panda-storage-banner",
+              transform(code, id) {
+                if (!id.replaceAll("\\", "/").endsWith("/@astrojs/node/dist/server.js")) return null;
+                return `import { logStorageBanner } from ${JSON.stringify(STORAGE_MODULE)};\nlogStorageBanner();\n${code}`;
+              },
+            },
+          ],
+        },
+      });
+    },
+  },
+};
 
 // https://astro.build/config
 export default defineConfig({
@@ -88,7 +119,7 @@ export default defineConfig({
     },
   },
 
-  integrations: [react()],
+  integrations: [react(), storageBanner],
 
   // A pattern with no hostname matches every host. Astro only takes a request's hostname from its
   // Host (or a proxy's X-Forwarded-Host) header when it matches one of these — otherwise every

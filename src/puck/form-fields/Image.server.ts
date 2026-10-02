@@ -1,9 +1,8 @@
-import { promises as fs } from "node:fs";
 import { and, eq } from "drizzle-orm";
 import sharp from "sharp";
 import { getDb } from "../../db/db.js";
 import { media, mediafolders } from "../../db/schema.js";
-import { getMediaPath } from "../../media/media.js";
+import { getMediaStorage, storageKey } from "../../storage/index.js";
 import type { MediaRef } from "../component-fields/ImageField.js";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
@@ -104,16 +103,11 @@ export async function processImageSubmission(
     throw new Error("We couldn't save that image, please try again");
   }
 
-  // Same on-disk layout as the admin uploader (pages/admin/media/upload.ts): split into two
-  // levels of the id's own characters, stored extension-less (format is sniffed from content at
-  // serve time — see pages/image/[id].ts), so nothing about the stored path is attacker-influenced.
+  // Same storage key as the admin uploader (media/upload.ts): derived from the id alone and
+  // extension-less (format is sniffed from content at serve time — see pages/image/[id].ts), so
+  // nothing about where it's stored is attacker-influenced.
   const mediaId = inserted.id;
-  const mediaPath = getMediaPath();
-  const fullMediaPath = `${mediaPath}/${mediaId.slice(0, 2)}/${mediaId.slice(2, 4)}/${mediaId}`;
-  const mediaDir = fullMediaPath.substring(0, fullMediaPath.lastIndexOf("/"));
-
-  await fs.mkdir(mediaDir, { recursive: true });
-  await fs.writeFile(fullMediaPath, output);
+  await getMediaStorage().write(storageKey(mediaId), output);
 
   return { id: mediaId, title, alt: title };
 }

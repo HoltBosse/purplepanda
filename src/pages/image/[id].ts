@@ -1,16 +1,13 @@
 import { createHash } from "node:crypto";
-import { createReadStream } from "node:fs";
-import { open, stat } from "node:fs/promises";
-import { join } from "node:path";
 import { Readable } from "node:stream";
 import type { APIRoute } from "astro";
 import { and, eq } from "drizzle-orm";
-import sharp from 'sharp';
+import sharp, { type Sharp } from 'sharp';
 import * as z from "zod";
 import { isAdminSession } from "../../auth/index.js";
 import { getDb } from "../../db/db.js";
 import { media, mediafolders } from "../../db/schema.js";
-import { getMediaPath } from "../../media/media.js";
+import { getMediaStorage, storageKey } from "../../storage/index.js";
 
 //TODO: in future support image manip via get params (sharp? package)
 
@@ -54,6 +51,39 @@ function getMimeType(buffer: Buffer): string {
   const text = buffer.subarray(0, 100).toString("utf-8").trimStart();
   if (text.startsWith("<svg") || text.startsWith("<?xml")) return "image/svg+xml";
   return "application/octet-stream";
+}
+
+// Reads just enough of the stream to sniff its format, then hands back the whole stream (the
+// already-read chunks replayed in front of the rest) for the response body.
+async function peekStream(stream: Readable, bytes: number): Promise<{ head: Buffer; body: Readable }> {
+  const iterator = stream[Symbol.asyncIterator]();
+  const chunks: Buffer[] = [];
+  let length = 0;
+  let done = false;
+  while (length < bytes) {
+    const next = await iterator.next();
+    if (next.done) {
+      done = true;
+      break;
+    }
+    const chunk = Buffer.from(next.value);
+    chunks.push(chunk);
+    length += chunk.length;
+  }
+  const body = Readable.from((async function* () {
+    try {
+      yield* chunks;
+      if (done) return;
+      for (let next = await iterator.next(); !next.done; next = await iterator.next()) {
+        yield next.value;
+      }
+    } finally {
+      // Also reached when the response is abandoned mid-stream (client disconnect), so the
+      // underlying file handle / S3 socket is released rather than left open.
+      stream.destroy();
+    }
+  })());
+  return { head: Buffer.concat(chunks).subarray(0, bytes), body };
 }
 
 function etagMatches(ifNoneMatch: string | null, etag: string): boolean {
@@ -154,12 +184,15 @@ export const GET: APIRoute = async ({ params, request, rewrite, session }) => {
     bypassed = true;
   }
 
-  const mediaPath = getMediaPath();
-  const filePath = join(mediaPath, id.slice(0, 2), id.slice(2, 4), id);
+  const storage = getMediaStorage();
+  const key = storageKey(id);
 
-  let fileStat: Awaited<ReturnType<typeof stat>>;
+  let fileSize: number;
+  let lastModified: number;
   try {
-    fileStat = await stat(filePath);
+    const info = await storage.statFile(key);
+    fileSize = info.size ?? (await storage.fileSize(key));
+    lastModified = info.lastModifiedMs ?? 0;
   } catch {
     return rewrite('/404');
   }
@@ -178,7 +211,7 @@ export const GET: APIRoute = async ({ params, request, rewrite, session }) => {
   const paramString = paramEntries.map(([k, v]) => `${k}=${v}`).join("&");
 
   const etag = `"${createHash("sha1")
-    .update(`${id}:${fileStat.mtimeMs}:${fileStat.size}:${paramString}`)
+    .update(`${id}:${lastModified}:${fileSize}:${paramString}`)
     .digest("hex")}"`;
 
   const cacheControl = bypassed ? "private, no-store" : IMAGE_CACHE_CONTROL;
@@ -193,8 +226,12 @@ export const GET: APIRoute = async ({ params, request, rewrite, session }) => {
   const hasTransform = paramEntries.length > 0;
 
   if (hasTransform) {
-    // #4: pass file path directly — sharp/libvips reads the file internally
-    let image = sharp(filePath);
+    let image: Sharp;
+    try {
+      image = sharp(await storage.readToBuffer(key));
+    } catch {
+      return rewrite('/404');
+    }
 
     //handle crop params (x1,y1,x2,y2) if any are present
     if(x1.success || y1.success || x2.success || y2.success) {
@@ -249,20 +286,23 @@ export const GET: APIRoute = async ({ params, request, rewrite, session }) => {
     });
   }
 
-  // #2: stream directly — read only 12 magic bytes for MIME detection
-  const fh = await open(filePath, 'r');
-  const magicBuf = Buffer.alloc(12);
-  await fh.read(magicBuf, 0, 12, 0);
-  await fh.close();
+  // Stream directly — only the first 12 bytes are needed for MIME detection
+  let head: Buffer;
+  let body: Readable;
+  try {
+    ({ head, body } = await peekStream(await storage.read(key), 12));
+  } catch {
+    return rewrite('/404');
+  }
 
-  const mimeType = getMimeType(magicBuf);
-  const stream = Readable.toWeb(createReadStream(filePath));
+  const mimeType = getMimeType(head);
+  const stream = Readable.toWeb(body);
 
   return new Response(stream as ReadableStream, {
     status: 200,
     headers: {
       "Content-Type": mimeType,
-      "Content-Length": String(fileStat.size),
+      "Content-Length": String(fileSize),
       ...(bypassed ? {} : { "ETag": etag }),
       "Cache-Control": cacheControl,
       "X-Content-Type-Options": "nosniff",

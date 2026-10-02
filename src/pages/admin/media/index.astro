@@ -1,6 +1,4 @@
 ---
-import { promises as fs } from 'node:fs';
-import { join } from 'node:path';
 import { Eye, EyeOff, Folder, Search } from '@lucide/astro';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import sharp from 'sharp';
@@ -10,11 +8,11 @@ import { getDb } from '../../../db/db.js';
 import { media, mediafolders } from "../../../db/schema.js";
 import Input from '../../../form/fields/Input.astro';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
-import { getMediaPath } from '../../../media/media.js';
 import { buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
 import { parseSearchQuery } from '../../../search/parser.js';
 import SearchBar from '../../../search/SearchBar';
 import type { SearchFieldSpec } from '../../../search/types.js';
+import { getMediaStorage, storageKey } from '../../../storage/index.js';
 
 // This page also backs /admin/media/[id] (./[id].astro renders it), which is where `id` comes
 // from -- and where it is validated -- so Astro.params isn't statically typed with it here.
@@ -84,9 +82,7 @@ type MediaItemWithMetadata = typeof mediaItems[number] & {
 const mediaItemsWithMetadata: MediaItemWithMetadata[] = await Promise.all(
   mediaItems.map(async (item): Promise<MediaItemWithMetadata> => {
     try {
-      const mediaPath = getMediaPath();
-      const filePath = join(mediaPath, item.id.slice(0, 2), item.id.slice(2, 4), item.id);
-    const fileBuffer = await fs.readFile(filePath);
+      const fileBuffer = await getMediaStorage().readToBuffer(storageKey(item.id));
       const metadata = await sharp(fileBuffer).metadata();
       
       return {
