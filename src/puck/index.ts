@@ -85,6 +85,10 @@ declare module "@puckeditor/core" {
   interface ComponentConfigExtensions {
     data?: (fields: any, context?: App.Locals) => Awaitable<Record<string, unknown>>;
     locations?: Location | Location[];
+    // Per-location replacements for parts of this component's config (fields, defaultProps,
+    // render, ...), merged over it by filterConfigByLocation — for a component that should behave
+    // differently in one editor, e.g. Button is a link on pages but a submit button in forms.
+    locationOverrides?: Partial<Record<Location, Record<string, unknown>>>;
     // When true, this component is off on every site until a super admin enables it for that site
     // under Admin → Sites — for components built for one site (or a few). Others are on everywhere.
     // See ./site-components.ts.
@@ -156,16 +160,24 @@ function componentMatchesLocation(component: unknown, location: Location): boole
 export function filterConfigByLocation(config: Config, location: Location): Config {
   const removedNames = new Set<string>();
   const filteredComponents: Config["components"] = {};
+  let overridden = false;
 
   for (const [name, comp] of Object.entries(config.components ?? {})) {
-    if (componentMatchesLocation(comp, location)) {
-      filteredComponents[name] = comp;
-    } else {
+    if (!componentMatchesLocation(comp, location)) {
       removedNames.add(name);
+      continue;
+    }
+    const override = comp.locationOverrides?.[location];
+    if (override) {
+      filteredComponents[name] = { ...comp, ...override } as typeof comp;
+      overridden = true;
+    } else {
+      filteredComponents[name] = comp;
     }
   }
 
-  if (removedNames.size === 0) return config;
+  if (removedNames.size === 0 && !overridden) return config;
+  if (removedNames.size === 0) return { ...config, components: filteredComponents };
 
   const filteredCategories: Config["categories"] = {};
   for (const [catName, cat] of Object.entries(config.categories ?? {})) {

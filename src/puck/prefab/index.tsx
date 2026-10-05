@@ -1,6 +1,8 @@
 export { default as Accordion } from "./Accordion.js";
 export type { AlertsProps } from "./Alerts.js";
 export { default as Alerts } from "./Alerts.js";
+export type { ButtonProps } from "./Button.js";
+export { default as Button } from "./Button.js";
 export type { CardCollectionItem, CardCollectionProps, OrderBy, OrderDirection } from "./CardCollection.js";
 export { default as CardCollection } from "./CardCollection.js";
 export { default as Flex } from "./Flex.js";

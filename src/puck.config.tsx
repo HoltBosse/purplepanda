@@ -3,7 +3,7 @@ import { FormEmbed } from "./puck/form/index.js";
 import { Checkbox, Image, RadioGroup, Select, Textarea, TextInput, Turnstile } from "./puck/form-fields/index.js";
 import { definePuckConfig } from "./puck/index.js";
 import { ImagePicker } from "./puck/media/index.js";
-import { Accordion, Alerts, CardCollection, Flex, Grid, Margin, Rich, Space, Video } from "./puck/prefab/index.js";
+import { Accordion, Alerts, Button, CardCollection, Flex, Grid, Margin, Rich, Space, Video } from "./puck/prefab/index.js";
 
 const config = definePuckConfig({
   categories: {
@@ -14,7 +14,7 @@ const config = definePuckConfig({
       components: ["Flex", "Grid", "Space", "CardCollection", "Margin"],
     },
     Content: {
-      components: ["Rich", "Alerts"],
+      components: ["Rich", "Alerts", "Button"],
     },
     // The private site module's categories, if it's built with one (see src/site/resolve.ts).
     ...site.categories,
@@ -47,17 +47,7 @@ const config = definePuckConfig({
     Accordion,
     Video,
     Alerts,
-    SubmitButton: {
-      fields: {
-        children: {
-          type: "text",
-        },
-      },
-      defaultProps: { children: "Submit" },
-      render: ({ children }) => {
-        return <button className="btn btn-primary" type="submit">{children}</button>;
-      },
-    },
+    Button,
     ImagePicker,
     // Last, so the site module's own components (usually `optIn`, see puck/site-components.ts)
     // can also stand in for any above of the same name.
