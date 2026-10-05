@@ -1,7 +1,7 @@
-import { Button, createUsePuck, Puck } from "@puckeditor/core";
+import { Button, createUsePuck, Puck, useGetPuck } from "@puckeditor/core";
 import "@puckeditor/core/puck.css";
 import "../styles/puck-theme.css";
-import type { Config, Data, Dictionary, Overrides, PuckAction, PuckContext } from "@puckeditor/core";
+import type { Config, Data, Dictionary, Overrides, PuckApi, PuckContext } from "@puckeditor/core";
 import { Render } from "@puckeditor/core";
 import type React from "react";
 import { cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -12,7 +12,7 @@ import { ChevronDown, Save } from "../puck/icons.js";
 import { sanitizeHtml } from "../puck/sanitize-html.js";
 import { sanitizeRichtextData } from "../puck/sanitize-richtext.js";
 import { getInjectedDisabledComponents, hideDisabledComponents } from "../puck/site-components.js";
-import { validateContentTree } from "../puck/validate-content.js";
+import { type ContentValidationError, validateContentTree } from "../puck/validate-content.js";
 import { ensureTemplateSlot } from "./template-slot.js";
 
 declare global {
@@ -73,6 +73,52 @@ function TemplateSlotRenderer() {
 
 const useTypedPuck = createUsePuck();
 
+// How many animation frames to keep waiting for a just-selected component to show up in the
+// canvas/outline DOM before scrolling anyway. The root zone is virtualized, so an offscreen
+// component only gets rendered once Puck pins the newly selected index on its next render, and
+// a freshly expanded outline branch likewise mounts a frame or two after the setUi dispatch.
+const FOCUS_SCROLL_MAX_FRAMES = 60;
+
+function scrollToComponentWhenRendered(id: string) {
+  const escaped = CSS.escape(id);
+  let frames = 0;
+  const attempt = () => {
+    const frame = document.querySelector<HTMLIFrameElement>("iframe#preview-frame");
+    const canvas = frame?.contentDocument ?? document;
+    const canvasEl = canvas.querySelector(`[data-puck-component="${escaped}"]`);
+    // Only present when the author already has the outline open in the left panel — that panel
+    // is deliberately left on whichever tab they chose, so this doesn't wait on it.
+    const layerEl = document.querySelector(`[data-puck-layer-tree-id="${escaped}"]`);
+    frames += 1;
+    if (canvasEl || frames >= FOCUS_SCROLL_MAX_FRAMES) {
+      canvasEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+      layerEl?.scrollIntoView({ block: "nearest" });
+      return;
+    }
+    requestAnimationFrame(attempt);
+  };
+  requestAnimationFrame(attempt);
+}
+
+// Jumps the editor to whatever a validation error is about: selects the offending component (so
+// the right panel shows its fields, with fieldLabel below outlining the bad ones) and scrolls the
+// canvas — and the outline, if that's the left panel's open tab — to the component. Puck's own
+// setUi reducer already expands every collapsed outline ancestor of a newly selected item, so
+// that isn't handled here. Root/page-level errors (and any component that can't be located) instead
+// deselect, so the fields panel falls back to the root's own fields (title/alias/etc.).
+function focusValidationError(puck: PuckApi, error: ContentValidationError) {
+  const selector = error.componentId === "root" ? undefined : puck.getSelectorForId(error.componentId);
+  puck.dispatch({
+    type: "setUi",
+    ui: {
+      itemSelector: selector ?? null,
+      leftSideBarVisible: true,
+      rightSideBarVisible: true,
+    },
+  });
+  if (selector) scrollToComponentWhenRendered(error.componentId);
+}
+
 interface FontLinks {
   headingFontLink: string | undefined;
   bodyFontLink: string | undefined;
@@ -83,11 +129,11 @@ function createOverrides(
   onSave: ((data: Data) => void) | undefined,
   fontLinks: FontLinks | undefined,
   // Populated from inside headerActions below (the only override here rendered unconditionally,
-  // as soon as Puck mounts) so guardedOnPublish — defined outside Puck's tree, in plain
-  // PuckEditor component scope — can still dispatch into it imperatively once a Publish attempt
-  // fails, to jump the side panel to the root fields view. Zustand's dispatch is referentially
-  // stable across renders, so caching it here is safe.
-  dispatchRef: { current: ((action: PuckAction) => void) | null },
+  // as soon as Puck mounts) so guardedOnPublish/guardedOnSave/guardedOnCommit — defined outside
+  // Puck's tree, in plain PuckEditor component scope — can still reach into it imperatively once
+  // an attempt is blocked, to jump to the first offending component (see focusValidationError).
+  // useGetPuck's getter always reads the latest store state, so caching a closure over it is safe.
+  focusErrorRef: { current: ((errors: ContentValidationError[]) => void) | null },
   rootPropsSchema: ((props: Record<string, unknown>) => z.ZodTypeAny) | undefined,
   // Commit is an alternate publish action offered only while authoring a brand-new page/content
   // item (see PuckEditor's isNew prop) — it POSTs to the same endpoint as Publish but persists the
@@ -103,7 +149,10 @@ function createOverrides(
   return {
     headerActions: ({ children }) => {
       const appStateData = useTypedPuck((state) => state.appState.data);
-      dispatchRef.current = useTypedPuck((state) => state.dispatch);
+      const getPuck = useGetPuck();
+      focusErrorRef.current = (errors) => {
+        if (errors[0]) focusValidationError(getPuck(), errors[0]);
+      };
 
       const showCommitMenu = Boolean(commit?.isNew && commit.onCommit);
 
@@ -203,23 +252,37 @@ function createOverrides(
       // now does, instead of staying stuck until the next click.
       const liveErrors = useMemo(() => validateContentTree(config, appStateData, { rootPropsSchema, disabledComponents: getInjectedDisabledComponents() }), [appStateData]);
 
+      // Each click jumps to the next offending component after the currently selected one
+      // (wrapping around), so repeated clicks walk every error in tree order. With nothing selected
+      // the root fields are already showing, so "root" counts as the current position there.
+      const focusNextError = () => {
+        const componentIds = [...new Set(liveErrors.map((error) => error.componentId))];
+        const puck = getPuck();
+        const currentId = (puck.selectedItem?.props as { id?: string } | undefined)?.id ?? "root";
+        const nextId = componentIds[(componentIds.indexOf(currentId) + 1) % componentIds.length];
+        const nextError = liveErrors.find((error) => error.componentId === nextId);
+        if (nextError) focusValidationError(puck, nextError);
+      };
+
       // The full per-field messages are in the title tooltip since there's no toast/panel system
       // to host a longer list inline in the header.
       const validationBadge =
         liveErrors.length > 0 ? (
-          <span
-            role="alert"
-            data-puck-validation-errors
-            title={liveErrors.map((error) => `${error.componentType} — ${error.field}: ${error.message}`).join("\n")}
-            style={{
-              alignSelf: "center",
-              marginRight: "0.5rem",
-              fontSize: "0.8rem",
-              color: "var(--color-error)",
-              cursor: "help",
-            }}
-          >
-            {liveErrors.length} field{liveErrors.length === 1 ? "" : "s"} need attention
+          <span role="alert" data-puck-validation-errors style={{ alignSelf: "center", marginRight: "0.5rem" }}>
+            <button
+              type="button"
+              onClick={focusNextError}
+              title={`${liveErrors.map((error) => `${error.componentType} — ${error.field}: ${error.message}`).join("\n")}\n\nClick to jump to the next one.`}
+              style={{
+                fontSize: "0.8rem",
+                color: "var(--color-error)",
+                textDecoration: "underline",
+                textUnderlineOffset: "2px",
+                cursor: "pointer",
+              }}
+            >
+              {liveErrors.length} field{liveErrors.length === 1 ? "" : "s"} need attention
+            </button>
           </span>
         ) : null;
 
@@ -467,10 +530,10 @@ export interface PuckEditorProps {
 }
 
 export default function PuckEditor({ config, data, templateData, onPublish, onSave, rootPropsSchema, isNew, onCommit, headingFontLink, bodyFontLink, dictionary }: PuckEditorProps) {
-  // Written to by createOverrides' headerActions (see below) with Puck's own dispatch, so it can
-  // be reached imperatively from guardedOnPublish — which runs outside Puck's component tree, as
-  // a plain PuckEditorProps.onPublish callback, and so can't call useTypedPuck itself.
-  const dispatchRef = useRef<((action: PuckAction) => void) | null>(null);
+  // Written to by createOverrides' headerActions (see below), so it can be reached imperatively
+  // from guardedOnPublish — which runs outside Puck's component tree, as a plain
+  // PuckEditorProps.onPublish callback, and so can't call useTypedPuck itself.
+  const focusErrorRef = useRef<((errors: ContentValidationError[]) => void) | null>(null);
 
   // AdminBareLayout stamps this the instant it renders the loading panda — i.e. essentially at
   // navigation start, well before this component's own (heavy, client:only) bundle has even
@@ -514,14 +577,7 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
         onPublish(nextData);
         return;
       }
-      // Deselect whatever's currently selected (if anything) and make sure both side panels are
-      // open, so the fields panel falls back to showing the root's own fields (title/alias/etc.)
-      // — the most likely place a blocked Publish is coming from, and otherwise easy to miss
-      // behind whatever component was last selected.
-      dispatchRef.current?.({
-        type: "setUi",
-        ui: { itemSelector: null, leftSideBarVisible: true, rightSideBarVisible: true },
-      });
+      focusErrorRef.current?.(errors);
     },
     [config, onPublish, rootPropsSchema],
   );
@@ -530,7 +586,11 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
     if (!onSave) return undefined;
     return (nextData: Data) => {
       const errors = validateContentTree(config, nextData, { rootPropsSchema, disabledComponents: getInjectedDisabledComponents() });
-      if (errors.length === 0) onSave(nextData);
+      if (errors.length === 0) {
+        onSave(nextData);
+        return;
+      }
+      focusErrorRef.current?.(errors);
     };
   }, [config, onSave, rootPropsSchema]);
 
@@ -543,10 +603,7 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
         onCommit(nextData);
         return;
       }
-      dispatchRef.current?.({
-        type: "setUi",
-        ui: { itemSelector: null, leftSideBarVisible: true, rightSideBarVisible: true },
-      });
+      focusErrorRef.current?.(errors);
     };
   }, [config, onCommit, rootPropsSchema]);
 
@@ -556,7 +613,7 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
         config,
         guardedOnSave,
         { headingFontLink, bodyFontLink },
-        dispatchRef,
+        focusErrorRef,
         rootPropsSchema,
         { isNew, onCommit: guardedOnCommit },
         markEditorReady,
