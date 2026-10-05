@@ -6,6 +6,7 @@ import type { AstroIntegration } from "astro";
 import { defineConfig } from "astro/config";
 import "dotenv/config";
 import { generateIslandsManifest } from "./src/islands-manifest.js";
+import { resolveSiteModule, SITE_MODULE_ID } from "./src/site/resolve.js";
 import { logStorageBanner } from "./src/storage/index.js";
 
 // Per-component lazy loaders for front-end islands, derived at build time from the Puck config so
@@ -15,6 +16,10 @@ import { logStorageBanner } from "./src/storage/index.js";
 const VIRTUAL_ISLANDS_ID = "virtual:purplepanda/islands";
 const RESOLVED_VIRTUAL_ISLANDS_ID = `\0${VIRTUAL_ISLANDS_ID}`;
 const PUCK_CONFIG_MODULE = new URL("./src/puck.config.tsx", import.meta.url).pathname;
+
+// The private site module (its components, categories and plugins) compiled into this build, or an
+// empty one — see src/site/resolve.ts.
+const SITE_MODULE = resolveSiteModule(new URL(".", import.meta.url).pathname);
 
 // Reports which storage driver uploads go to (and shouts if it's the in-memory one) when the server
 // starts, rather than on the first request -- the middleware and routes are only imported lazily.
@@ -61,14 +66,23 @@ export default defineConfig({
     plugins: [
       tailwindcss(),
       {
+        name: "purple-panda-site",
+        enforce: "pre",
+        resolveId(id) {
+          return id === SITE_MODULE_ID ? SITE_MODULE : null;
+        },
+      },
+      {
         name: "purple-panda-islands",
         resolveId(id) {
           return id === VIRTUAL_ISLANDS_ID ? RESOLVED_VIRTUAL_ISLANDS_ID : null;
         },
         async load(id) {
           if (id !== RESOLVED_VIRTUAL_ISLANDS_ID) return null;
+          // The site module registers its components the same way puck.config does, so its islands
+          // get their own chunks too.
           return generateIslandsManifest(
-            PUCK_CONFIG_MODULE,
+            [PUCK_CONFIG_MODULE, SITE_MODULE],
             (source, importer) => this.resolve(source, importer),
             (code) => this.parse(code),
           );

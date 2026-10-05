@@ -1,3 +1,4 @@
+import site from "purplepanda:site";
 import { FormEmbed } from "./puck/form/index.js";
 import { Checkbox, Image, RadioGroup, Select, Textarea, TextInput, Turnstile } from "./puck/form-fields/index.js";
 import { definePuckConfig } from "./puck/index.js";
@@ -14,7 +15,9 @@ const config = definePuckConfig({
     },
     Content: {
       components: ["Rich", "Alerts"],
-    }
+    },
+    // The private site module's categories, if it's built with one (see src/site/resolve.ts).
+    ...site.categories,
   },
   components: {
     HeadingBlock: {
@@ -55,9 +58,12 @@ const config = definePuckConfig({
         return <button className="btn btn-primary" type="submit">{children}</button>;
       },
     },
-    ImagePicker
+    ImagePicker,
+    // Last, so the site module's own components (usually `optIn`, see puck/site-components.ts)
+    // can also stand in for any above of the same name.
+    ...site.components,
   },
-  fontFamilies: ["https://use.typekit.net/pdw7dwo.css?family=josefin-sans"]
+  fontFamilies: ["https://use.typekit.net/pdw7dwo.css?family=josefin-sans", ...(site.fontFamilies ?? [])]
 });
 
 export default config;

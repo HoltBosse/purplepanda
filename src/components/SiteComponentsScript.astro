@@ -1,0 +1,12 @@
+---
+import { getDisabledComponents } from '../puck/site-components.server.js';
+
+// Hands the editors the opt-in components this site hasn't enabled, so they leave them out of the
+// palette and flag any instance before Save (see getInjectedDisabledComponents() in
+// ../puck/site-components.ts). Rendered by both admin layouts, ahead of any island, the same way as
+// ContentTypesScript. Only a convenience: the save routes check again server-side.
+const disabled = [...(await getDisabledComponents())];
+// Escaping `<` keeps a component name from breaking out of the tag.
+const serialized = JSON.stringify(disabled).replace(/</g, '\\u003c');
+---
+<script is:inline set:html={`window.__PP_DISABLED_COMPONENTS = ${serialized};`} />

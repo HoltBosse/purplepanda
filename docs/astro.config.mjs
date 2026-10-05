@@ -25,6 +25,7 @@ export default defineConfig({
 						{ label: 'Installation', slug: 'devs/install' },
 						{ label: 'Tenancy', slug: 'devs/tenancy' },
 						{ label: 'Components', slug: 'devs/components' },
+						{ label: 'Site Components', slug: 'devs/site-components' },
 						{ label: 'Content Types', slug: 'devs/content-types' },
 						{ label: 'Fonts', slug: 'devs/fonts' },
 						{ label: 'Image REST API', slug: 'devs/image-rest-api' },

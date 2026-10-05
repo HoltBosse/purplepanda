@@ -1,10 +1,10 @@
 import { resolve } from 'node:path';
 import type { Plugin } from 'vite';
 
-// Two modules are environment, not logic: the site's Puck config and the Postgres pool. Tests run
-// without a database and shouldn't depend on whatever components the site happens to register, so
-// this plugin swaps both for fixed doubles, and supplies the one virtual module the Astro build
-// generates (see astro.config.ts) rather than ships as a file.
+// Three modules are environment, not logic: the site's Puck config, its private site module and the
+// Postgres pool. Tests run without a database and shouldn't depend on whatever components the site
+// happens to register, so this plugin swaps all three for fixed doubles, and supplies the one
+// virtual module the Astro build generates (see astro.config.ts) rather than ships as a file.
 //
 // The Puck double registers two throwaway components so tests can assert *where* content ends up:
 //   Block   — renders a leaf marked with its id
@@ -46,6 +46,9 @@ export default { $client: client };
 const VIRTUAL_ISLANDS_ID = 'virtual:purplepanda/islands';
 const RESOLVED_VIRTUAL_ISLANDS_ID = `\0${VIRTUAL_ISLANDS_ID}`;
 
+// Tests never see a private site module (see src/site/resolve.ts), whatever the checkout has.
+const SITE_MODULE_ID = 'purplepanda:site';
+
 const STUBS = new Map<string, string>([
   [resolve('src/puck.config.tsx'), PUCK_CONFIG],
   [resolve('src/db/client.ts'), DB_CLIENT],
@@ -56,6 +59,7 @@ export function purplePandaStubModules(): Plugin {
     name: 'purplepanda-test-stub-modules',
     enforce: 'pre',
     resolveId(id) {
+      if (id === SITE_MODULE_ID) return resolve('src/site/empty.ts');
       return id === VIRTUAL_ISLANDS_ID ? RESOLVED_VIRTUAL_ISLANDS_ID : null;
     },
     load(id) {

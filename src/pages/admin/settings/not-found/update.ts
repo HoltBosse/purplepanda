@@ -8,6 +8,7 @@ import { getDb } from "../../../../db/db.js";
 import { NOT_FOUND_SETTING_KEY } from "../../../../db/not-found.js";
 import { dagNodes, settings, settingsKeyTarget } from "../../../../db/schema.js";
 import { runOverride } from "../../../../hooks/index.js";
+import { getDisabledComponents } from "../../../../puck/site-components.server.js";
 import { contentValidationErrorsSchema, formatValidationErrors, validateContentTree } from "../../../../puck/validate-content.js";
 import externalPuckConfig from "../../../../puck.config.js";
 
@@ -36,7 +37,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const parsedContent = JSON.parse(contentResult.data);
 
-    const validationErrors = validateContentTree(externalPuckConfig ?? {}, parsedContent);
+    const validationErrors = validateContentTree(externalPuckConfig ?? {}, parsedContent, { disabledComponents: await getDisabledComponents() });
     const overrideErrors = await runOverride("content:validate", { entity: "not-found", content: parsedContent }, contentValidationErrorsSchema);
     if (overrideErrors) validationErrors.push(...overrideErrors);
     if (validationErrors.length > 0) {

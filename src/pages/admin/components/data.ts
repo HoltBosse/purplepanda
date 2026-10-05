@@ -1,5 +1,6 @@
 import type { Config } from "@puckeditor/core";
 import type { APIContext } from "astro";
+import { getDisabledComponents } from "../../../puck/site-components.server.js";
 import externalPuckConfig from "../../../puck.config.js";
 
 type JsonObject = Record<string, unknown>;
@@ -46,6 +47,11 @@ export async function POST(context: APIContext): Promise<Response> {
 
   if (!component) {
     return json({ error: `Component '${componentName}' not found` }, 404);
+  }
+
+  // Its resolver may read data this site shouldn't reach for a component it hasn't enabled.
+  if ((await getDisabledComponents()).has(componentName)) {
+    return json({ error: `Component '${componentName}' isn't enabled for this site` }, 403);
   }
 
   if (!hasDataResolver(component)) {

@@ -6,7 +6,9 @@ description: How one PurplePanda install serves several sites, and what that mea
 One install serves any number of sites ("tenants"). Each tenant has its own pages, content types,
 templates, media, documents, forms, settings, redirects, tags, roles and audit log, and answers on
 one or more domains (`example.com` and `www.example.com`, or `blog.example.com`, …). The code —
-`src/puck.config.tsx`, `src/plugins.ts`, your own routes — is shared by all of them.
+`src/puck.config.tsx`, `src/plugins.ts`, your own routes — is shared by all of them. A component
+can still be limited to particular sites, and kept out of this repository: see
+[Site Components](/devs/site-components).
 
 # Domains and the root site
 

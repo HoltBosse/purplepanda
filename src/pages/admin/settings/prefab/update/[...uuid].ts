@@ -7,6 +7,7 @@ import { getDb } from "../../../../../db/db.js";
 import { prefabSettingKey } from "../../../../../db/prefabs.js";
 import { dagNodes, settings, settingsKeyTarget } from "../../../../../db/schema.js";
 import { runOverride } from "../../../../../hooks/index.js";
+import { getDisabledComponents } from "../../../../../puck/site-components.server.js";
 import { contentValidationErrorsSchema, formatValidationErrors, validateContentTree } from "../../../../../puck/validate-content.js";
 import externalPuckConfig from "../../../../../puck.config.js";
 
@@ -36,7 +37,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const parsedContent = JSON.parse(contentResult.data);
 
-    const validationErrors = validateContentTree(externalPuckConfig ?? {}, parsedContent);
+    const validationErrors = validateContentTree(externalPuckConfig ?? {}, parsedContent, { disabledComponents: await getDisabledComponents() });
     const overrideErrors = await runOverride("content:validate", { entity: "prefab", content: parsedContent }, contentValidationErrorsSchema);
     if (overrideErrors) validationErrors.push(...overrideErrors);
     if (validationErrors.length > 0) {

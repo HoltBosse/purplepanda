@@ -5,6 +5,8 @@ import { getDb } from '../../../../db/db.js';
 import { tenantDomains, tenants } from '../../../../db/schema.js';
 import { createFormFlashSession } from '../../../../form/session.js';
 import PortalLayout from '../../../../layouts/PortalLayout.astro';
+import { optInComponentNames } from '../../../../puck/site-components.js';
+import externalPuckConfig from '../../../../puck.config.js';
 
 const access = await dashboardAccess(Astro, { superAdmin: true });
 if (access.response) {
@@ -16,6 +18,7 @@ const db = getDb();
 const { id } = Astro.params;
 
 let name = '';
+let enabledComponents: string[] = [];
 let domains: { domain: string; isRoot: boolean; isPrimary: boolean }[] = [];
 if (id) {
     const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id)).limit(1);
@@ -23,6 +26,7 @@ if (id) {
         return Astro.rewrite('/404');
     }
     name = tenant.name;
+    enabledComponents = tenant.enabledComponents;
     domains = await db
         .select({ domain: tenantDomains.domain, isRoot: tenantDomains.isRoot, isPrimary: tenantDomains.isPrimary })
         .from(tenantDomains)
@@ -41,6 +45,18 @@ const domainsValue = flash.domains ?? domains.map((domain) => domain.domain).joi
 const rootValue = flash.root ?? domains.find((domain) => domain.isRoot)?.domain ?? '';
 const rootOptions = domains.map((domain) => domain.domain);
 const primaryValue = flash.primary ?? domains.find((domain) => domain.isPrimary)?.domain ?? '';
+
+// The components this build marks `optIn` (see src/puck/site-components.ts), each ticked when this
+// site has it enabled. Enabled names this build doesn't have are kept by the update handler, and
+// only counted here.
+const components = (externalPuckConfig?.components ?? {}) as Record<string, { label?: string }>;
+const optInComponents = optInComponentNames(externalPuckConfig ?? {})
+    .map((componentName) => ({ name: componentName, label: components[componentName]?.label ?? componentName }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+const checkedComponents = flash.components !== undefined
+    ? flash.components.split('\n')
+    : enabledComponents;
+const unknownComponentCount = enabledComponents.filter((componentName) => !(componentName in components)).length;
 
 const action = id ? `/dashboard/admin/sites/update/${id}` : '/dashboard/admin/sites/update';
 const inputClassList = "w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200";
@@ -80,6 +96,35 @@ const inputClassList = "w-full rounded-md border border-gray-300 px-3 py-2 focus
                 <p class="text-sm opacity-70">
                     A new site starts empty, with an "Administrator" role. Sign in to its admin on one of its
                     domains with your super admin account to add its users and content.
+                </p>
+            )}
+        </div>
+
+        <div class="p-6 bg-base-100 rounded-lg space-y-4">
+            <h2 class="text-lg font-medium">Components</h2>
+            <p class="text-sm opacity-70">
+                Every site can use the standard components. These ones are built for particular sites and only
+                appear in this site's editors once enabled here. Turning one off takes it out of the editors and
+                stops content that uses it from being saved until it's removed; published pages that use it keep
+                rendering.
+            </p>
+            {optInComponents.length > 0 ? (
+                <div class="grid gap-2 sm:grid-cols-2">
+                    {optInComponents.map((component) => (
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" class="checkbox checkbox-sm" name="components" value={component.name} checked={checkedComponents.includes(component.name)} />
+                            <span>{component.label}</span>
+                            {component.label !== component.name && <code class="text-xs opacity-60">{component.name}</code>}
+                        </label>
+                    ))}
+                </div>
+            ) : (
+                <p class="text-sm opacity-70">This install has no site-specific components.</p>
+            )}
+            {unknownComponentCount > 0 && (
+                <p class="text-sm opacity-70">
+                    {unknownComponentCount === 1 ? '1 more component is' : `${unknownComponentCount} more components are`}
+                    {' '}enabled for this site but not part of this build. Saving leaves {unknownComponentCount === 1 ? 'it' : 'them'} enabled.
                 </p>
             )}
         </div>

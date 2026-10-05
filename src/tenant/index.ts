@@ -70,6 +70,11 @@ export async function getPrimaryDomain(db: Db, tenantId: string): Promise<string
   return (await getTenantDomainMap(db)).primaryByTenant.get(tenantId) ?? null;
 }
 
+// The opt-in Puck components a tenant has enabled — see src/puck/site-components.ts.
+export async function getEnabledComponents(db: Db, tenantId: string): Promise<string[]> {
+  return (await getTenantDomainMap(db)).componentsByTenant.get(tenantId) ?? [];
+}
+
 // Where to build links to the root site: its primary hostname when it has one (so they don't land
 // on a hostname that just redirects), else the root domain itself.
 export async function getRootDomain(db: Db): Promise<string | null> {

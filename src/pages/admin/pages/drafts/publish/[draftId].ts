@@ -9,6 +9,7 @@ import { getDb } from "../../../../../db/db.js";
 import { dagNodes, pages } from "../../../../../db/schema.js";
 import { runOverride } from "../../../../../hooks/index.js";
 import { pageRootPropsSchema } from "../../../../../puck/page-root-schema.js";
+import { getDisabledComponents } from "../../../../../puck/site-components.server.js";
 import { contentValidationErrorsSchema, formatValidationErrors, validateContentTree } from "../../../../../puck/validate-content.js";
 import externalPuckConfig from "../../../../../puck.config.js";
 
@@ -41,7 +42,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const parsedContent = JSON.parse(contentResult.data);
 
-    const validationErrors = validateContentTree(externalPuckConfig ?? {}, parsedContent, { rootPropsSchema: pageRootPropsSchema });
+    const validationErrors = validateContentTree(externalPuckConfig ?? {}, parsedContent, { rootPropsSchema: pageRootPropsSchema, disabledComponents: await getDisabledComponents() });
     const overrideErrors = await runOverride("content:validate", { entity: "page", content: parsedContent }, contentValidationErrorsSchema);
     if (overrideErrors) validationErrors.push(...overrideErrors);
     if (validationErrors.length > 0) {

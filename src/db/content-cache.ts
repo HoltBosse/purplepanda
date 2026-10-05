@@ -117,6 +117,8 @@ export interface TenantDomainMap {
   domainsByTenant: Map<string, string[]>;
   // The hostname each tenant's others redirect to, for tenants that have marked one.
   primaryByTenant: Map<string, string>;
+  // The opt-in components each tenant has enabled (tenants.enabled_components).
+  componentsByTenant: Map<string, string[]>;
   // The root domain and the tenant owning it, if one is marked.
   rootDomain: string | null;
   rootTenantId: string | null;
@@ -225,6 +227,7 @@ export async function getTenantDomainMap(db: Db): Promise<TenantDomainMap> {
         tenantId: tenants.id,
         tenantName: tenants.name,
         tenantState: tenants.state,
+        tenantComponents: tenants.enabledComponents,
       })
       .from(tenantDomains)
       .innerJoin(tenants, eq(tenantDomains.tenantId, tenants.id))
@@ -233,6 +236,7 @@ export async function getTenantDomainMap(db: Db): Promise<TenantDomainMap> {
           byDomain: new Map(),
           domainsByTenant: new Map(),
           primaryByTenant: new Map(),
+          componentsByTenant: new Map(),
           rootDomain: null,
           rootTenantId: null,
         };
@@ -247,6 +251,7 @@ export async function getTenantDomainMap(db: Db): Promise<TenantDomainMap> {
             map.rootDomain = row.domain;
           }
           if (row.isPrimary) map.primaryByTenant.set(row.tenantId, row.domain);
+          map.componentsByTenant.set(row.tenantId, row.tenantComponents);
           const domains = map.domainsByTenant.get(row.tenantId) ?? [];
           domains.push(row.domain);
           map.domainsByTenant.set(row.tenantId, domains);

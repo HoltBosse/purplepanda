@@ -163,18 +163,16 @@ async function followToLeaf(
   return { id, exported };
 }
 
-export async function generateIslandsManifest(
-  configPath: string,
-  resolve: ResolveFn,
-  parse: ParseFn,
-): Promise<string> {
+// Lines of the loader map for the components registered in one config-shaped module (puck.config,
+// or the private site module — see ./site/index.ts). Never throws; an unanalyzable module adds none.
+async function manifestLines(configPath: string, resolve: ResolveFn, parse: ParseFn): Promise<string[]> {
   try {
     const ast = await loadAst(configPath, parse);
-    if (!ast) return "export default {};\n";
+    if (!ast) return [];
 
     const bindings = collectImportBindings(ast);
     const componentsObj = findComponentsObject(ast);
-    if (!componentsObj) return "export default {};\n";
+    if (!componentsObj) return [];
 
     const lines: string[] = [];
     for (const prop of componentsObj.properties ?? []) {
@@ -193,10 +191,24 @@ export async function generateIslandsManifest(
         `  ${JSON.stringify(name)}: () => import(${JSON.stringify(leaf.id)}).then((m) => m[${JSON.stringify(leaf.exported)}]),`,
       );
     }
-
-    return `// Auto-generated island loaders. Do not edit.\nexport default {\n${lines.join("\n")}\n};\n`;
+    return lines;
   } catch {
     // Never break the build over island analysis; the runtime falls back to the full config.
-    return "export default {};\n";
+    return [];
   }
+}
+
+// Several modules can register components; a later one's entry wins over an earlier one's of the
+// same name, matching the order puck.config spreads them in.
+export async function generateIslandsManifest(
+  configPaths: string | readonly string[],
+  resolve: ResolveFn,
+  parse: ParseFn,
+): Promise<string> {
+  const lines: string[] = [];
+  for (const configPath of typeof configPaths === "string" ? [configPaths] : configPaths) {
+    lines.push(...(await manifestLines(configPath, resolve, parse)));
+  }
+  if (lines.length === 0) return "export default {};\n";
+  return `// Auto-generated island loaders. Do not edit.\nexport default {\n${lines.join("\n")}\n};\n`;
 }

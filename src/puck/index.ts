@@ -11,6 +11,7 @@ export { ItemContext, useBoundItem, wrapConfigWithDataBinding } from "./data-bin
 export { formRootPropsSchema } from "./form-root-schema.js";
 export { ISLAND_NAME_ATTR, ISLAND_PROPS_ATTR, IslandRenderContext, wrapConfigWithIslands } from "./islands.js";
 export { pageRootPropsSchema } from "./page-root-schema.js";
+export { disabledComponentNames, hideDisabledComponents, optInComponentNames } from "./site-components.js";
 export type { ContentValidationError, ValidateContentTreeOptions } from "./validate-content.js";
 export { formatValidationErrors, validateContentTree } from "./validate-content.js";
 
@@ -84,6 +85,10 @@ declare module "@puckeditor/core" {
   interface ComponentConfigExtensions {
     data?: (fields: any, context?: App.Locals) => Awaitable<Record<string, unknown>>;
     locations?: Location | Location[];
+    // When true, this component is off on every site until a super admin enables it for that site
+    // under Admin → Sites — for components built for one site (or a few). Others are on everywhere.
+    // See ./site-components.ts.
+    optIn?: boolean;
     bindableFields?: Record<string, BindableFieldMeta>;
     // When true, this component is hydrated as a standalone React island on the published front
     // end: its whole render output becomes interactive (hooks, effects, event handlers) while the

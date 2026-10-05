@@ -74,6 +74,30 @@ describe('generateIslandsManifest', () => {
         expect(() => parseAst(out)).not.toThrow();
     });
 
+    // puck.config plus the private site module (see site/resolve.ts), which registers its own.
+    it('merges the components of several config modules', async () => {
+        file('Video.tsx', 'export default function Video() { return null; }');
+        file('Hero.tsx', 'export const Hero = { render: () => null };');
+        const config = file(
+            'config.tsx',
+            `import site from "purplepanda:site";
+             import Video from "./Video.js";
+             export default { components: { Video, ...site.components } };`,
+        );
+        const site = file(
+            'site.ts',
+            `import { Hero } from "./Hero.js";
+             export default { components: { Hero } };`,
+        );
+
+        const out = await generateIslandsManifest([config, site], resolve, parseAst);
+
+        expect(out).toContain('Video.tsx');
+        expect(out).toContain('Hero.tsx');
+        expect(out).toContain('.then((m) => m["Hero"])');
+        expect(() => parseAst(out)).not.toThrow();
+    });
+
     // The point of the analysis: emit the individual component chunk, not the whole barrel.
     it('follows a barrel re-export through to the real component module', async () => {
         file('Video.tsx', 'export default function Video() { return null; }');

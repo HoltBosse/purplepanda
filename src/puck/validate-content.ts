@@ -27,7 +27,13 @@ export type ValidateContentTreeOptions = {
   // ./page-root-schema.js), so there's no propsSchema to look up on a component config for them.
   // Pass one explicitly to also validate root.props alongside the component tree below.
   rootPropsSchema?: ((props: Record<string, unknown>) => z.ZodTypeAny) | undefined;
+  // Components the current site hasn't enabled (see ./site-components.ts). Any instance of one is
+  // an error, so content that still uses a component after it's turned off can't be saved again
+  // until the instance is removed.
+  disabledComponents?: ReadonlySet<string> | undefined;
 };
+
+export const DISABLED_COMPONENT_MESSAGE = "This component isn't enabled for this site. Remove it to save.";
 
 // Validates every component instance in a page/content/form/prefab's Puck tree against its own
 // `propsSchema` (see ./index.js), the same way buildFormSubmissionSchema (./form/schema.js)
@@ -43,6 +49,16 @@ export function validateContentTree(
   const errors: ContentValidationError[] = [];
 
   for (const node of nodes) {
+    if (options?.disabledComponents?.has(node.type)) {
+      errors.push({
+        componentId: typeof node.props?.id === "string" ? node.props.id : node.type,
+        componentType: node.type,
+        field: "(component)",
+        message: DISABLED_COMPONENT_MESSAGE,
+      });
+      continue;
+    }
+
     const component = (config.components as Record<string, unknown> | undefined)?.[node.type] as
       | { propsSchema?: (props: Record<string, unknown>) => z.ZodTypeAny }
       | undefined;

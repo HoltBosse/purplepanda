@@ -61,3 +61,6 @@ psqlshell.sh
 # Vitest browser mode failure artifacts
 .vitest-attachments/
 **/__screenshots__/
+
+# A private site module (components, plugins) compiled into this build -- see src/site/resolve.ts.
+/sites/

@@ -8,6 +8,8 @@ import { invalidateTenantDomainCache } from "../../../../../db/content-cache.js"
 import { getDb } from "../../../../../db/db.js";
 import { roles, tenantDomains, tenants } from "../../../../../db/schema.js";
 import { createFormFlashSession } from "../../../../../form/session.js";
+import { optInComponentNames } from "../../../../../puck/site-components.js";
+import externalPuckConfig from "../../../../../puck.config.js";
 import { runWithTenant } from "../../../../../tenant/context.js";
 import { domainSchema, normalizeDomain, parseDomainList } from "../../../../../tenant/index.js";
 
@@ -39,10 +41,11 @@ export async function POST(context: APIContext): Promise<Response> {
     const rawDomains = field("domains");
     const rawRoot = field("root");
     const rawPrimary = field("primary");
+    const rawComponents = formData.getAll("components").filter((value): value is string => typeof value === "string");
 
     const formFlash = createFormFlashSession(context.session);
     const fail = async (message: string) => {
-        await formFlash.set("tenant", { name: rawName, domains: rawDomains, root: rawRoot, primary: rawPrimary });
+        await formFlash.set("tenant", { name: rawName, domains: rawDomains, root: rawRoot, primary: rawPrimary, components: rawComponents.join("\n") });
         await addAlertToSession(context.session, createAlert(alertType.error, message));
         return context.redirect(isNew ? "/dashboard/admin/sites/new" : `/dashboard/admin/sites/edit/${id}`);
     };
@@ -73,11 +76,17 @@ export async function POST(context: APIContext): Promise<Response> {
     }
 
     let existingDomains: { domain: string; isRoot: boolean }[] = [];
+    let existingComponents: string[] = [];
     if (id) {
-        const [existing] = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.id, id)).limit(1);
+        const [existing] = await db
+            .select({ id: tenants.id, enabledComponents: tenants.enabledComponents })
+            .from(tenants)
+            .where(eq(tenants.id, id))
+            .limit(1);
         if (!existing) {
             return context.rewrite("/404");
         }
+        existingComponents = existing.enabledComponents;
         existingDomains = await db
             .select({ domain: tenantDomains.domain, isRoot: tenantDomains.isRoot })
             .from(tenantDomains)
@@ -111,13 +120,22 @@ export async function POST(context: APIContext): Promise<Response> {
         return fail(`You're signed in through ${context.url.hostname}, so it can't be removed from this site here.`);
     }
 
+    // The opt-in components ticked on the form, which only lists the ones this build has. Names it
+    // doesn't know stay enabled as they were: another image sharing this database (built with
+    // different site components, see docs/devs/site-components) may still need them.
+    const optIn = optInComponentNames(externalPuckConfig ?? {});
+    const enabledComponents = [
+        ...optIn.filter((component) => rawComponents.includes(component)),
+        ...existingComponents.filter((component) => !optIn.includes(component)),
+    ];
+
     const tenantId = await db.transaction(async (tx) => {
         let savedId: string;
         if (id) {
-            await tx.update(tenants).set({ name: name.data }).where(eq(tenants.id, id));
+            await tx.update(tenants).set({ name: name.data, enabledComponents }).where(eq(tenants.id, id));
             savedId = id;
         } else {
-            const [inserted] = await tx.insert(tenants).values({ name: name.data }).returning({ id: tenants.id });
+            const [inserted] = await tx.insert(tenants).values({ name: name.data, enabledComponents }).returning({ id: tenants.id });
             savedId = inserted!.id;
         }
 

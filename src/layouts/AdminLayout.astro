@@ -8,6 +8,7 @@ import { AlertList } from '../alert/AlertList.js';
 import { canSwitchSites } from '../auth/index.js';
 import Container from '../components/Container.astro';
 import ContentTypesScript from '../components/ContentTypesScript.astro';
+import SiteComponentsScript from '../components/SiteComponentsScript.astro';
 import { listContentTypes } from '../db/content-types.js';
 import { getDb } from '../db/db.js';
 import { users } from '../db/schema.js';
@@ -132,6 +133,7 @@ const navItems = (await runOverride('admin:nav', { user, defaultNavItems }, navI
 	<link rel="icon" type="image/svg+xml" href="/admin/assets/favicon.svg" />
 	<link rel="icon" href="/admin/assets/favicon.ico" />
 	<ContentTypesScript />
+	<SiteComponentsScript />
 </head>
 <body class="h-screen overflow-hidden">
 	<div class="flex h-full">

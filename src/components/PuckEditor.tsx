@@ -11,6 +11,7 @@ import { extractFamilyFromLink } from "../form/fields/font-utils.js";
 import { ChevronDown, Save } from "../puck/icons.js";
 import { sanitizeHtml } from "../puck/sanitize-html.js";
 import { sanitizeRichtextData } from "../puck/sanitize-richtext.js";
+import { getInjectedDisabledComponents, hideDisabledComponents } from "../puck/site-components.js";
 import { validateContentTree } from "../puck/validate-content.js";
 import { ensureTemplateSlot } from "./template-slot.js";
 
@@ -200,7 +201,7 @@ function createOverrides(
       // at the last Save/Publish click — so the count (and the field-by-field tooltip) drops as
       // soon as an author actually fixes something, the same way the fieldLabel outline above
       // now does, instead of staying stuck until the next click.
-      const liveErrors = useMemo(() => validateContentTree(config, appStateData, { rootPropsSchema }), [appStateData]);
+      const liveErrors = useMemo(() => validateContentTree(config, appStateData, { rootPropsSchema, disabledComponents: getInjectedDisabledComponents() }), [appStateData]);
 
       // The full per-field messages are in the title tooltip since there's no toast/panel system
       // to host a longer list inline in the header.
@@ -508,7 +509,7 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
   // gets caught there.
   const guardedOnPublish = useCallback(
     (nextData: Data) => {
-      const errors = validateContentTree(config, nextData, { rootPropsSchema });
+      const errors = validateContentTree(config, nextData, { rootPropsSchema, disabledComponents: getInjectedDisabledComponents() });
       if (errors.length === 0) {
         onPublish(nextData);
         return;
@@ -528,7 +529,7 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
   const guardedOnSave = useMemo(() => {
     if (!onSave) return undefined;
     return (nextData: Data) => {
-      const errors = validateContentTree(config, nextData, { rootPropsSchema });
+      const errors = validateContentTree(config, nextData, { rootPropsSchema, disabledComponents: getInjectedDisabledComponents() });
       if (errors.length === 0) onSave(nextData);
     };
   }, [config, onSave, rootPropsSchema]);
@@ -537,7 +538,7 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
   const guardedOnCommit = useMemo(() => {
     if (!onCommit) return undefined;
     return (nextData: Data) => {
-      const errors = validateContentTree(config, nextData, { rootPropsSchema });
+      const errors = validateContentTree(config, nextData, { rootPropsSchema, disabledComponents: getInjectedDisabledComponents() });
       if (errors.length === 0) {
         onCommit(nextData);
         return;
@@ -612,7 +613,9 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
 
   const configCopy = useMemo(() => {
     const nextConfig = {
-      ...config,
+      // Components this site has turned off stay registered, so content already using them still
+      // draws, but drop out of the palette (see puck/site-components.ts).
+      ...hideDisabledComponents(config, getInjectedDisabledComponents()),
       root: {
         ...(config.root ?? {}),
       },

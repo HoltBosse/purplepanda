@@ -41,6 +41,9 @@ export const tenants = pgTable("tenants", {
   id: uuid("id").defaultRandom().primaryKey(),
   state: integer("state").notNull().default(1), // 1 = enabled, 0 = disabled (every domain 404s)
   name: varchar("name", { length: 255 }).notNull(),
+  // The opt-in Puck components (`optIn: true`, see src/puck/site-components.ts) this site may use.
+  // Names this build doesn't know (e.g. from another image sharing the database) are kept as-is.
+  enabledComponents: text("enabled_components").array().notNull().default(sql`'{}'::text[]`),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
