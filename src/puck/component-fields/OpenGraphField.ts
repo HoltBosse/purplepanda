@@ -13,7 +13,8 @@ export const ogField = categoryField(
     description: { type: "textarea", label: "Description" },
     // The raw uploaded image is used as-is for og:image (see page.astro) — no need for the
     // crop/focus/sizing controls that matter when an image is actually laid out on the page.
-    image: { ...imageField, minimal: true } as Field,
+    // Optional: with none set, page.astro just omits og:image.
+    image: { ...imageField, minimal: true, optional: true } as Field,
   },
   // Secondary/optional relative to the rest of root fields — collapsed on load so it doesn't
   // compete with title/alias/etc. for attention until someone actually wants to override it.

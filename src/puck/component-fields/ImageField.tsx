@@ -153,6 +153,7 @@ function ImagePickerField({
   value,
   onChange,
   minimal = false,
+  optional = false,
 }: {
   value: ImageConfig | null;
   onChange: (value: ImageConfig | null) => void;
@@ -160,6 +161,9 @@ function ImagePickerField({
   // image..." picker button — for usages (e.g. an og:image) where the raw uploaded image is
   // used as-is and the extra editing surface is just noise.
   minimal?: boolean;
+  // For usages where no image is a valid choice: drops the error styling from the empty state
+  // and adds a button to clear a chosen image back to null.
+  optional?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -498,11 +502,34 @@ function ImagePickerField({
           type="button"
           onClick={openDialog}
           className={`btn btn-outline join-item justify-start font-normal ${
-            minimal ? "w-full" : "flex-1 min-w-0 rounded-bl-none"
-          } ${!value ? "border-error text-error" : ""}`}
+            minimal && !(optional && value) ? "w-full" : "flex-1 min-w-0"
+          } ${minimal ? "" : "rounded-bl-none"} ${!value && !optional ? "border-error text-error" : ""}`}
         >
           <span className="truncate">{value ? value.title || value.id : "Select an image..."}</span>
         </button>
+        {optional && value && (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="btn btn-outline join-item px-2"
+            aria-label="Remove image"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="size-4"
+              aria-hidden="true"
+            >
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </button>
+        )}
         {!minimal && (
           <>
             <button
@@ -960,18 +987,21 @@ function ImagePickerField({
 // template (see bindableFields below and ../data-binding.js). Spread and override to opt into
 // `minimal: true` for a usage that just needs the raw uploaded image with no crop/focus/sizing
 // controls, e.g. `{ ...imageField, minimal: true }` (see OpenGraphField.ts) — same pattern as
-// overriding DateTimeField's label elsewhere in this package.
-export type ImageFieldConfig = CustomField<ImageConfig | null> & { minimal?: boolean };
+// overriding DateTimeField's label elsewhere in this package. `optional: true` likewise marks a
+// usage where leaving the image empty is fine (see ImagePickerField's `optional` prop).
+export type ImageFieldConfig = CustomField<ImageConfig | null> & { minimal?: boolean; optional?: boolean };
 
 export const imageField: ImageFieldConfig = {
   type: "custom",
   label: "Image",
   minimal: false,
+  optional: false,
   render: ({ field, value, onChange }) => (
     <ImagePickerField
       value={value}
       onChange={onChange}
       minimal={(field as ImageFieldConfig | undefined)?.minimal ?? false}
+      optional={(field as ImageFieldConfig | undefined)?.optional ?? false}
     />
   ),
 };

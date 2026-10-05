@@ -1,9 +1,88 @@
-import type { ComponentConfig } from "@puckeditor/core";
+import type { ComponentConfig, Field } from "@puckeditor/core";
+import type { CSSProperties } from "react";
+import { type ImageConfig, imageField } from "../component-fields/ImageField.js";
+import { categoryField } from "./CategoryObjectField.js";
+
+type ImagePosition = "start" | "end";
 
 export type ButtonProps = {
   children: string;
   href: string;
+  // Grouped under one collapsed "Image" section in the editor (see imageGroupField) — most
+  // buttons are text-only, so these stay out of the way until someone wants an image.
+  image?: {
+    file?: ImageConfig | null;
+    position?: ImagePosition;
+    gap?: number;
+  };
 };
+
+// The image sits beside the label in a flex row rather than in a slot: a slot would let
+// authors drop links, forms or other buttons inside the <a>/<button> (invalid nested interactive
+// content), and flat props stay JSON-serializable and bindable.
+const flexDirection: Record<ImagePosition, CSSProperties["flexDirection"]> = {
+  start: "row",
+  end: "row-reverse",
+};
+
+// Content shared by both the link and submit renders. With no image the label is rendered bare,
+// so existing buttons keep their exact markup.
+function ButtonContent({ children, image }: ButtonProps) {
+  const file = image?.file;
+  if (!file?.id) return <>{children}</>;
+
+  const base = `/image/${file.id}`;
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        flexDirection: flexDirection[image?.position ?? "start"] ?? "row",
+        gap: `${(image?.gap ?? 2) * 0.25}rem`,
+      }}
+    >
+      <picture>
+        <source srcSet={`${base}?fmt=webp`} type="image/webp" />
+        <source srcSet={`${base}?fmt=png`} type="image/png" />
+        <img
+          src={`${base}?fmt=png`}
+          // Decorative: the label beside it already names the button.
+          alt=""
+          // Sized to the label's line height rather than by the picker — explicit pixel sizes
+          // and crops would push the button out of shape, so the field runs in minimal mode.
+          style={{ height: "1.25em", width: "auto" }}
+        />
+      </picture>
+      <span>{children}</span>
+    </span>
+  );
+}
+
+const imageGroupField = categoryField(
+  "Image",
+  {
+    // Minimal: the image is always sized to the label (see ButtonContent), so the picker's
+    // crop/focus/sizing controls would only produce values that get ignored.
+    file: { ...imageField, label: "Image", minimal: true, optional: true } as Field,
+    position: {
+      type: "radio",
+      label: "Position",
+      options: [
+        { label: "Start", value: "start" },
+        { label: "End", value: "end" },
+      ],
+    },
+    gap: {
+      type: "number",
+      label: "Gap",
+      min: 0,
+    },
+  },
+  { defaultExpanded: false },
+) as Field<ButtonProps["image"]>;
+
+const imageDefaults: ButtonProps["image"] = { file: null, position: "start", gap: 2 };
 
 // A link styled as a button everywhere but forms, where it's the form's submit button instead —
 // a link there would leave the page without submitting, and a submit button outside a form does
@@ -19,13 +98,19 @@ const Button: ComponentConfig<ButtonProps> = {
       type: "text",
       label: "Link",
     },
+    image: imageGroupField,
   },
   defaultProps: {
     children: "Button",
     href: "",
+    image: imageDefaults,
   },
-  render: ({ children, href }) => {
-    return <a className="btn btn-primary" href={href || undefined}>{children}</a>;
+  render: (props) => {
+    return (
+      <a className="btn btn-primary" href={props.href || undefined}>
+        <ButtonContent {...props} />
+      </a>
+    );
   },
   locationOverrides: {
     form: {
@@ -34,13 +119,19 @@ const Button: ComponentConfig<ButtonProps> = {
           type: "text",
           label: "Label",
         },
+        image: imageGroupField,
       },
       defaultProps: {
         children: "Submit",
         href: "",
+        image: imageDefaults,
       },
-      render: ({ children }: ButtonProps) => {
-        return <button className="btn btn-primary" type="submit">{children}</button>;
+      render: (props: ButtonProps) => {
+        return (
+          <button className="btn btn-primary" type="submit">
+            <ButtonContent {...props} />
+          </button>
+        );
       },
     },
   },

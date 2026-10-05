@@ -103,6 +103,42 @@ describe('imageField minimal mode', () => {
     });
 });
 
+describe('imageField optional mode', () => {
+    const Render = imageField.render as unknown as (props: {
+        field: typeof imageField;
+        value: ImageValue;
+        onChange: (value: ImageValue) => void;
+    }) => React.JSX.Element;
+
+    it('flags an empty picker as an error by default', async () => {
+        const s = await render(<Render field={imageField} value={null} onChange={vi.fn()} />);
+
+        await expect.element(s.getByRole('button', { name: 'Select an image...' })).toHaveClass('border-error');
+        await expect.element(s.getByRole('button', { name: 'Remove image' })).not.toBeInTheDocument();
+    });
+
+    it('leaves an empty picker unflagged when optional: true', async () => {
+        const s = await render(<Render field={{ ...imageField, optional: true }} value={null} onChange={vi.fn()} />);
+
+        await expect.element(s.getByRole('button', { name: 'Select an image...' })).not.toHaveClass('border-error');
+        await expect.element(s.getByRole('button', { name: 'Remove image' })).not.toBeInTheDocument();
+    });
+
+    it('clears a chosen image back to null when optional: true', async () => {
+        const onChange = vi.fn();
+        const s = await render(
+            <Render
+                field={{ ...imageField, minimal: true, optional: true }}
+                value={{ id: 'img-1', title: 'Sunset' } as ImageValue}
+                onChange={onChange}
+            />,
+        );
+
+        await s.getByRole('button', { name: 'Remove image' }).click();
+        expect(onChange).toHaveBeenCalledWith(null);
+    });
+});
+
 describe('imageField dialog', () => {
     it('loads media from the lookup endpoint when opened', async () => {
         const fetchMock = stubLookup();
