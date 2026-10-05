@@ -66,6 +66,22 @@ export default defineConfig({
     plugins: [
       tailwindcss(),
       {
+        // Astro's content sync (`astro sync`, `astro check`, and `astro dev` itself when it restarts
+        // after a config change) spins up a throwaway Vite server with this same config. That
+        // server still pre-bundles the optimizeDeps.include list below, and by default writes it to
+        // the same node_modules/.vite/deps the dev server is serving from — replacing everything
+        // the dev server's own scan had found with just that list. A running dev server then keeps
+        // handing out its old ?v= hashes for files that no longer exist, and every one of them gets
+        // 504 "Outdated Optimize Dep" until it's restarted. So the throwaway server — the only one
+        // in middleware mode with no websocket and dependency discovery off — gets its own cache.
+        name: "purple-panda-isolate-sync-deps-cache",
+        config({ server, optimizeDeps }) {
+          if (server?.middlewareMode && server.ws === false && optimizeDeps?.noDiscovery) {
+            return { cacheDir: new URL("./node_modules/.vite/sync/", import.meta.url).pathname };
+          }
+        },
+      },
+      {
         name: "purple-panda-site",
         enforce: "pre",
         resolveId(id) {
