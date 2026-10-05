@@ -18,6 +18,7 @@ import { ImagePicker } from "./puck/media/index.js";
 * `data`: A function that returns params matching your render function. is wrapped for client side integration in puck editor and server side in rendering. Allows you to get server side data.
 * `locations`: String or array of strings for `form`, `page`, and/or `template`. Controls where the component shows up
 * `optIn`: Set to `true` to keep the component off on every site until a super admin enables it for that site under Admin → Sites. See [Site Components](/devs/site-components).
+* `siteSettings`: Settings that apply to every use of the component on a site — API keys, provider options, privacy choices — edited once under Admin → Settings instead of on each block. See [Site settings](#site-settings) below.
 * `bindableFields`: A record mapping a component's own prop names to binding metadata (`label`, optional `fieldTypes`, optional `overridable`). Marks that prop as eligible for data-binding when the component is nested inside a `CardCollection`'s card template, so each rendered card can pull the prop's value from a different field on its content-type item. `overridable` additionally lets a group of sub-keys on the bound value (e.g. an image's width/height) be pinned to one shared value set by the author, instead of varying per item.
 * `island`: Set to `true` to hydrate the component as a standalone React island on the published front end. By default a rendered page is fully static HTML — no React runs in the browser. An island component's whole `render` output is hydrated into a live React root, so `useState`, `useEffect`, and event handlers work, while the rest of the page stays static. Its props must be JSON-serializable (primitives, plain objects/arrays) — no `slot` fields or `ReactNode` props, since the props travel to the browser inside the island marker.
 * `propsSchema`: A function, given the component's stored props, that returns the Zod schema they must satisfy - e.g. requiring a field to be non-empty, a URL to be valid, or an image/form/content type to actually be selected. This validates what an editor configured in the side panel, as opposed to `toSubmissionSchema` below, which validates what an end user later posts into a rendered form. It's checked in two places: client-side, blocking Save/Publish in the editor and outlining the offending field in red, and server-side, on every route that persists a page/content item/form/template/prefab - so a component can't be saved half-configured from either surface. Components without it are left unvalidated. Return a `.loose()` Zod object so fields you don't validate (`id`, unrelated props) don't fail. See `prefab/Video.tsx` (`url` required) or `media/ImagePicker.tsx` (`image` required, but not its crop/size sub-fields) for examples.
@@ -25,6 +26,50 @@ import { ImagePicker } from "./puck/media/index.js";
 * `processSubmission`: A function for a form field whose posted value needs a server-side side effect before it's stored — writing an uploaded file to disk, inserting a DB row, calling an external API — rather than being stored as posted. Given the raw `FormData` value(s) for the field (before it's reduced to plain JSON) and the component's own stored props, it returns the value to store in the submission's `data` in its place; that value is what `toSubmissionSchema` then validates. It only runs once a submission has already passed spam/CSRF checks, so a rejected bot submission never triggers the side effect. Throw to reject the submission with a field-specific error message. See `form-fields/Image.tsx` — it writes the uploaded file to disk, creates a media record in the configured destination folder, and stores a `{ id, title, alt }` reference.
 * `submissionDisplay`: Set to `false` to hide this field from the admin submissions viewer, for fields whose stored value isn't a meaningful answer to show an admin — e.g. Turnstile's verification token. Defaults to shown.
 * `renderSubmissionValue`: A function for custom rendering of a field's stored value in the admin submissions viewer, for values the viewer's default text formatting wouldn't render usefully. Given the stored value and the component's props, it returns an HTML string the viewer injects as-is (so it must already be safe/escaped). Omit to fall back to the viewer's default formatting. `Image.tsx` uses this to show its stored media reference as a thumbnail instead of a printed object.
+
+## Site settings
+
+A component declares its site-wide settings with `siteSettings`, and the settings page draws a section for it — for every site that can use it (an `optIn` component a site hasn't enabled gets none). The values are stored as one JSON object in the `settings` table under `component:<name>`.
+
+```ts
+import { defineComponentSiteSettings } from "../component-settings.js";
+
+export const mapSiteSettings = defineComponentSiteSettings({
+  description: "Shown above the fields on the settings page.",
+  fields: {
+    apiKey: { type: "secret", label: "API key" },
+    style: {
+      type: "select",
+      label: "Map style",
+      options: [{ label: "Streets", value: "streets" }, { label: "Satellite", value: "satellite" }],
+      default: "streets",
+    },
+    zoomControls: { type: "boolean", label: "Show zoom controls", default: true },
+    region: { type: "text", label: "Region", default: "us", pattern: /^[a-z]{2}$/, patternMessage: "Use a two-letter code" },
+  },
+});
+```
+
+Field types:
+
+* `text`: a text input. `default` is also what a blank value reads as; `pattern` rejects other values on save.
+* `secret`: write-only. Never sent back to the settings form, the editor or the browser; leaving it blank on save keeps the saved value, and a "Remove the saved value" checkbox clears it.
+* `select`: one of `options`, else `default`.
+* `boolean`: an On/Off select.
+
+Read them on the server with `getComponentSettings(name, settings)` (secrets included — for submission checks and the like) or `getPublicComponentSettings(name, settings)` (secrets left out — safe to pass on to a render) from `src/puck/component-settings.server.ts`. Both read through the settings cache and always return every declared field, normalized: a field added later reads as its default and a stored value that no longer fits falls back to it, so changing the fields needs no migration.
+
+Hand values to `render` through the `data` resolver, under a prop starting with `_` so stored content can't supply it (see `resolver-props.ts`). Import the server module dynamically, so it stays out of the editor bundle:
+
+```ts
+data: async () => {
+  if (!import.meta.env.SSR) return {};
+  const { getPublicComponentSettings } = await import("../component-settings.server.js");
+  return { _map: await getPublicComponentSettings("Map", mapSiteSettings) };
+},
+```
+
+`form-fields/Turnstile.tsx` (keys and widget options) and `prefab/Video.tsx` (an "ask before loading embedded videos" notice) are the built-in examples.
 
 ## Interactive islands
 

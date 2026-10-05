@@ -2,7 +2,7 @@ import * as z from 'zod';
 import { getDb } from '../../../db/db.js';
 import { templates } from '../../../db/schema.js';
 import { getAllFields } from '../../../form/index.js';
-import { FormEncType, FormMethod, type FormSection } from '../../../form/types.js';
+import { type FieldConfig, FormEncType, FormMethod, type FormSection } from '../../../form/types.js';
 import type { ContentTypeRecord } from '../../../puck/content-types.js';
 
 const inputClassList = "w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200 bg-base-100";
@@ -10,10 +10,10 @@ const fields = getAllFields();
 
 export async function getSettingsForm(
     defaultTemplateId?: string,
-    turnstileSiteKey?: string,
-    turnstileSecretKey?: string,
     flash: Record<string, string> = {},
     contentTypes: ContentTypeRecord[] = [],
+    // Components' own settings sections, from ./_component-settings.ts.
+    componentSettingsGroups: FieldConfig[] = [],
     contentTemplateDefaults: Record<string, string> = {},
     headingFontLink?: string,
     bodyFontLink?: string,
@@ -28,8 +28,6 @@ export async function getSettingsForm(
     const allTemplatesOptions = await getDb().select().from(templates);
     const siteNameValue = flash['site-name'] ?? siteName;
     const dtOptionValue = flash['dt-option'] ?? defaultTemplateId;
-    const turnstileSiteKeyValue = flash['turnstile-site-key'] ?? turnstileSiteKey;
-    const turnstileSecretKeyValue = flash['turnstile-secret-key'] ?? turnstileSecretKey;
     const headingFontValue = flash['heading-font'] ?? headingFontLink;
     const bodyFontValue = flash['body-font'] ?? bodyFontLink;
     const emailHostValue = flash['email-host'] ?? emailHost;
@@ -347,68 +345,7 @@ export async function getSettingsForm(
                     ...contentTypeGroups,
                 ],
             },
-            {
-                id: 'turnstile-group-wrapper',
-                name: 'turnstile-group-wrapper',
-                type: "Group",
-                fields: fields,
-                classList: "p-6 bg-base-100 rounded-lg settings-search-section",
-                groupFields: [
-                    {
-                        id: 'turnstile-group-header',
-                        name: 'turnstile-group-header',
-                        type: 'Html',
-                        markup: '<h2 class="text-lg font-medium settings-search-label">Turnstile</h2>',
-                    },
-                    {
-                        id: 'turnstile-site-key-group',
-                        name: 'turnstile-site-key-group',
-                        type: "Group",
-                        fields: fields,
-                        classList: "grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6 mt-6",
-                        groupFields: [
-                            {
-                                id: 'turnstile-site-key-header',
-                                name: 'turnstile-site-key-header',
-                                type: 'Html',
-                                markup: '<h2 class="text-md font-medium flex items-center settings-search-label">Site Key</h2>',
-                            },
-                            {
-                                id: 'turnstile-site-key',
-                                name: 'turnstile-site-key',
-                                type: 'Input',
-                                classList: inputClassList,
-                                ...(turnstileSiteKeyValue ? { value: turnstileSiteKeyValue } : {}),
-                                validator: z.string().optional(),
-                            },
-                        ],
-                    },
-                    {
-                        id: 'turnstile-secret-key-group',
-                        name: 'turnstile-secret-key-group',
-                        type: "Group",
-                        fields: fields,
-                        classList: "grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6 mt-6",
-                        groupFields: [
-                            {
-                                id: 'turnstile-secret-key-header',
-                                name: 'turnstile-secret-key-header',
-                                type: 'Html',
-                                markup: '<h2 class="text-md font-medium flex items-center settings-search-label">Secret Key</h2>',
-                            },
-                            {
-                                id: 'turnstile-secret-key',
-                                name: 'turnstile-secret-key',
-                                type: 'Input',
-                                inputType: 'password',
-                                classList: inputClassList,
-                                ...(turnstileSecretKeyValue ? { value: turnstileSecretKeyValue } : {}),
-                                validator: z.string().optional(),
-                            },
-                        ],
-                    }
-                ]
-            },
+            ...componentSettingsGroups,
             {
                 id: 'email-group-wrapper',
                 name: 'email-group-wrapper',

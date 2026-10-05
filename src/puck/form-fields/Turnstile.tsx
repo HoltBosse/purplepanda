@@ -1,10 +1,12 @@
 import type { ComponentConfig } from "@puckeditor/core";
 import * as z from "zod";
+import { type TurnstileWidgetOptions, turnstileSiteSettings } from "./turnstile-settings.js";
 
-// `siteKey` isn't an editable field — it's resolved server-side by `data` below from the
-// turnstile_site_key setting, mirroring FormEmbed.tsx's `_html`.
+// `_turnstile` isn't an editable field — it's resolved server-side by `data` below from the site's
+// Turnstile settings (Admin → Settings), mirroring FormEmbed.tsx's `_html`. Undefined until both
+// keys are set.
 export type TurnstileProps = {
-  siteKey?: string;
+  _turnstile?: TurnstileWidgetOptions;
 };
 
 type TurnstileRenderProps = TurnstileProps & { id: string; puck?: { isEditing?: boolean } };
@@ -27,14 +29,15 @@ const Turnstile: ComponentConfig<TurnstileProps> = {
   locations: "form",
   submissionDisplay: false,
   toSubmissionSchema,
+  siteSettings: turnstileSiteSettings,
   data: async () => {
     if (!import.meta.env.SSR) return {};
-    const { getTurnstileSiteKey } = await import("./turnstile.server.js");
-    return { siteKey: await getTurnstileSiteKey() };
+    const { getTurnstileWidgetOptions } = await import("./turnstile.server.js");
+    return { _turnstile: await getTurnstileWidgetOptions() };
   },
   fields: {},
   defaultProps: {},
-  render: ({ id, puck, siteKey }: TurnstileRenderProps) => {
+  render: ({ id, puck, _turnstile: options }: TurnstileRenderProps) => {
     if (puck?.isEditing) {
       return (
         <div className="w-full rounded-md border border-dashed border-base-content/30 bg-base-200 px-4 py-6 text-center text-sm text-base-content/60">
@@ -43,17 +46,25 @@ const Turnstile: ComponentConfig<TurnstileProps> = {
       );
     }
 
-    if (!siteKey) {
+    if (!options) {
       return (
         <p className="w-full text-sm text-error">
-          Turnstile is not configured. Set turnstile_site_key and turnstile_secret_key in settings.
+          Turnstile is not configured. Set its site key and secret key under Settings → Turnstile.
         </p>
       );
     }
 
     return (
       <div className="w-full">
-        <div className="cf-turnstile" data-sitekey={siteKey} data-response-field-name={`field-${id}`} />
+        <div
+          className="cf-turnstile"
+          data-sitekey={options.siteKey}
+          data-theme={options.theme}
+          data-size={options.size}
+          data-appearance={options.appearance}
+          data-language={options.language}
+          data-response-field-name={`field-${id}`}
+        />
         <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer />
       </div>
     );

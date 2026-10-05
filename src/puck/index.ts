@@ -1,9 +1,17 @@
 import type { Config, Field, Fields } from "@puckeditor/core";
 import type { Thing } from "schema-dts";
 import type * as z from "zod";
+import type { ComponentSiteSettings } from "./component-settings.js";
 
 export type { ComponentConfig, Slot } from "@puckeditor/core";
 export { ClientComponentDataWrapper, wrapConfigWithClientDataResolvers } from "./client-data-wrapper.js";
+export type {
+  ComponentSettingField,
+  ComponentSettingValues,
+  ComponentSiteSettings,
+  PublicComponentSettingValues,
+} from "./component-settings.js";
+export { componentsWithSiteSettings, defineComponentSiteSettings } from "./component-settings.js";
 export type { ContentTypeFieldDef, ContentTypeInput, ContentTypeRecord, JsonLdConfig } from "./content-types.js";
 export { buildJsonLd, getContentTypeRecords, normalizeBaseUrl } from "./content-types.js";
 export type { BoundItem } from "./data-binding.js";
@@ -93,6 +101,10 @@ declare module "@puckeditor/core" {
     // under Admin → Sites — for components built for one site (or a few). Others are on everywhere.
     // See ./site-components.ts.
     optIn?: boolean;
+    // Settings that apply to every use of this component on a site — API keys, provider options —
+    // edited under Admin → Settings rather than per block, and read server-side through
+    // ./component-settings.server.ts. See ./component-settings.ts.
+    siteSettings?: ComponentSiteSettings;
     bindableFields?: Record<string, BindableFieldMeta>;
     // When true, this component is hydrated as a standalone React island on the published front
     // end: its whole render output becomes interactive (hooks, effects, event handlers) while the

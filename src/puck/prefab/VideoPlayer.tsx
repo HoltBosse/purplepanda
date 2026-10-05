@@ -1,10 +1,4 @@
 import "@videojs/react/video/skin.css";
-import { parseCloudflareSource } from "@videojs/media/dom/cloudflare";
-import { parseSpotifySource } from "@videojs/media/dom/spotify";
-import { parseTikTokSource } from "@videojs/media/dom/tiktok";
-import { parseTwitchSource } from "@videojs/media/dom/twitch";
-import { parseVimeoSource } from "@videojs/media/dom/vimeo";
-import { parseYouTubeSource } from "@videojs/media/dom/youtube";
 import { createPlayer } from "@videojs/react";
 import { CloudflareVideo } from "@videojs/react/media/cloudflare-video";
 import { SpotifyAudio } from "@videojs/react/media/spotify-audio";
@@ -14,26 +8,13 @@ import { VimeoVideo } from "@videojs/react/media/vimeo-video";
 import { YouTubeVideo } from "@videojs/react/media/youtube-video";
 import { Video as Html5Video, VideoSkin, videoFeatures } from "@videojs/react/video";
 import { type CSSProperties, useEffect, useRef } from "react";
+import { detectEmbedProvider } from "./video-providers.js";
 
 const { Player } = createPlayer({ features: videoFeatures });
 
 export interface VideoPlayerProps {
   url: string;
   autoplay: boolean;
-}
-
-type EmbedProvider = "youtube" | "vimeo" | "cloudflare" | "tiktok" | "twitch" | "spotify";
-
-// Ordered by how likely a pasted URL is to be one of these — doesn't affect correctness, since
-// each provider's matcher is specific to its own domain(s).
-function detectEmbedProvider(src: string): EmbedProvider | null {
-  if (parseYouTubeSource(src)) return "youtube";
-  if (parseVimeoSource(src)) return "vimeo";
-  if (parseCloudflareSource(src)) return "cloudflare";
-  if (parseTikTokSource(src)) return "tiktok";
-  if (parseTwitchSource(src)) return "twitch";
-  if (parseSpotifySource(src)) return "spotify";
-  return null;
 }
 
 // Split out of Video.tsx purely for readability — kept as a plain (non-lazy) import there. A

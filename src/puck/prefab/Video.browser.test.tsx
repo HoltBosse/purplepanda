@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-react';
 import Video, { type VideoProps } from './Video';
 
@@ -71,5 +71,70 @@ describe('Video render', () => {
 
         expect(hasSkin(withControls.container)).toBe(true);
         expect(hasSkin(autoplaying.container)).toBe(false);
+    });
+});
+
+describe('Video consent notice', () => {
+    const consent = {
+        message: 'Hosted by {service}; playing loads {service}.',
+        button: 'Play video',
+        remember: true,
+    };
+    const youtube = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+
+    afterEach(() => {
+        localStorage.clear();
+    });
+
+    async function renderWithConsent(props: Partial<VideoProps>) {
+        return render(<VideoRender url="" autoplay={false} {...props} puck={puck} />);
+    }
+
+    it('covers a third-party player with the notice, naming the service', async () => {
+        const screen = await renderWithConsent({ url: youtube, _consent: consent });
+
+        await expect.element(screen.getByText('Hosted by YouTube; playing loads YouTube.')).toBeInTheDocument();
+        await expect.element(screen.getByRole('link', { name: 'YouTube privacy policy' })).toBeInTheDocument();
+        expect(screen.container.querySelector('iframe')).toBeNull();
+    });
+
+    it('loads the player once the visitor chooses to play', async () => {
+        const screen = await renderWithConsent({ url: youtube, _consent: consent });
+
+        await screen.getByRole('button', { name: 'Play video' }).click();
+
+        await expect.poll(() => screen.container.querySelector('[data-video-consent]')).toBeNull();
+        await expect.poll(() => screen.container.querySelector('iframe')).not.toBeNull();
+    });
+
+    it('remembers "always allow" per service in the browser', async () => {
+        const first = await renderWithConsent({ url: youtube, _consent: consent });
+        await first.getByRole('checkbox', { name: 'Always allow YouTube' }).click();
+        await first.getByRole('button', { name: 'Play video' }).click();
+
+        const again = await renderWithConsent({ url: youtube, _consent: consent });
+        await expect.poll(() => again.container.querySelector('[data-video-consent]')).toBeNull();
+
+        const vimeo = await renderWithConsent({ url: 'https://vimeo.com/76979871', _consent: consent });
+        expect(vimeo.container.querySelector('[data-video-consent="vimeo"]')).not.toBeNull();
+    });
+
+    it('does not offer to remember when the site turned that off', async () => {
+        const screen = await renderWithConsent({ url: youtube, _consent: { ...consent, remember: false } });
+
+        expect(screen.container.querySelector('input[type="checkbox"]')).toBeNull();
+    });
+
+    it('plays a plain video file without asking, since there is no service involved', async () => {
+        const screen = await renderVideo({ url: 'https://example.com/clip.mp4', _consent: consent });
+
+        expect(screen.container.querySelector('[data-video-consent]')).toBeNull();
+    });
+
+    it('loads embeds straight away when the site has the notice off', async () => {
+        const screen = await renderWithConsent({ url: youtube });
+
+        await expect.poll(() => screen.container.querySelector('iframe')).not.toBeNull();
+        expect(screen.container.querySelector('[data-video-consent]')).toBeNull();
     });
 });

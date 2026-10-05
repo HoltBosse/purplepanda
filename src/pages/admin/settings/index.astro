@@ -8,7 +8,11 @@ import Form from '../../../form/Form.astro';
 import { getAllFields } from '../../../form/index.js';
 import { createFormFlashSession } from '../../../form/session.js';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { componentsWithSiteSettings } from '../../../puck/component-settings.js';
+import { getStoredComponentSettings } from '../../../puck/component-settings.server.js';
+import { getDisabledComponents } from '../../../puck/site-components.server.js';
 import externalPuckConfig from '../../../puck.config.js';
+import { getComponentSettingsGroups } from './_component-settings.js';
 import { getSettingsForm } from './_form.js';
 
 const db = getDb();
@@ -18,10 +22,6 @@ const defaultTemplateId = defaultTemplateSetting?.value as string | undefined;
 
 const [siteNameSetting] = await db.select().from(settings).where(eq(settings.key, 'site_name')).limit(1);
 const siteName = siteNameSetting?.value as string | undefined;
-
-const turnstileSettings = await db.select().from(settings).where(inArray(settings.key, ['turnstile_site_key', 'turnstile_secret_key']));
-const turnstileSiteKey = turnstileSettings.find(s => s.key === 'turnstile_site_key')?.value as string | undefined;
-const turnstileSecretKey = turnstileSettings.find(s => s.key === 'turnstile_secret_key')?.value as string | undefined;
 
 const fontSettings = await db.select().from(settings).where(inArray(settings.key, ['heading_font_link', 'body_font_link']));
 const headingFontLink = fontSettings.find(s => s.key === 'heading_font_link')?.value as string | undefined;
@@ -56,12 +56,14 @@ const fields = getAllFields();
 const formFlash = createFormFlashSession(Astro.session);
 const flash = await formFlash.get('settings') ?? {};
 await formFlash.delete('settings');
+// Components declaring site settings get a section each, unless this site can't use them.
+const settingsComponents = componentsWithSiteSettings(externalPuckConfig ?? {}, await getDisabledComponents());
+const componentSettings = await getStoredComponentSettings(settingsComponents);
 const form = await getSettingsForm(
 	defaultTemplateId,
-	turnstileSiteKey,
-	turnstileSecretKey,
 	flash,
 	contentTypes,
+	getComponentSettingsGroups(settingsComponents, componentSettings, flash),
 	contentTemplateDefaults,
 	headingFontLink,
 	bodyFontLink,

@@ -6,18 +6,34 @@ import { getDb } from "../../../db/db.js";
 import { settings, settingsKeyTarget } from "../../../db/schema.js";
 import { createUserAlertMessageFromArray, formDataToRecord, getFieldByName, validateForm } from "../../../form/index.js";
 import { createFormFlashSession } from "../../../form/session.js";
+import { componentSettingsKey, componentsWithSiteSettings } from "../../../puck/component-settings.js";
+import { getStoredComponentSettings } from "../../../puck/component-settings.server.js";
+import { getDisabledComponents } from "../../../puck/site-components.server.js";
+import externalPuckConfig from "../../../puck.config.js";
+import { componentSecretFieldNames, getComponentSettingsGroups, readComponentSettingsForm } from "./_component-settings.js";
 import { getSettingsForm } from "./_form.js";
 
 export async function POST(context: APIContext): Promise<Response> {
     const db = getDb();
     const contentTypes = await listContentTypes(db);
-    const form = await getSettingsForm(undefined, undefined, undefined, {}, contentTypes);
+    // Only the components this site can use: a disabled one's settings are left as they are.
+    const settingsComponents = componentsWithSiteSettings(externalPuckConfig ?? {}, await getDisabledComponents());
+    const storedComponentSettings = await getStoredComponentSettings(settingsComponents);
+    const form = await getSettingsForm(
+        undefined,
+        {},
+        contentTypes,
+        getComponentSettingsGroups(settingsComponents, storedComponentSettings),
+    );
     const formData = await context.request.formData();
     const formFlash = createFormFlashSession(context.session);
     const result = validateForm(form, formData);
 
     if (!result.success) {
-        await formFlash.set('settings', formDataToRecord(formData));
+        const flashValues = formDataToRecord(formData);
+        // Secrets aren't kept in the session; the form never shows them again anyway.
+        for (const name of componentSecretFieldNames(settingsComponents)) delete flashValues[name];
+        await formFlash.set('settings', flashValues);
         const errorMessage = createUserAlertMessageFromArray(form, result.errors);
         const alert = createAlert(alertType.error, errorMessage);
         await addAlertToSession(context.session, alert);
@@ -26,8 +42,6 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const siteName = getFieldByName(form, 'site-name')?.value ?? '';
     const defaultTemplateId = getFieldByName(form, 'dt-option')?.value;
-    const turnstileSiteKey = getFieldByName(form, 'turnstile-site-key')?.value ?? '';
-    const turnstileSecretKey = getFieldByName(form, 'turnstile-secret-key')?.value ?? '';
     const headingFontLink = getFieldByName(form, 'heading-font')?.value ?? '';
     const bodyFontLink = getFieldByName(form, 'body-font')?.value ?? '';
     const emailHost = getFieldByName(form, 'email-host')?.value ?? '';
@@ -43,16 +57,6 @@ export async function POST(context: APIContext): Promise<Response> {
         .insert(settings)
         .values({ key: 'default_template', value: defaultTemplateId })
         .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: defaultTemplateId } });
-
-    await db
-        .insert(settings)
-        .values({ key: 'turnstile_site_key', value: turnstileSiteKey })
-        .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: turnstileSiteKey } });
-
-    await db
-        .insert(settings)
-        .values({ key: 'turnstile_secret_key', value: turnstileSecretKey })
-        .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: turnstileSecretKey } });
 
     await db
         .insert(settings)
@@ -88,6 +92,13 @@ export async function POST(context: APIContext): Promise<Response> {
             .insert(settings)
             .values({ key: templateSettingKey, value: templateValue })
             .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: templateValue } });
+    }
+
+    for (const [name, value] of readComponentSettingsForm(form, settingsComponents, storedComponentSettings)) {
+        await db
+            .insert(settings)
+            .values({ key: componentSettingsKey(name), value })
+            .onConflictDoUpdate({ target: settingsKeyTarget, set: { value } });
     }
 
     invalidateSettingsCache(db);

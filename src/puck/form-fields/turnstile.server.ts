@@ -1,19 +1,19 @@
-import { eq } from "drizzle-orm";
-import { getDb } from "../../db/db.js";
-import { settings } from "../../db/schema.js";
+import { publicComponentSettings } from "../component-settings.js";
+import { getComponentSettings } from "../component-settings.server.js";
+import { type TurnstileWidgetOptions, turnstileSiteSettings } from "./turnstile-settings.js";
 
-const SITE_KEY_SETTING = "turnstile_site_key";
-const SECRET_KEY_SETTING = "turnstile_secret_key";
 const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
-async function getSettingValue(key: string): Promise<string | undefined> {
-  const db = getDb();
-  const [row] = await db.select({ value: settings.value }).from(settings).where(eq(settings.key, key)).limit(1);
-  return typeof row?.value === "string" && row.value.length > 0 ? row.value : undefined;
+function getTurnstileSettings() {
+  return getComponentSettings("Turnstile", turnstileSiteSettings);
 }
 
-export function getTurnstileSiteKey(): Promise<string | undefined> {
-  return getSettingValue(SITE_KEY_SETTING);
+// The widget's options for the current site, or undefined until both keys are set — a widget with
+// no secret to verify against would only ever produce submissions that fail.
+export async function getTurnstileWidgetOptions(): Promise<TurnstileWidgetOptions | undefined> {
+  const settings = await getTurnstileSettings();
+  if (!settings.siteKey || !settings.secretKey) return undefined;
+  return publicComponentSettings(turnstileSiteSettings, settings);
 }
 
 // Verifies a submitted Turnstile response token against Cloudflare's siteverify API using the
@@ -23,7 +23,7 @@ export function getTurnstileSiteKey(): Promise<string | undefined> {
 export async function verifyTurnstileToken(token: unknown): Promise<boolean> {
   if (typeof token !== "string" || token.length === 0) return false;
 
-  const secretKey = await getSettingValue(SECRET_KEY_SETTING);
+  const { secretKey } = await getTurnstileSettings();
   if (!secretKey) return false;
 
   try {

@@ -73,7 +73,9 @@ export function getFieldByName(form: FormSection, name: string): FieldConfig | n
 export function createUserAlertMessageFromArray(form: FormSection, errors: Record<string, string>): string {
   return Object.entries(errors)
     .map(([name, error]) => {
-      const label = getFieldByName(form, name)?.label ?? name;
+      // alertLabel names a field in error messages without rendering a <label> above it.
+      const field = getFieldByName(form, name);
+      const label = field?.alertLabel ?? field?.label ?? name;
       return `${label}: ${error}`;
     })
     .join('\n');

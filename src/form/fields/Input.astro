@@ -6,10 +6,11 @@ import type { BaseFieldProps } from "../types";
 interface Props extends BaseFieldProps {
   placeholder?: string;
   classList?: string;
+  autocomplete?: string;
   inputType?: "text" | "email" | "password" | "number" | "tel" | "url" | "checkbox" | "radio" | "file" | "submit" | "button" | "reset" | "hidden" | "date" | "time" | "datetime-local" | "month" | "week" | "color" | "search" | "range";
 }
 
-const { placeholder, classList, inputType, ...baseProps } = Astro.props as Props;
+const { placeholder, classList, autocomplete, inputType, ...baseProps } = Astro.props as Props;
 const { id, name, value, required, type } = baseProps;
 const resolvedInputType = (inputType ?? type ?? "text") as astroHTML.JSX.HTMLInputTypeAttribute;
 const isPassword = resolvedInputType === "password";
@@ -26,6 +27,7 @@ const isPassword = resolvedInputType === "password";
         placeholder={placeholder}
         value={value}
         required={required}
+        autocomplete={autocomplete}
         data-password-input
       />
       <button
@@ -47,6 +49,7 @@ const isPassword = resolvedInputType === "password";
       placeholder={placeholder}
       value={value}
       required={required}
+      autocomplete={autocomplete}
     />
   )}
 </BaseField>
