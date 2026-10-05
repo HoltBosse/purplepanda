@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { domainSchema, linkUrlOnDomain, normalizeDomain, parseDomainInput, parseDomainList, pickPrimaryDomain, urlOnDomain } from './index';
+import { domainSchema, hostingDomainFor, hostingHostname, linkUrlOnDomain, normalizeDomain, parseDomainInput, parseDomainList, parseHostingHostname, pickPrimaryDomain, urlOnDomain } from './index';
 
 describe('normalizeDomain', () => {
     it('lowercases and drops a fully-qualified trailing dot', () => {
@@ -77,5 +77,28 @@ describe('domainSchema', () => {
         expect(domainSchema.safeParse('evil.example/path').success).toBe(false);
         expect(domainSchema.safeParse(42).success).toBe(false);
         expect(domainSchema.safeParse(null).success).toBe(false);
+    });
+});
+
+describe('hosting hostnames', () => {
+    const id = '0b6c4c8e-5d3a-4e8f-9a51-2f6a3c1d7e90';
+
+    it('defaults to hosting.<root domain>, preferring HOSTING_DOMAIN', () => {
+        expect(hostingDomainFor('example.com', undefined)).toBe('hosting.example.com');
+        expect(hostingDomainFor('example.com', 'Sites.Example.NET')).toBe('sites.example.net');
+        expect(hostingDomainFor(null, undefined)).toBeNull();
+    });
+
+    it('round-trips a tenant id', () => {
+        const hostname = hostingHostname(id.toUpperCase(), 'hosting.example.com');
+        expect(hostname).toBe(`${id}.hosting.example.com`);
+        expect(parseHostingHostname(hostname, 'hosting.example.com')).toBe(id);
+    });
+
+    it('only accepts a single uuid label directly under the hosting domain', () => {
+        for (const domain of ['hosting.example.com', 'www.hosting.example.com', `x.${id}.hosting.example.com`, `${id}.example.com`, `${id}xhosting.example.com`]) {
+            expect(parseHostingHostname(domain, 'hosting.example.com'), domain).toBeNull();
+        }
+        expect(parseHostingHostname(`${id}.hosting.example.com`, null)).toBeNull();
     });
 });

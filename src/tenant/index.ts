@@ -2,63 +2,53 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as z from "zod";
 import { getTenantDomainMap } from "../db/content-cache.js";
 import type { TenantContext } from "./context.js";
+import { normalizeDomain } from "./domains.js";
+
+// Hostname parsing lives in ./domains.ts, which has no server dependencies (the site form's script
+// uses it too).
+export { domainSchema, normalizeDomain, parseDomainInput, parseDomainList } from "./domains.js";
 
 type Db = NodePgDatabase<Record<string, unknown>>;
 
-// A hostname label: letters, digits and inner hyphens, 1-63 characters. A domain is one or more of
-// them (so a bare `localhost` counts, for development) and at most 253 characters overall.
-const LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
-
-function isValidDomain(domain: string): boolean {
-  return domain.length > 0 && domain.length <= 253 && domain.split(".").every((label) => LABEL.test(label));
-}
-
-// The canonical form domains are stored and looked up in: lowercased, without the trailing dot of
-// a fully-qualified name. Returns null for anything that isn't a plain hostname.
-export function normalizeDomain(hostname: string): string | null {
-  const domain = hostname.trim().toLowerCase().replace(/\.$/, "");
-  return isValidDomain(domain) ? domain : null;
-}
-
-// A hostname from a client (a query param, a form field), validated and normalized as above.
-export const domainSchema = z.string().max(253).transform((value, ctx) => {
-  const domain = normalizeDomain(value);
-  if (!domain) {
-    ctx.addIssue({ code: "custom", message: "Not a valid hostname" });
-    return z.NEVER;
-  }
-  return domain;
-});
-
-// Lenient parsing for what an admin types into the tenant form: tolerates a pasted URL's scheme
-// and trailing slash, but not a path, port or anything else that isn't part of the hostname.
-export function parseDomainInput(raw: string): string | null {
-  const stripped = raw.trim().replace(/^https?:\/\//i, "").replace(/\/$/, "");
-  return normalizeDomain(stripped);
-}
-
-// One domain per line (or comma separated), blank lines ignored, duplicates collapsed. `invalid`
-// holds whatever didn't parse, as typed, so the form can say which.
-export function parseDomainList(raw: string): { domains: string[]; invalid: string[] } {
-  const domains = new Set<string>();
-  const invalid: string[] = [];
-  for (const entry of raw.split(/[\n,]/)) {
-    if (!entry.trim()) continue;
-    const domain = parseDomainInput(entry);
-    if (domain) domains.add(domain);
-    else invalid.push(entry.trim());
-  }
-  return { domains: [...domains], invalid };
-}
-
-// The tenant a request's hostname belongs to, or null when no enabled tenant answers on it.
+// The tenant a request's hostname belongs to, or null when no enabled tenant answers on it. Besides
+// the hostnames in tenant_domains, every tenant answers on its hosting hostname (see below).
 export async function resolveTenantForHostname(db: Db, hostname: string): Promise<TenantContext | null> {
   const domain = normalizeDomain(hostname);
   if (!domain) return null;
   const map = await getTenantDomainMap(db);
-  const entry = map.byDomain.get(domain);
+  const hostingId = parseHostingHostname(domain, hostingDomainFor(map.rootDomain));
+  // A tenant always has at least one domain of its own, so its first one finds its entry.
+  const entry = map.byDomain.get(hostingId ? (map.domainsByTenant.get(hostingId)?.[0] ?? "") : domain);
   if (entry?.tenantState !== 1) return null;
   return { id: entry.tenantId, name: entry.tenantName, isRoot: entry.tenantId === map.rootTenantId };
+}
+
+// Every tenant also answers on `<tenant id>.<hosting domain>`: the hostname a site's own domains
+// point their DNS at (a CNAME, or an apex's flattened CNAME / ALIAS / ANAME), so one wildcard
+// record (`*.hosting.example.com`) sends them all here. The hosting domain is HOSTING_DOMAIN, or
+// `hosting.` plus the root domain without it — set HOSTING_DOMAIN in production, or moving the
+// root domain changes every site's target and breaks their DNS. Null with no root domain marked.
+export function hostingDomainFor(rootDomain: string | null, env: string | undefined = process.env.HOSTING_DOMAIN): string | null {
+  const configured = env ? normalizeDomain(env) : null;
+  return configured ?? (rootDomain ? `hosting.${rootDomain}` : null);
+}
+
+// Where Caddy's on-demand TLS `ask` checks a hostname — see src/pages/purplepanda/tls-ask.ts.
+export const TLS_ASK_PATH = "/purplepanda/tls-ask";
+
+export async function getHostingDomain(db: Db): Promise<string | null> {
+  return hostingDomainFor((await getTenantDomainMap(db)).rootDomain);
+}
+
+export function hostingHostname(tenantId: string, hostingDomain: string): string {
+  return `${tenantId.toLowerCase()}.${hostingDomain}`;
+}
+
+// The tenant id a hosting hostname names, or null when the (normalized) domain isn't one.
+export function parseHostingHostname(domain: string, hostingDomain: string | null): string | null {
+  if (!hostingDomain || !domain.endsWith(`.${hostingDomain}`)) return null;
+  const label = domain.slice(0, -hostingDomain.length - 1);
+  return z.uuid().safeParse(label).success ? label : null;
 }
 
 export async function getTenantDomains(db: Db, tenantId: string): Promise<string[]> {

@@ -7,6 +7,7 @@ import { createFormFlashSession } from '../../../../form/session.js';
 import PortalLayout from '../../../../layouts/PortalLayout.astro';
 import { optInComponentNames } from '../../../../puck/site-components.js';
 import externalPuckConfig from '../../../../puck.config.js';
+import { getHostingDomain, hostingHostname } from '../../../../tenant/index.js';
 
 const access = await dashboardAccess(Astro, { superAdmin: true });
 if (access.response) {
@@ -56,6 +57,12 @@ const optInComponents = optInComponentNames(externalPuckConfig ?? {})
 const checkedComponents = flash.components !== undefined
     ? flash.components.split('\n')
     : enabledComponents;
+// The hostname this site's domains point their DNS at (see hostingDomainFor() in src/tenant/index.ts).
+// It names the site by id, so a new site's id is chosen now and posted back with the form.
+const hostingId = id ?? (flash.hostingId || crypto.randomUUID());
+const hostingDomain = await getHostingDomain(db);
+const hostingTarget = hostingDomain ? hostingHostname(hostingId, hostingDomain) : null;
+
 const unknownComponentCount = enabledComponents.filter((componentName) => !(componentName in components)).length;
 
 const action = id ? `/dashboard/admin/sites/update/${id}` : '/dashboard/admin/sites/update';
@@ -64,15 +71,6 @@ const inputClassList = "w-full rounded-md border border-gray-300 px-3 py-2 focus
 
 <PortalLayout user={user} title={id ? 'Edit site' : 'New site'}>
     <form method="POST" action={action} class="space-y-6">
-        {!id && (
-            <div role="alert" class="alert alert-warning mt-2">
-                <span>
-                    <strong>Work in progress:</strong> creating sites here is not complete yet. Consult the admin
-                    before adding a new site.
-                </span>
-            </div>
-        )}
-
         <div class="flex items-center justify-between align-middle pt-2">
             <h1 class="text-2xl font-semibold">{id ? 'Edit Site' : 'New Site'}</h1>
             <button class="btn btn-primary">Save</button>
@@ -89,13 +87,46 @@ const inputClassList = "w-full rounded-md border border-gray-300 px-3 py-2 focus
                 <textarea class={`${inputClassList} font-mono`} name="domains" rows="5" required placeholder={'example.com\nwww.example.com'}>{domainsValue}</textarea>
                 <span class="block mt-1 text-sm opacity-70">
                     One hostname per line, without scheme, port or path — e.g. <code>example.com</code>,
-                    <code>www.example.com</code> or <code>blog.example.com</code>. Point each one's DNS at this server.
+                    <code>www.example.com</code> or <code>blog.example.com</code>. The records each one needs are under DNS below.
                 </span>
             </label>
+            {!id && <input type="hidden" name="hostingId" value={hostingId} />}
             {!id && (
                 <p class="text-sm opacity-70">
                     A new site starts empty, with an "Administrator" role. Sign in to its admin on one of its
                     domains with your super admin account to add its users and content.
+                </p>
+            )}
+        </div>
+
+        <div class="p-6 bg-base-100 rounded-lg space-y-4">
+            <h2 class="text-lg font-medium">DNS</h2>
+            {hostingTarget ? (
+                <div id="domain-dns" class="space-y-4" data-target={hostingTarget}>
+                    <p class="text-sm opacity-70">
+                        Point each of the site's domains at <code class="select-all">{hostingTarget}</code>, at the DNS
+                        provider the domain is registered with: a <code>CNAME</code> record for a subdomain like
+                        <code>www</code>, and for the apex domain (<code>example.com</code> itself, which can't have a plain
+                        CNAME) whichever stand-in the provider has — CNAME flattening, or an <code>ALIAS</code> or
+                        <code>ANAME</code> record. Remove any other <code>A</code>,
+                        <code>AAAA</code> or <code>CNAME</code> records on the same names first. A certificate is issued
+                        automatically on the first visit once the DNS has updated, which can take up to a day.
+                    </p>
+                    <label class="block">
+                        <span class="block mb-1 font-medium">DNS provider</span>
+                        <select id="dns-provider" class={`${inputClassList} bg-base-100 text-base-content sm:max-w-xs`}></select>
+                    </label>
+                    <div id="domain-dns-records" class="space-y-6"></div>
+                    {id && (
+                        <p class="text-sm opacity-70">
+                            The site also answers on <a class="link" href={`https://${hostingTarget}/`} target="_blank" rel="noopener">{hostingTarget}</a> itself,
+                            to check it's being served before its domains have moved over.
+                        </p>
+                    )}
+                </div>
+            ) : (
+                <p class="text-sm opacity-70">
+                    No hosting domain to point domains at: mark a root domain, or set <code>HOSTING_DOMAIN</code>.
                 </p>
             )}
         </div>
@@ -166,4 +197,5 @@ const inputClassList = "w-full rounded-md border border-gray-300 px-3 py-2 focus
             </div>
         )}
     </form>
+    <script>import '../../../../scripts/domain-dns'</script>
 </PortalLayout>

@@ -33,6 +33,39 @@ root site can't be disabled.
 
 A new site starts empty apart from one "Administrator" role with admin access.
 
+## Pointing domains here
+
+Every site also answers on its **hosting hostname**, `<site id>.<HOSTING_DOMAIN>` (by default
+`HOSTING_DOMAIN` is `hosting.` plus the root domain; set it explicitly in production, since moving
+the root domain would otherwise change every site's hostname). A site's own domains point their DNS
+at that: a `CNAME` for a subdomain, and for an apex domain whatever its DNS provider offers instead —
+CNAME flattening, or an `ALIAS` or `ANAME` record. A provider with none of those (GoDaddy) is
+told to move the domain's nameservers to Cloudflare; the form never suggests an `A` record to the
+server's address, which would silently break if the server moved.
+The new/edit site form walks through the records per provider. One wildcard record serves every
+hosting hostname: `*.hosting.example.com` `A`/`AAAA` → the server.
+
+Certificates are issued on demand by the proxy, on each hostname's first visit. With Caddy:
+
+```
+{
+	on_demand_tls {
+		ask http://localhost:3012/purplepanda/tls-ask
+	}
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+	reverse_proxy localhost:3012
+}
+```
+
+`/purplepanda/tls-ask?domain=<hostname>` answers 200 for every hostname an enabled site answers on
+(its domains and its hosting hostname) and 404 otherwise, so nobody can have certificates issued
+just by pointing a domain at the server. It's served on any hostname, outside any site.
+
 `astro.config.ts` trusts `X-Forwarded-Host`/`-Proto` from any client, so the proxy in front must
 overwrite those headers rather than pass a client's through — otherwise a request for one site can
 be made to render another's, and a shared cache would store it under the wrong URL.

@@ -4,7 +4,7 @@ import { clearAlertsFromSession, getAlertsFromSession } from "../alert/index.js"
 import { isAdminSession } from "../auth/index.js";
 import { getDb } from "../db/db.js";
 import { runWithTenant } from "../tenant/context.js";
-import { getPrimaryDomain, normalizeDomain, resolveTenantForHostname, urlOnDomain } from "../tenant/index.js";
+import { getPrimaryDomain, normalizeDomain, resolveTenantForHostname, TLS_ASK_PATH, urlOnDomain } from "../tenant/index.js";
 
 // Paths that do not require authentication
 const PUBLIC_PATHS = ["/admin/login", "/admin/sso"];
@@ -25,6 +25,11 @@ function hasMalformedIdParam(params: Record<string, string | undefined>): boolea
 }
 
 export const onRequest = defineMiddleware(async (context, next) => {
+  // Asked by the TLS proxy, as no site in particular, whether a hostname is one of any site's.
+  if (context.url.pathname === TLS_ASK_PATH) {
+    return next();
+  }
+
   const db = getDb();
 
   // Every request belongs to whichever tenant its hostname is registered to; an unknown hostname,

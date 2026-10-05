@@ -41,14 +41,30 @@ export async function POST(context: APIContext): Promise<Response> {
     const rawDomains = field("domains");
     const rawRoot = field("root");
     const rawPrimary = field("primary");
+    // A new site's id, chosen when its form was rendered: the form shows the hosting hostname
+    // (`<id>.hosting.…`) its domains should point at, so the site has to be created with that id.
+    const rawHostingId = field("hostingId");
     const rawComponents = formData.getAll("components").filter((value): value is string => typeof value === "string");
 
     const formFlash = createFormFlashSession(context.session);
-    const fail = async (message: string) => {
-        await formFlash.set("tenant", { name: rawName, domains: rawDomains, root: rawRoot, primary: rawPrimary, components: rawComponents.join("\n") });
+    const fail = async (message: string, flashHostingId = rawHostingId) => {
+        await formFlash.set("tenant", { name: rawName, domains: rawDomains, root: rawRoot, primary: rawPrimary, components: rawComponents.join("\n"), hostingId: flashHostingId });
         await addAlertToSession(context.session, createAlert(alertType.error, message));
         return context.redirect(isNew ? "/dashboard/admin/sites/new" : `/dashboard/admin/sites/edit/${id}`);
     };
+
+    const hostingIdField = z.uuid().safeParse(rawHostingId);
+    const hostingId = hostingIdField.success ? hostingIdField.data.toLowerCase() : null;
+    if (isNew) {
+        if (!hostingId) {
+            return fail("The form was missing the new site's id. Reload the page and try again.", "");
+        }
+        const [existing] = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.id, hostingId)).limit(1);
+        if (existing) {
+            // Left out of the flash, so the form comes back with a fresh id (and hosting hostname).
+            return fail("This form was already used to create a site, so the new one gets a different hosting hostname. Check its DNS records below and save again.", "");
+        }
+    }
 
     const name = nameSchema.safeParse(rawName);
     if (!name.success) {
@@ -135,7 +151,7 @@ export async function POST(context: APIContext): Promise<Response> {
             await tx.update(tenants).set({ name: name.data, enabledComponents }).where(eq(tenants.id, id));
             savedId = id;
         } else {
-            const [inserted] = await tx.insert(tenants).values({ name: name.data, enabledComponents }).returning({ id: tenants.id });
+            const [inserted] = await tx.insert(tenants).values({ id: hostingId!, name: name.data, enabledComponents }).returning({ id: tenants.id });
             savedId = inserted!.id;
         }
 
