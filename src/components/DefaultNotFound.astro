@@ -1,14 +1,19 @@
+---
+import Analytics from './Analytics.astro';
+---
 
 <!doctype html>
 <html lang="en" class="default-not-found">
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width" />
+		<Analytics part="head" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<link rel="icon" href="/favicon.ico" />
 		<title>404 — Page Not Found</title>
 	</head>
 	<body>
+		<Analytics part="body" />
 		<main>
 			<div class="container">
 				<div class="code">404</div>

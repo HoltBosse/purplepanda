@@ -1,0 +1,18 @@
+---
+import { ANALYTICS_SETTING_KEY, renderAnalytics } from '../analytics/index.js';
+import { getSetting } from '../db/content-cache.js';
+import { getDb } from '../db/db.js';
+
+interface Props {
+    // `head` goes as early in the <head> as possible; `body` (the providers' <noscript>
+    // fallbacks) right after <body> opens.
+    part: 'head' | 'body';
+}
+
+// The tracking snippets of the providers enabled under /admin/settings/analytics. Rendered by
+// every public route — the pages and both 404 pages — but not the admin previews, so editors
+// don't show up in the site's analytics.
+const { part } = Astro.props;
+const markup = renderAnalytics(await getSetting(getDb(), ANALYTICS_SETTING_KEY))[part];
+---
+{markup && <Fragment set:html={markup} />}

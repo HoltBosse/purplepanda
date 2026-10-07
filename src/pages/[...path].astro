@@ -3,6 +3,7 @@ import '../styles/global.css';
 import type { Data } from '@puckeditor/core';
 import { eq } from 'drizzle-orm';
 import type { BreadcrumbList } from 'schema-dts';
+import Analytics from '../components/Analytics.astro';
 import PageRenderer from '../components/PageRenderer.js';
 import ThemeHead from '../components/ThemeHead.astro';
 import { getContentTypePage, getPlainPageForPath } from '../db/content-cache.js';
@@ -144,6 +145,7 @@ const jsonLdScript = jsonLdDocument ? JSON.stringify(jsonLdDocument).replace(/</
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <Analytics part="head" />
     <title>{title}</title>
     {ogDescription && <meta name="description" content={ogDescription} />}
     {ogTitle && <meta property="og:title" content={ogTitle} />}
@@ -156,6 +158,7 @@ const jsonLdScript = jsonLdDocument ? JSON.stringify(jsonLdDocument).replace(/</
     <ThemeHead />
 </head>
 <body data-scheme={REPLACEMENT_DEFAULTS.scheme}>
+    <Analytics part="body" />
     <PageRenderer pageData={pageData} templateData={templateData} renderIsolatedIsland={renderToStaticMarkup} />
     <script>
         import "../puck/hydrate-page-islands.js";

@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import type { Data } from '@puckeditor/core';
 import { REPLACEMENT_DEFAULTS } from '../theme/index.js';
+import Analytics from './Analytics.astro';
 import PageRenderer from './PageRenderer.js';
 import ThemeHead from './ThemeHead.astro';
 
@@ -23,10 +24,12 @@ const { renderToStaticMarkup } = await import('react-dom/server');
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
+    <Analytics part="head" />
     <title>{title}</title>
     <ThemeHead />
 </head>
 <body data-scheme={REPLACEMENT_DEFAULTS.scheme}>
+    <Analytics part="body" />
     <PageRenderer pageData={pageData} renderIsolatedIsland={renderToStaticMarkup} />
     <script>
         import "../puck/hydrate-page-islands.js";

@@ -116,6 +116,7 @@ const defaultNavItems: NavItem[] = [
 			{ label: 'Configurations', href: '/admin/settings' },
 			// Super admins only, as the page itself is (see auth/super-admin.ts).
 			...(user.superAdmin ? [{ label: 'Themes', href: '/admin/settings/themes' }] : []),
+			{ label: 'Analytics', href: '/admin/settings/analytics' },
 			{ label: 'Redirects', href: '/admin/redirects' },
 			{ label: 'Tags', href: '/admin/tags' },
 			{ label: 'Audit', href: '/admin/audit' },
