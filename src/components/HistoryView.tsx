@@ -21,6 +21,7 @@ import {
   PAD_X,
 } from "./history-layout.js";
 import PageRenderer from "./PageRenderer.js";
+import { postForm } from "./post-form.js";
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
@@ -232,31 +233,16 @@ function PreviewFrame({
 // Submits a real POST (rather than fetch) so the server's redirect to
 // /admin/{type}/drafts/edit/{id} — or, on failure, its session-flashed error
 // alert — is followed by the browser exactly as it is from the pages/content
-// list views. Mirrors the hidden-form pattern in PagePuckEditor.tsx.
+// list views.
 function submitCreateDraft(
   entityType: string,
   entityId: string,
   name: string,
   sourceNodeId: string | null
 ) {
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = "/admin/drafts/create";
-  form.style.display = "none";
-
   const fields: Record<string, string> = { entityType, entityId, name };
   if (sourceNodeId !== null) fields.sourceNodeId = sourceNodeId;
-
-  for (const [key, value] of Object.entries(fields)) {
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = key;
-    input.value = value;
-    form.appendChild(input);
-  }
-
-  document.body.appendChild(form);
-  form.submit();
+  postForm("/admin/drafts/create", fields);
 }
 
 function CreateDraftDialog({

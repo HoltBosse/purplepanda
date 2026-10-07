@@ -18,9 +18,9 @@ const contentField = Rich.fields?.content as {
     tiptap: { selector: (ctx: { editor?: Partial<Editor> }) => Record<string, boolean> };
 };
 
-/** Stands in for a TipTap editor, reporting the given marks as active. */
-function fakeEditor(active: string[]) {
-    return { isActive: (name: string) => active.includes(name) } as unknown as Editor;
+/** Stands in for a TipTap editor, reporting the given marks as active and the given node attributes. */
+function fakeEditor(active: string[], attributes: Record<string, Record<string, unknown>> = {}) {
+    return { isActive: (name: string) => active.includes(name), getAttributes: (type: string) => attributes[type] ?? {} } as unknown as Editor;
 }
 
 describe('Rich render', () => {
@@ -77,6 +77,11 @@ describe('Rich tiptap selector', () => {
         const state = contentField.tiptap.selector({ editor: fakeEditor([]) });
 
         expect(state).toEqual({ isSuperscript: false, isSubscript: false, isLink: false });
+    });
+
+    it('flags the text style of the paragraph or heading at the cursor', () => {
+        expect(contentField.tiptap.selector({ editor: fakeEditor([], { paragraph: { ppTextStyle: 'eyebrow' } }) })).toMatchObject({ 'textStyle:eyebrow': true });
+        expect(contentField.tiptap.selector({ editor: fakeEditor([], { heading: { ppTextStyle: 'quote' } }) })).toMatchObject({ 'textStyle:quote': true });
     });
 
     it('coerces to booleans when there is no editor yet', () => {

@@ -23,15 +23,10 @@ const defaultTemplateId = defaultTemplateSetting?.value as string | undefined;
 const [siteNameSetting] = await db.select().from(settings).where(eq(settings.key, 'site_name')).limit(1);
 const siteName = siteNameSetting?.value as string | undefined;
 
-const fontSettings = await db.select().from(settings).where(inArray(settings.key, ['heading_font_link', 'body_font_link']));
-const headingFontLink = fontSettings.find(s => s.key === 'heading_font_link')?.value as string | undefined;
-const bodyFontLink = fontSettings.find(s => s.key === 'body_font_link')?.value as string | undefined;
-
 const emailSettings = await db.select().from(settings).where(inArray(settings.key, ['email_host', 'email_address', 'email_password']));
 const emailHost = emailSettings.find(s => s.key === 'email_host')?.value as string | undefined;
 const emailAddress = emailSettings.find(s => s.key === 'email_address')?.value as string | undefined;
 const emailPassword = emailSettings.find(s => s.key === 'email_password')?.value as string | undefined;
-const fontFamilies = externalPuckConfig?.fontFamilies ?? [];
 const contentTypes = await listContentTypes(db);
 // Items per content type — anything not deleted, drafts and unpublished included — for the
 // builder's delete confirmation to say what goes with it.
@@ -65,9 +60,6 @@ const form = await getSettingsForm(
 	contentTypes,
 	getComponentSettingsGroups(settingsComponents, componentSettings, flash),
 	contentTemplateDefaults,
-	headingFontLink,
-	bodyFontLink,
-	fontFamilies,
 	siteName,
 	emailHost,
 	emailAddress,
@@ -122,21 +114,11 @@ const form = await getSettingsForm(
 		if (e.key === 'Enter') e.preventDefault();
 	});
 
-	async function flashAnchorTarget() {
+	function flashAnchorTarget() {
 		const hash = window.location.hash.slice(1);
 		if (!hash) return;
 		const target = document.getElementById(hash);
 		if (!target) return;
-
-		// The Heading/Body Font fields preview their selection via a real webfont <link>, loaded
-		// after first paint. Once that font arrives the sample text reflows and shifts everything
-		// below it — scrolling too early gets silently undone by that shift a moment later. Wait
-		// for fonts to settle (and bail out after a beat if that promise never resolves) before
-		// scrolling, so the shift happens before we position the target rather than after.
-		await Promise.race([
-			document.fonts?.ready ?? Promise.resolve(),
-			new Promise((resolve) => setTimeout(resolve, 1000)),
-		]);
 
 		// The page body scrolls inside a nested `.drawer-content` (not the document itself), which
 		// native fragment-navigation scrolling doesn't reliably reach — so drive it explicitly

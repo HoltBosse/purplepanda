@@ -3,14 +3,14 @@ import '../../../../styles/global.css';
 import type { Data } from '@puckeditor/core';
 import { eq } from 'drizzle-orm';
 import PageRenderer from '../../../../components/PageRenderer.js';
+import ThemeHead from '../../../../components/ThemeHead.astro';
 import { getDb } from '../../../../db/db.js';
-import { resolveFontSettings } from '../../../../db/fonts.js';
 import { dagNodes, pages } from '../../../../db/schema.js';
 import { formatPageTitle, resolveSiteName } from '../../../../db/site.js';
 import { resolveTemplateSetting } from '../../../../db/templates.js';
-import { extractFamilyFromLink } from '../../../../form/fields/font-utils.js';
 import { resolveDataForSSR } from '../../../../puck/server-data-wrapper.js';
 import externalPuckConfig from '../../../../puck.config.js';
+import { REPLACEMENT_DEFAULTS } from '../../../../theme/index.js';
 
 // Dynamically imported (not a static top-level import) so it's only pulled into the SSR
 // dependency graph on an actual page request — see the same comment in page.astro.
@@ -36,18 +36,15 @@ const templateSetting = await resolveTemplateSetting(db, page?.contentType ?? un
 
 const config = externalPuckConfig ?? {};
 
-const [pageData, templateData, fontSettings, siteName] = await Promise.all([
+const [pageData, templateData, siteName] = await Promise.all([
     resolveDataForSSR(config, draft.content as Data),
     templateSetting?.templates?.content
         ? resolveDataForSSR(config, templateSetting.templates.content as Data)
         : Promise.resolve(undefined),
-    resolveFontSettings(db),
     resolveSiteName(db),
 ]);
 
 const title: string = formatPageTitle((pageData as any)?.root?.props?.title ?? '', siteName);
-const headingFontFamily = extractFamilyFromLink(fontSettings.headingFontLink);
-const bodyFontFamily = extractFamilyFromLink(fontSettings.bodyFontLink);
 ---
 
 <!DOCTYPE html>
@@ -57,19 +54,9 @@ const bodyFontFamily = extractFamilyFromLink(fontSettings.bodyFontLink);
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
     <title>{title}</title>
-    {fontSettings.bodyFontLink && <link rel="stylesheet" href={fontSettings.bodyFontLink} />}
-    {fontSettings.headingFontLink && fontSettings.headingFontLink !== fontSettings.bodyFontLink && (
-        <link rel="stylesheet" href={fontSettings.headingFontLink} />
-    )}
-    <style define:vars={{
-        bodyFontFamily: bodyFontFamily ? `'${bodyFontFamily}', sans-serif` : 'inherit',
-        headingFontFamily: headingFontFamily ? `'${headingFontFamily}', sans-serif` : 'inherit',
-    }}>
-        body { font-family: var(--bodyFontFamily); }
-        :global(h1), :global(h2), :global(h3), :global(h4), :global(h5), :global(h6) { font-family: var(--headingFontFamily); }
-    </style>
+    <ThemeHead />
 </head>
-<body>
+<body data-scheme={REPLACEMENT_DEFAULTS.scheme}>
     <PageRenderer pageData={pageData} templateData={templateData} renderIsolatedIsland={renderToStaticMarkup} />
     <script>
         import "../../../../puck/hydrate-page-islands.js";

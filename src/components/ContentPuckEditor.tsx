@@ -17,8 +17,6 @@ interface ContentPuckEditorProps {
   onCommit?: (data: Data) => void;
   isDraft?: boolean;
   isNew?: boolean;
-  headingFontLink?: string;
-  bodyFontLink?: string;
 }
 
 export default function ContentPuckEditor({
@@ -31,8 +29,6 @@ export default function ContentPuckEditor({
   onCommit,
   isDraft,
   isNew,
-  headingFontLink,
-  bodyFontLink,
 }: ContentPuckEditorProps) {
   const contentType = useMemo(() => getContentType(contentTypeId), [contentTypeId]);
 
@@ -74,8 +70,6 @@ export default function ContentPuckEditor({
     ...(isDraft !== undefined ? { isDraft } : {}),
     ...(isNew !== undefined ? { isNew } : {}),
     ...(draftPublishUrl !== undefined ? { draftPublishUrl } : {}),
-    ...(headingFontLink !== undefined ? { headingFontLink } : {}),
-    ...(bodyFontLink !== undefined ? { bodyFontLink } : {}),
   };
 
   return (

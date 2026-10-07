@@ -2,6 +2,8 @@ import type { Config, Data } from '@puckeditor/core';
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-react';
 import * as z from 'zod';
+import { GRAPE_THEME } from '../theme/presets';
+import { setInjectedTheme, themeSummary } from '../theme/summary';
 import PuckEditor from './PuckEditor';
 
 const config = {
@@ -54,13 +56,25 @@ describe('PuckEditor', () => {
         await expect.poll(() => screen.container.querySelectorAll('button').length).toBeGreaterThan(0);
     });
 
-    it('mounts with font links supplied', async () => {
-        const screen = await renderEditor({
-            headingFontLink: 'https://fonts.bunny.net/css2?family=Inter:wght@400&display=swap',
-            bodyFontLink: 'https://fonts.bunny.net/css2?family=Inter:wght@400&display=swap',
-        });
+    it('styles the canvas with the site theme and switches its mode from the header', async () => {
+        setInjectedTheme(themeSummary(GRAPE_THEME));
+        try {
+            const screen = await renderEditor();
+            const canvas = () => document.querySelector<HTMLIFrameElement>('iframe#preview-frame')?.contentDocument;
 
-        await expect.poll(() => screen.container.querySelectorAll('button').length).toBeGreaterThan(0);
+            await expect.poll(() => canvas()?.getElementById('purplepanda-theme')?.textContent ?? '').toContain('--pp-color-grape: #5b3fd0');
+            expect(canvas()?.head.querySelector('link[href*="fonts.bunny.net"]')).not.toBeNull();
+            expect(canvas()?.body.getAttribute('data-scheme')).toBe('default');
+            await expect.poll(() => canvas()?.documentElement.getAttribute('data-pp-mode')).toBe('light');
+
+            // Sits in Puck's viewport bar, after the device buttons, as an icon button.
+            await expect.poll(() => document.querySelector('[class*="_ViewportControls-actionsInner_"] [data-puck-canvas-mode] button')).not.toBeNull();
+            expect(screen.container.querySelector('[data-puck-canvas-mode]')?.closest('[class*="_ViewportControls-actionsInner_"]')).not.toBeNull();
+            document.querySelector<HTMLButtonElement>('[data-puck-canvas-mode] button')?.click();
+            await expect.poll(() => canvas()?.documentElement.getAttribute('data-pp-mode')).toBe('dark');
+        } finally {
+            delete (globalThis as { __PP_THEME?: unknown }).__PP_THEME;
+        }
     });
 });
 

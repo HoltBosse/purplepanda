@@ -1,0 +1,14 @@
+---
+import { getDb } from '../db/db.js';
+import { getRenderedTheme } from '../theme/server.js';
+
+// The site theme for a rendered page's <head>: its font stylesheets and its generated CSS (see
+// theme/css.ts). Used by every route that renders site content outside the editors: the public
+// pages, the custom 404 page and the admin preview routes. The page's <body> should carry
+// data-scheme="default" so it takes the default scheme's colors.
+const { css, fontLinks } = await getRenderedTheme(getDb());
+// Escaping `<` keeps a value in the theme from closing the <style> tag.
+const safeCss = css.replace(/</g, '\\3c ');
+---
+{fontLinks.map((href) => <link rel="stylesheet" href={href} />)}
+<style is:inline set:html={safeCss} />

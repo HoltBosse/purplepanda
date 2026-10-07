@@ -1,4 +1,6 @@
 import { type ReactNode, useEffect, useState } from "react";
+import { REPLACEMENT_DEFAULTS } from "../../theme/index.js";
+import { variantClass } from "../component-fields/ThemeFields.js";
 import { EMBED_PROVIDERS, type EmbedProvider } from "./video-providers.js";
 import type { VideoConsentOptions } from "./video-settings.js";
 
@@ -59,7 +61,7 @@ export default function VideoConsent({
       data-video-consent={provider}
     >
       <p className="max-w-prose text-sm">{options.message.replaceAll("{service}", name)}</p>
-      <button type="button" className="btn btn-primary" onClick={play}>
+      <button type="button" className={variantClass(REPLACEMENT_DEFAULTS.variant)} onClick={play}>
         {options.button}
       </button>
       {options.remember && (

@@ -1,23 +1,20 @@
 ---
 import '../styles/global.css';
 import type { Data } from '@puckeditor/core';
-import type { FontSettings } from '../db/fonts.js';
-import { extractFamilyFromLink } from '../form/fields/font-utils.js';
+import { REPLACEMENT_DEFAULTS } from '../theme/index.js';
 import PageRenderer from './PageRenderer.js';
+import ThemeHead from './ThemeHead.astro';
 
 interface Props {
     pageData: Data;
     title: string;
-    fontSettings: FontSettings;
 }
 
-const { pageData, title, fontSettings } = Astro.props;
+const { pageData, title } = Astro.props;
 
 // See [...path].astro for why this is imported lazily.
 const { renderToStaticMarkup } = await import('react-dom/server');
 
-const headingFontFamily = extractFamilyFromLink(fontSettings.headingFontLink);
-const bodyFontFamily = extractFamilyFromLink(fontSettings.bodyFontLink);
 ---
 
 <!DOCTYPE html>
@@ -27,19 +24,9 @@ const bodyFontFamily = extractFamilyFromLink(fontSettings.bodyFontLink);
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
     <title>{title}</title>
-    {fontSettings.bodyFontLink && <link rel="stylesheet" href={fontSettings.bodyFontLink} />}
-    {fontSettings.headingFontLink && fontSettings.headingFontLink !== fontSettings.bodyFontLink && (
-        <link rel="stylesheet" href={fontSettings.headingFontLink} />
-    )}
-    <style define:vars={{
-        bodyFontFamily: bodyFontFamily ? `'${bodyFontFamily}', sans-serif` : 'inherit',
-        headingFontFamily: headingFontFamily ? `'${headingFontFamily}', sans-serif` : 'inherit',
-    }}>
-        body { font-family: var(--bodyFontFamily); }
-        :global(h1), :global(h2), :global(h3), :global(h4), :global(h5), :global(h6) { font-family: var(--headingFontFamily); }
-    </style>
+    <ThemeHead />
 </head>
-<body>
+<body data-scheme={REPLACEMENT_DEFAULTS.scheme}>
     <PageRenderer pageData={pageData} renderIsolatedIsland={renderToStaticMarkup} />
     <script>
         import "../puck/hydrate-page-islands.js";

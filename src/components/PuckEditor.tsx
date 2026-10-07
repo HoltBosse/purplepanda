@@ -1,18 +1,20 @@
-import { Button, createUsePuck, Puck, useGetPuck } from "@puckeditor/core";
+import { Button, createUsePuck, IconButton, Puck, useGetPuck } from "@puckeditor/core";
 import "@puckeditor/core/puck.css";
 import "../styles/puck-theme.css";
 import type { Config, Data, Dictionary, Overrides, PuckApi, PuckContext } from "@puckeditor/core";
 import { Render } from "@puckeditor/core";
 import type React from "react";
-import { cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import type * as z from "zod";
-import { extractFamilyFromLink } from "../form/fields/font-utils.js";
-import { ChevronDown, Save } from "../puck/icons.js";
+import { ensureStylesheet } from "../form/fields/font-picker-core.js";
+import { ChevronDown, Moon, Save, Sun } from "../puck/icons.js";
 import { sanitizeHtml } from "../puck/sanitize-html.js";
 import { sanitizeRichtextData } from "../puck/sanitize-richtext.js";
 import { getInjectedDisabledComponents, hideDisabledComponents } from "../puck/site-components.js";
 import { type ContentValidationError, validateContentTree } from "../puck/validate-content.js";
+import { type Mode, REPLACEMENT_DEFAULTS } from "../theme/index.js";
+import { getInjectedTheme, setInjectedTheme, THEME_CHANNEL, type ThemeSummary } from "../theme/summary.js";
 import { ensureTemplateSlot } from "./template-slot.js";
 
 declare global {
@@ -119,15 +121,110 @@ function focusValidationError(puck: PuckApi, error: ContentValidationError) {
   if (selector) scrollToComponentWhenRendered(error.componentId);
 }
 
-interface FontLinks {
-  headingFontLink: string | undefined;
-  bodyFontLink: string | undefined;
+// Which of the theme's modes the canvas shows, shared by the header toggle and the iframe override
+// (separate components Puck renders in different places). It only switches the canvas, never the
+// admin UI around it.
+function createCanvasModeStore() {
+  let mode: Mode = "light";
+  const listeners = new Set<() => void>();
+  return {
+    get: () => mode,
+    set: (next: Mode) => {
+      mode = next;
+      for (const listener of listeners) listener();
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
+
+type CanvasModeStore = ReturnType<typeof createCanvasModeStore>;
+
+// The published site theme (injected by ThemeScript.astro), kept current when the theme screen
+// saves in another tab.
+function useSiteTheme(): ThemeSummary | undefined {
+  const [theme, setTheme] = useState(getInjectedTheme);
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const channel = new BroadcastChannel(THEME_CHANNEL);
+    channel.onmessage = (event: MessageEvent<ThemeSummary>) => {
+      setInjectedTheme(event.data);
+      setTheme(event.data);
+    };
+    return () => channel.close();
+  }, []);
+  return theme;
+}
+
+// Puck's viewport bar (device sizes and zoom) has no override, so the canvas light/dark toggle is
+// portalled into it, right after the device buttons, as an icon button wearing the bar's own
+// classes. Puck's class names are hashed per build (e.g. `_ViewportControls-divider_v26yb_72`),
+// hence the prefix match. Puck can rebuild the bar (entering and leaving full screen, a resize),
+// so a MutationObserver puts the slot back whenever it goes missing.
+const VIEWPORT_BAR = '[class*="_ViewportControls-actionsInner_"]';
+
+type ViewportBarSlot = { node: HTMLElement; dividerClass: string; buttonClass: string; innerClass: string };
+
+function useViewportBarSlot(): ViewportBarSlot | null {
+  const [slot, setSlot] = useState<ViewportBarSlot | null>(null);
+  useEffect(() => {
+    let node: HTMLElement | null = null;
+    const attach = () => {
+      const bar = document.querySelector<HTMLElement>(VIEWPORT_BAR);
+      if (!bar || (node && bar.contains(node))) return;
+      const divider = bar.querySelector<HTMLElement>('[class*="_ViewportControls-divider_"]');
+      const button = bar.querySelector<HTMLElement>('[class*="_ViewportButton_"]');
+      const inner = bar.querySelector<HTMLElement>('[class*="_ViewportButton-inner_"]');
+      node = document.createElement("span");
+      node.style.display = "contents";
+      // After the device buttons, ahead of the zoom controls (which start at the first divider).
+      bar.insertBefore(node, divider);
+      setSlot({
+        node,
+        dividerClass: divider?.className ?? "",
+        // The device buttons' wrapper, minus whichever one happens to be the active size.
+        buttonClass: [...(button?.classList ?? [])].filter((c) => !c.includes("--isActive")).join(" "),
+        innerClass: inner?.className ?? "",
+      });
+    };
+    attach();
+    const observer = new MutationObserver(attach);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      node?.remove();
+    };
+  }, []);
+  return slot;
+}
+
+function CanvasModeToggle({ store }: { store: CanvasModeStore }) {
+  const mode = useSyncExternalStore(store.subscribe, store.get);
+  const slot = useViewportBarSlot();
+  if (!slot) return null;
+  const next = mode === "light" ? "dark" : "light";
+  const title = `Preview the page in ${next} mode`;
+  return createPortal(
+    <>
+      <span className={slot.dividerClass} />
+      <span className={slot.buttonClass} data-puck-canvas-mode={mode}>
+        <IconButton type="button" title={title} onClick={() => store.set(next)}>
+          <span className={slot.innerClass}>{mode === "light" ? <Moon size={16} /> : <Sun size={16} />}</span>
+        </IconButton>
+      </span>
+    </>,
+    slot.node,
+  );
 }
 
 function createOverrides(
   config: Config,
   onSave: ((data: Data) => void) | undefined,
-  fontLinks: FontLinks | undefined,
+  canvasMode: CanvasModeStore,
   // Populated from inside headerActions below (the only override here rendered unconditionally,
   // as soon as Puck mounts) so guardedOnPublish/guardedOnSave/guardedOnCommit — defined outside
   // Puck's tree, in plain PuckEditor component scope — can still reach into it imperatively once
@@ -143,9 +240,6 @@ function createOverrides(
   // that the actual editor canvas (not just the surrounding chrome) is ready to interact with.
   onEditorReady: () => void,
 ): Partial<Overrides<Config>> {
-  const headingFontFamily = extractFamilyFromLink(fontLinks?.headingFontLink);
-  const bodyFontFamily = extractFamilyFromLink(fontLinks?.bodyFontLink);
-
   return {
     headerActions: ({ children }) => {
       const appStateData = useTypedPuck((state) => state.appState.data);
@@ -299,6 +393,7 @@ function createOverrides(
         return (
           <>
             {validationBadge}
+            <CanvasModeToggle store={canvasMode} />
             {saveButton}
             {publishButton}
             {commitPortal}
@@ -309,6 +404,7 @@ function createOverrides(
       return (
         <>
           {validationBadge}
+          <CanvasModeToggle store={canvasMode} />
           {saveButton}
           {children}
           {showCommitMenu ? (
@@ -456,7 +552,9 @@ function createOverrides(
         };
       }, [document]);
 
-      // biome-ignore lint/correctness/useExhaustiveDependencies: fontLinks?.headingFontLink/bodyFontLink are read below via a for-of over an array literal, which biome doesn't trace — removing them would let fontLinks change without re-running the effect
+      const theme = useSiteTheme();
+      const mode = useSyncExternalStore(canvasMode.subscribe, canvasMode.get);
+
       useEffect(() => {
         if (!document) return;
 
@@ -476,34 +574,31 @@ function createOverrides(
           attributeFilter: ["data-theme"],
         });
 
-        document.documentElement.style.setProperty(
-          "--pp-body-font",
-          bodyFontFamily ? `'${bodyFontFamily}', sans-serif` : "inherit",
-        );
-        document.documentElement.style.setProperty(
-          "--pp-heading-font",
-          headingFontFamily ? `'${headingFontFamily}', sans-serif` : "inherit",
-        );
-
-        if (!document.getElementById("purplepanda-font-styles")) {
-          const style = document.createElement("style");
-          style.id = "purplepanda-font-styles";
-          style.textContent =
-            "body { font-family: var(--pp-body-font, inherit); } " +
-            "h1, h2, h3, h4, h5, h6 { font-family: var(--pp-heading-font, inherit); }";
-          document.head.appendChild(style);
-        }
-
-        for (const href of [fontLinks?.bodyFontLink, fontLinks?.headingFontLink]) {
-          if (!href || document.head.querySelector(`link[href="${href}"]`)) continue;
-          const link = document.createElement("link");
-          link.rel = "stylesheet";
-          link.href = href;
-          document.head.appendChild(link);
-        }
+        // The page itself takes the default scheme, as the published <body> does.
+        document.body.setAttribute("data-scheme", REPLACEMENT_DEFAULTS.scheme);
 
         return () => themeObserver.disconnect();
-      }, [document, fontLinks?.headingFontLink, fontLinks?.bodyFontLink]);
+      }, [document]);
+
+      // The mode is pinned rather than left to the author's system setting, so the header toggle
+      // decides what the canvas shows. AutoFrame only ever adds attributes, so this one stays put.
+      useEffect(() => {
+        document?.documentElement.setAttribute("data-pp-mode", mode);
+      }, [document, mode]);
+
+      // The site theme's CSS and font stylesheets, the same ones published pages load.
+      useEffect(() => {
+        if (!document || !theme) return;
+        let style = document.getElementById("purplepanda-theme") as HTMLStyleElement | null;
+        if (!style) {
+          style = document.createElement("style");
+          style.id = "purplepanda-theme";
+          document.head.appendChild(style);
+        }
+        style.textContent = theme.css;
+
+        for (const href of theme.fontLinks) ensureStylesheet(href, document);
+      }, [document, theme]);
 
       return <>{children}</>;
     },
@@ -524,12 +619,10 @@ export interface PuckEditorProps {
   // page/content item can be committed (state -1) instead of published live.
   isNew?: boolean;
   onCommit?: (data: Data) => void;
-  headingFontLink?: string;
-  bodyFontLink?: string;
   dictionary?: Dictionary;
 }
 
-export default function PuckEditor({ config, data, templateData, onPublish, onSave, rootPropsSchema, isNew, onCommit, headingFontLink, bodyFontLink, dictionary }: PuckEditorProps) {
+export default function PuckEditor({ config, data, templateData, onPublish, onSave, rootPropsSchema, isNew, onCommit, dictionary }: PuckEditorProps) {
   // Written to by createOverrides' headerActions (see below), so it can be reached imperatively
   // from guardedOnPublish — which runs outside Puck's component tree, as a plain
   // PuckEditorProps.onPublish callback, and so can't call useTypedPuck itself.
@@ -607,18 +700,20 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
     };
   }, [config, onCommit, rootPropsSchema]);
 
+  const canvasMode = useMemo(createCanvasModeStore, []);
+
   const overrides = useMemo(
     () =>
       createOverrides(
         config,
         guardedOnSave,
-        { headingFontLink, bodyFontLink },
+        canvasMode,
         focusErrorRef,
         rootPropsSchema,
         { isNew, onCommit: guardedOnCommit },
         markEditorReady,
       ),
-    [config, guardedOnSave, headingFontLink, bodyFontLink, rootPropsSchema, isNew, guardedOnCommit, markEditorReady],
+    [config, guardedOnSave, canvasMode, rootPropsSchema, isNew, guardedOnCommit, markEditorReady],
   );
 
   // Puck's richtext field shows stored HTML raw until its tiptap editor chunk loads, so the

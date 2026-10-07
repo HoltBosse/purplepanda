@@ -1,5 +1,6 @@
 import type { ComponentConfig, Slot } from "@puckeditor/core";
 import * as z from "zod";
+import { units } from "../../theme/units.js";
 
 type FlexProps = {
   direction: "row" | "column";
@@ -79,7 +80,7 @@ const Flex: ComponentConfig<FlexProps> = {
           flexDirection: direction,
           justifyContent,
           alignItems,
-          gap: `${gap * 0.25}rem`,
+          gap: units(gap),
           flexWrap: wrap,
         }}
       />

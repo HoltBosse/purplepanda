@@ -11,3 +11,4 @@ export type { UserOption } from "./NotifyUsersField.js";
 export { notifyUsersField } from "./NotifyUsersField.js";
 export { ogField } from "./OpenGraphField.js";
 export { parentPageField } from "./ParentPageField.js";
+export { schemeField, textStyleClass, textStyleField, themeStyleFields, variantClass, variantField } from "./ThemeFields.js";

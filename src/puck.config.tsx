@@ -3,7 +3,7 @@ import { FormEmbed } from "./puck/form/index.js";
 import { Checkbox, Image, RadioGroup, Select, Textarea, TextInput, Turnstile } from "./puck/form-fields/index.js";
 import { definePuckConfig } from "./puck/index.js";
 import { ImagePicker } from "./puck/media/index.js";
-import { Accordion, Alerts, Button, CardCollection, Flex, Grid, Margin, Rich, Space, Video } from "./puck/prefab/index.js";
+import { Accordion, Alerts, Button, Card, CardCollection, Flex, Grid, Margin, Rich, Section, Space, Video } from "./puck/prefab/index.js";
 
 const config = definePuckConfig({
   categories: {
@@ -11,7 +11,7 @@ const config = definePuckConfig({
       components: ["TextInput", "Textarea", "Select", "Checkbox", "RadioGroup", "Turnstile", "Image"],
     },
     Layout: {
-      components: ["Flex", "Grid", "Space", "CardCollection", "Margin"],
+      components: ["Section", "Card", "Flex", "Grid", "Space", "CardCollection", "Margin"],
     },
     Content: {
       components: ["Rich", "Alerts", "Button"],
@@ -20,16 +20,8 @@ const config = definePuckConfig({
     ...site.categories,
   },
   components: {
-    HeadingBlock: {
-      fields: {
-        children: {
-          type: "text",
-        },
-      },
-      render: ({ children }) => {
-        return <h1>{children}</h1>;
-      },
-    },
+    Section,
+    Card,
     Grid,
     Flex,
     Space,

@@ -9,6 +9,7 @@ import { canSwitchSites } from '../auth/index.js';
 import Container from '../components/Container.astro';
 import ContentTypesScript from '../components/ContentTypesScript.astro';
 import SiteComponentsScript from '../components/SiteComponentsScript.astro';
+import ThemeScript from '../components/ThemeScript.astro';
 import { listContentTypes } from '../db/content-types.js';
 import { getDb } from '../db/db.js';
 import { users } from '../db/schema.js';
@@ -113,6 +114,8 @@ const defaultNavItems: NavItem[] = [
 		icon: Settings,
 		subItems: [
 			{ label: 'Configurations', href: '/admin/settings' },
+			// Super admins only, as the page itself is (see auth/super-admin.ts).
+			...(user.superAdmin ? [{ label: 'Themes', href: '/admin/settings/themes' }] : []),
 			{ label: 'Redirects', href: '/admin/redirects' },
 			{ label: 'Tags', href: '/admin/tags' },
 			{ label: 'Audit', href: '/admin/audit' },
@@ -134,6 +137,7 @@ const navItems = (await runOverride('admin:nav', { user, defaultNavItems }, navI
 	<link rel="icon" href="/admin/assets/favicon.ico" />
 	<ContentTypesScript />
 	<SiteComponentsScript />
+	<ThemeScript />
 </head>
 <body class="h-screen overflow-hidden">
 	<div class="flex h-full">

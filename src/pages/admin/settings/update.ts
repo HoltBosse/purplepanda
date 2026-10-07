@@ -42,8 +42,6 @@ export async function POST(context: APIContext): Promise<Response> {
 
     const siteName = getFieldByName(form, 'site-name')?.value ?? '';
     const defaultTemplateId = getFieldByName(form, 'dt-option')?.value;
-    const headingFontLink = getFieldByName(form, 'heading-font')?.value ?? '';
-    const bodyFontLink = getFieldByName(form, 'body-font')?.value ?? '';
     const emailHost = getFieldByName(form, 'email-host')?.value ?? '';
     const emailAddress = getFieldByName(form, 'email-address')?.value ?? '';
     const emailPassword = getFieldByName(form, 'email-password')?.value ?? '';
@@ -57,16 +55,6 @@ export async function POST(context: APIContext): Promise<Response> {
         .insert(settings)
         .values({ key: 'default_template', value: defaultTemplateId })
         .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: defaultTemplateId } });
-
-    await db
-        .insert(settings)
-        .values({ key: 'heading_font_link', value: headingFontLink })
-        .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: headingFontLink } });
-
-    await db
-        .insert(settings)
-        .values({ key: 'body_font_link', value: bodyFontLink })
-        .onConflictDoUpdate({ target: settingsKeyTarget, set: { value: bodyFontLink } });
 
     await db
         .insert(settings)

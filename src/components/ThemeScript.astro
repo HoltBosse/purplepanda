@@ -1,0 +1,14 @@
+---
+import { getDb } from '../db/db.js';
+import { getTheme } from '../theme/server.js';
+import { themeSummary } from '../theme/summary.js';
+
+// Hands the editors the published site theme: its CSS and fonts for the canvas, and the schemes,
+// button variants and text styles the theme fields offer (see getInjectedTheme() in
+// ../theme/summary.ts). Rendered by both admin layouts, ahead of any island, the same way as
+// SiteComponentsScript.
+const summary = themeSummary(await getTheme(getDb()));
+// Escaping `<` keeps a value in the theme from breaking out of the tag.
+const serialized = JSON.stringify(summary).replace(/</g, '\\u003c');
+---
+<script is:inline set:html={`window.__PP_THEME = ${serialized};`} />

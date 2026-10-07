@@ -1,6 +1,7 @@
 import type { ComponentConfig, Slot } from "@puckeditor/core";
 import type { CSSProperties } from "react";
 import * as z from "zod";
+import { units } from "../../theme/units.js";
 
 type MarginProps = {
   desktopWidth: number;
@@ -64,8 +65,8 @@ const Margin: ComponentConfig<MarginProps> = {
           className={className}
           style={
             {
-              "--margin-mobile": `${mobileMargin * 0.25}rem`,
-              "--margin-desktop-width": `${desktopWidth * 0.25}rem`,
+              "--margin-mobile": units(mobileMargin),
+              "--margin-desktop-width": units(desktopWidth),
             } as CSSProperties
           }
         />

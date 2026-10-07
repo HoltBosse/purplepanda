@@ -1,5 +1,6 @@
 import type { ComponentConfig } from "@puckeditor/core";
 import * as z from "zod";
+import { units } from "../../theme/units.js";
 
 type SpaceProps = {
   direction?: "" | "vertical" | "horizontal";
@@ -35,7 +36,7 @@ const Space: ComponentConfig<SpaceProps> = {
   },
   inline: true,
   render: ({ direction, size, puck }) => {
-    const value = `${size * 0.25}rem`;
+    const value = units(size);
     return (
       <div
         ref={puck.dragRef}

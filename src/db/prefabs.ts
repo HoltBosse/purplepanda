@@ -2,8 +2,11 @@ import { eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { settings } from './schema.js';
 
+export const DEFAULT_PREFAB_SETTING_KEY = 'default_prefab';
+export const CONTENT_PREFAB_SETTING_KEY_PREFIX = 'content_default_prefab_';
+
 export function prefabSettingKey(contentTypeId?: string): string {
-    return contentTypeId ? `content_default_prefab_${contentTypeId}` : 'default_prefab';
+    return contentTypeId ? `${CONTENT_PREFAB_SETTING_KEY_PREFIX}${contentTypeId}` : DEFAULT_PREFAB_SETTING_KEY;
 }
 
 /**

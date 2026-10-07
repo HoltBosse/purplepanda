@@ -10,3 +10,12 @@ export function capitalizeWords(str: string): string {
         .map((word) => capitalize(word))
         .join(' ');
 }
+// Escapes text for use in HTML markup, in element content or a quoted attribute value.
+export function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}

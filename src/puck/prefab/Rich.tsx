@@ -8,7 +8,10 @@ import type { ReactNode, SyntheticEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as z from "zod";
-import { ChevronDown, Link as LinkIcon, Subscript, Superscript } from "../icons.js";
+import { units } from "../../theme/units.js";
+import { currentTheme } from "../component-fields/ThemeFields.js";
+import { ChevronDown, Link as LinkIcon, Subscript, Superscript, Type } from "../icons.js";
+import { RichTextStyle } from "./rich-text-style.js";
 
 type RichProps = {
   content: ReactNode;
@@ -29,16 +32,24 @@ function toPropsSchema() {
     .loose();
 }
 
-function SuperSubMenu({
-  editor,
-  isSuperscript,
-  isSubscript,
+// A toolbar button that opens a menu portalled to <body>, anchored under the button's right edge
+// and closed by any pointerdown outside both. `children` gets `close` for the menu items to call.
+function RteDropdown({
+  icon,
+  active,
   readOnly,
+  title,
+  menuClassName,
+  dataAttrs,
+  children,
 }: {
-  editor: Editor | null;
-  isSuperscript?: boolean;
-  isSubscript?: boolean;
-  readOnly?: boolean;
+  icon: ReactNode;
+  active: boolean;
+  readOnly?: boolean | undefined;
+  title: string;
+  menuClassName: string;
+  dataAttrs?: Record<`data-${string}`, boolean>;
+  children: (close: () => void) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<{ top: number; right: number } | null>(null);
@@ -56,8 +67,7 @@ function SuperSubMenu({
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (containerRef.current?.contains(target)) return;
-      if (menuRef.current?.contains(target)) return;
+      if (containerRef.current?.contains(target) || menuRef.current?.contains(target)) return;
       setOpen(false);
     };
 
@@ -71,35 +81,19 @@ function SuperSubMenu({
     };
   }, [open]);
 
-  const toggleSuperscript = () => {
-    const chain = editor?.chain().focus();
-    if (isSuperscript) chain?.unsetSuperscript().run();
-    else chain?.unsetSubscript().setSuperscript().run();
-    setOpen(false);
-  };
-
-  const toggleSubscript = () => {
-    const chain = editor?.chain().focus();
-    if (isSubscript) chain?.unsetSubscript().run();
-    else chain?.unsetSuperscript().setSubscript().run();
-    setOpen(false);
-  };
-
-  const ActiveIcon = isSubscript ? Subscript : Superscript;
-
   return (
-    <div ref={containerRef} className="relative inline-flex">
+    <div ref={containerRef} className="relative inline-flex" {...dataAttrs}>
       <RichTextMenu.Control
         icon={
           <span className="inline-flex items-center gap-0.5">
-            <ActiveIcon />
+            {icon}
             <ChevronDown size={12} />
           </span>
         }
-        active={!!(isSuperscript || isSubscript)}
+        active={active}
         disabled={!!readOnly}
         onClick={() => setOpen((prev) => !prev)}
-        title="Superscript / Subscript"
+        title={title}
       />
       {open &&
         position &&
@@ -107,37 +101,131 @@ function SuperSubMenu({
           <ul
             ref={menuRef}
             data-puck-rte-menu
-            className="fixed z-50 min-w-36 list-none rounded-md border border-gray-200 bg-white p-1 shadow-md dark:border-gray-700 dark:bg-gray-800"
+            className={`fixed z-50 ${menuClassName} list-none rounded-md border border-gray-200 bg-white p-1 shadow-md dark:border-gray-700 dark:bg-gray-800`}
             style={{ top: position.top, right: position.right }}
           >
+            {children(() => setOpen(false))}
+          </ul>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+function SuperSubMenu({
+  editor,
+  isSuperscript,
+  isSubscript,
+  readOnly,
+}: {
+  editor: Editor | null;
+  isSuperscript?: boolean;
+  isSubscript?: boolean;
+  readOnly?: boolean;
+}) {
+  const ActiveIcon = isSubscript ? Subscript : Superscript;
+
+  return (
+    <RteDropdown
+      icon={<ActiveIcon />}
+      active={!!(isSuperscript || isSubscript)}
+      readOnly={readOnly}
+      title="Superscript / Subscript"
+      menuClassName="min-w-36"
+    >
+      {(close) => {
+        const toggleSuperscript = () => {
+          const chain = editor?.chain().focus();
+          if (isSuperscript) chain?.unsetSuperscript().run();
+          else chain?.unsetSubscript().setSuperscript().run();
+          close();
+        };
+
+        const toggleSubscript = () => {
+          const chain = editor?.chain().focus();
+          if (isSubscript) chain?.unsetSubscript().run();
+          else chain?.unsetSuperscript().setSubscript().run();
+          close();
+        };
+
+        return (
+          <>
             <li>
-              <button
-                type="button"
-                className={`flex w-full items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                  isSuperscript ? "font-semibold" : ""
-                }`}
-                onClick={toggleSuperscript}
-              >
+              <button type="button" className={`flex w-full items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${isSuperscript ? "font-semibold" : ""}`} onClick={toggleSuperscript}>
                 <Superscript size={16} />
                 Superscript
               </button>
             </li>
             <li>
-              <button
-                type="button"
-                className={`flex w-full items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                  isSubscript ? "font-semibold" : ""
-                }`}
-                onClick={toggleSubscript}
-              >
+              <button type="button" className={`flex w-full items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${isSubscript ? "font-semibold" : ""}`} onClick={toggleSubscript}>
                 <Subscript size={16} />
                 Subscript
               </button>
             </li>
-          </ul>,
-          document.body,
-        )}
-    </div>
+          </>
+        );
+      }}
+    </RteDropdown>
+  );
+}
+
+const TEXT_STYLE_FLAG = "textStyle:";
+
+function textStyleFlags(editor: Editor | null | undefined): Record<string, boolean> {
+  const id = (editor?.getAttributes("paragraph").ppTextStyle ?? editor?.getAttributes("heading").ppTextStyle) as string | null | undefined;
+  return id ? { [`${TEXT_STYLE_FLAG}${id}`]: true } : {};
+}
+
+function currentTextStyle(state: Record<string, unknown> | null | undefined): string | null {
+  const key = Object.keys(state ?? {}).find((k) => k.startsWith(TEXT_STYLE_FLAG) && state?.[k]);
+  return key ? key.slice(TEXT_STYLE_FLAG.length) : null;
+}
+
+// The site theme's text styles, applied to the paragraphs and headings in the selection (see
+// ./rich-text-style.ts). "Default" clears it, so the element takes its usual style again.
+function TextStyleMenu({ editor, current, readOnly }: { editor: Editor | null; current: string | null; readOnly?: boolean }) {
+  const styles = currentTheme().textStyles;
+  const currentName = styles.find((s) => s.id === current)?.name;
+
+  return (
+    <RteDropdown
+      icon={<Type />}
+      active={!!current}
+      readOnly={readOnly}
+      title={currentName ? `Text style: ${currentName}` : "Text style"}
+      menuClassName="min-w-44 max-h-80 overflow-y-auto"
+      dataAttrs={{ "data-rich-text-style-menu": true }}
+    >
+      {(close) => {
+        const choose = (id: string | null) => {
+          editor?.chain().focus().setPpTextStyle(id).run();
+          close();
+        };
+
+        return (
+          <>
+            <li>
+              <button type="button" className={`flex w-full items-center rounded px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${current ? "" : "font-semibold"}`} onClick={() => choose(null)}>
+                Default
+              </button>
+            </li>
+            {styles.map((style) => (
+              <li key={style.id}>
+                <button
+                  type="button"
+                  data-text-style-option={style.id}
+                  className={`flex w-full items-center rounded px-2 py-1 text-left hover:bg-gray-100 dark:hover:bg-gray-700 ${current === style.id ? "bg-gray-100 dark:bg-gray-700" : ""}`}
+                  style={{ fontFamily: style.fontFamily, fontWeight: style.weight, fontSize: `min(${units(style.size)}, 1.25rem)`, lineHeight: 1.3 }}
+                  onClick={() => choose(style.id)}
+                >
+                  {style.name}
+                </button>
+              </li>
+            ))}
+          </>
+        );
+      }}
+    </RteDropdown>
   );
 }
 
@@ -303,11 +391,14 @@ const Rich: ComponentConfig<RichProps> = {
           Placeholder.configure({ placeholder: "Type something..." }),
           SuperscriptExtension,
           SubscriptExtension,
+          RichTextStyle,
         ],
         selector: (ctx) => ({
           isSuperscript: !!ctx.editor?.isActive("superscript"),
           isSubscript: !!ctx.editor?.isActive("subscript"),
           isLink: !!ctx.editor?.isActive("link"),
+          // Puck's editor state only holds booleans, so the current text style is one flag per style.
+          ...textStyleFlags(ctx.editor),
         }),
       },
       renderMenu: ({ children, editor, editorState, readOnly }) => (
@@ -322,6 +413,7 @@ const Rich: ComponentConfig<RichProps> = {
                 isSubscript={!!editorState?.isSubscript}
                 readOnly={!!readOnly}
               />
+              <TextStyleMenu editor={editor} current={currentTextStyle(editorState)} readOnly={!!readOnly} />
               <LinkMenu editor={editor} isLink={!!editorState?.isLink} readOnly={!!readOnly} />
             </RichTextMenu.Group>
           </RichTextMenu>
@@ -334,7 +426,8 @@ const Rich: ComponentConfig<RichProps> = {
   },
   render: ({ content, puck }) => {
     return (
-      <div className={`prose max-w-none ${puck?.isEditing ? "rich-placeholder-wrap" : ""}`}>
+      // pp-rich: the site theme's text styles and scheme colors (see theme/css.ts).
+      <div className={`prose pp-rich max-w-none ${puck?.isEditing ? "rich-placeholder-wrap" : ""}`}>
         {content}
       </div>
     );

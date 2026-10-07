@@ -52,6 +52,12 @@ export async function getSessionUser(session: AstroSession | undefined) {
   return user;
 }
 
+export type SessionUser = NonNullable<Awaited<ReturnType<typeof getSessionUser>>>;
+
+// What a route gate (dashboardAccess, requireSuperAdmin) returns: the account, or the response to
+// send instead.
+export type AccessResult = { user: SessionUser; response?: undefined } | { user?: undefined; response: Response };
+
 // Same check the /admin middleware gates on: a live user, signed in on this tenant, who is either a
 // super admin or an enabled member of this tenant holding an active role that carries adminAccess. Shared
 // here so other routes (e.g. /image) can grant admin-only behavior without duplicating (or

@@ -7,6 +7,7 @@ import {
     type ComponentWithSiteSettings,
     normalizeComponentSettings,
 } from '../../../puck/component-settings.js';
+import { escapeHtml } from '../../../string/index.js';
 
 // The settings page's sections for components' own site settings (see puck/component-settings.ts):
 // one section per component, one row per field, built from the component's declaration so a new
@@ -14,15 +15,6 @@ import {
 
 const inputClassList = "w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring focus:ring-blue-200 bg-base-100";
 const fields = getAllFields();
-
-function escapeHtml(value: string): string {
-    return value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
 
 function fieldName(componentName: string, key: string): string {
     return `component-${componentName}-${key}`;

@@ -1,6 +1,9 @@
 import type { ComponentConfig, Field } from "@puckeditor/core";
 import type { CSSProperties } from "react";
+import { REPLACEMENT_DEFAULTS } from "../../theme/index.js";
+import { units } from "../../theme/units.js";
 import { type ImageConfig, imageField } from "../component-fields/ImageField.js";
+import { themeStyleFields, variantClass } from "../component-fields/ThemeFields.js";
 import { categoryField } from "./CategoryObjectField.js";
 
 type ImagePosition = "start" | "end";
@@ -8,6 +11,9 @@ type ImagePosition = "start" | "end";
 export type ButtonProps = {
   children: string;
   href: string;
+  // A button variant id from the site theme. Buttons saved before variants existed have none and
+  // render as Primary, which is what they were.
+  variant?: string;
   // Grouped under one collapsed "Image" section in the editor (see imageGroupField) — most
   // buttons are text-only, so these stay out of the way until someone wants an image.
   image?: {
@@ -39,7 +45,7 @@ function ButtonContent({ children, image }: ButtonProps) {
         display: "inline-flex",
         alignItems: "center",
         flexDirection: flexDirection[image?.position ?? "start"] ?? "row",
-        gap: `${(image?.gap ?? 2) * 0.25}rem`,
+        gap: units(image?.gap ?? 2),
       }}
     >
       <picture>
@@ -84,6 +90,8 @@ const imageGroupField = categoryField(
 
 const imageDefaults: ButtonProps["image"] = { file: null, position: "start", gap: 2 };
 
+const styleFields = themeStyleFields({ variant: {} });
+
 // A link styled as a button everywhere but forms, where it's the form's submit button instead —
 // a link there would leave the page without submitting, and a submit button outside a form does
 // nothing. See locationOverrides in ../index.ts.
@@ -98,16 +106,18 @@ const Button: ComponentConfig<ButtonProps> = {
       type: "text",
       label: "Link",
     },
+    ...styleFields,
     image: imageGroupField,
   },
   defaultProps: {
     children: "Button",
     href: "",
+    variant: REPLACEMENT_DEFAULTS.variant,
     image: imageDefaults,
   },
   render: (props) => {
     return (
-      <a className="btn btn-primary" href={props.href || undefined}>
+      <a className={variantClass(props.variant)} href={props.href || undefined}>
         <ButtonContent {...props} />
       </a>
     );
@@ -119,16 +129,18 @@ const Button: ComponentConfig<ButtonProps> = {
           type: "text",
           label: "Label",
         },
+        ...styleFields,
         image: imageGroupField,
       },
       defaultProps: {
         children: "Submit",
         href: "",
+        variant: REPLACEMENT_DEFAULTS.variant,
         image: imageDefaults,
       },
       render: (props: ButtonProps) => {
         return (
-          <button className="btn btn-primary" type="submit">
+          <button className={variantClass(props.variant)} type="submit">
             <ButtonContent {...props} />
           </button>
         );

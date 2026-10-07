@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import ContentTypesScript from '../components/ContentTypesScript.astro';
 import loadingPandaSVGRaw from '../components/LoadingPanda.svg?raw';
 import SiteComponentsScript from '../components/SiteComponentsScript.astro';
+import ThemeScript from '../components/ThemeScript.astro';
 import { getDb } from '../db/db.js';
 import { users } from '../db/schema.js';
 
@@ -45,6 +46,7 @@ const loadingPandaSvgInline = loadingPandaSVGRaw.replace(/\x3cscript[^>]*>[\s\S]
 	<link rel="icon" href="/admin/assets/favicon.ico" />
 	<ContentTypesScript />
 	<SiteComponentsScript />
+	<ThemeScript />
 </head>
 <body class="h-screen overflow-x-hidden">
 	{showLoadingPanda && (

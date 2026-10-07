@@ -34,6 +34,7 @@ Logged via [`addAction`](/devs/actions-api) - persisted to the audit log (`/admi
 | `not-found:update` | `{ id: string, version: string \| null }` | Existing custom 404 page saved |
 | `redirect:create` | `{ id: string }` | New redirect saved |
 | `redirect:update` | `{ id: string }` | Existing redirect saved |
+| `theme:update` | `{ id: string, version: string \| null }` | Site theme saved from Settings → Themes (`id` is the `theme` settings row) |
 | `template:create` | `{ id: string, version: string \| null }` | New template saved |
 | `template:update` | `{ id: string, version: string \| null }` | Existing template saved |
 | `tenant:create` | `{ id: string }` | New site created (root site only) |

@@ -2,6 +2,7 @@
 // it can be imported without that file's `../../puck.config.js` dependency, which only
 // resolves inside an Astro build.
 import type { CSSProperties } from "react";
+import { units } from "../../theme/units.js";
 import { DEFAULT_LAYOUT, type ResponsiveLayout } from "../component-fields/LayoutField.js";
 
 export type { GridLayout, ResponsiveLayout } from "../component-fields/LayoutField.js";
@@ -39,11 +40,11 @@ export function buildGridLayout(id: string, layout: ResponsiveLayout | undefined
 
   const style = {
     "--columns-desktop": resolvedLayout.desktop.columns,
-    "--gap-desktop": `${resolvedLayout.desktop.gap * 0.25}rem`,
+    "--gap-desktop": units(resolvedLayout.desktop.gap),
     "--columns-tablet": resolvedLayout.tablet.columns,
-    "--gap-tablet": `${resolvedLayout.tablet.gap * 0.25}rem`,
+    "--gap-tablet": units(resolvedLayout.tablet.gap),
     "--columns-mobile": resolvedLayout.mobile.columns,
-    "--gap-mobile": `${resolvedLayout.mobile.gap * 0.25}rem`,
+    "--gap-mobile": units(resolvedLayout.mobile.gap),
   } as CSSProperties;
 
   return { className, styleTag, style };

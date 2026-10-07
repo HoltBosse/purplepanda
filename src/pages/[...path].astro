@@ -4,19 +4,19 @@ import type { Data } from '@puckeditor/core';
 import { eq } from 'drizzle-orm';
 import type { BreadcrumbList } from 'schema-dts';
 import PageRenderer from '../components/PageRenderer.js';
+import ThemeHead from '../components/ThemeHead.astro';
 import { getContentTypePage, getPlainPageForPath } from '../db/content-cache.js';
 import { matchContentTypeRoute } from '../db/content-types.js';
 import { getDb } from '../db/db.js';
-import { resolveFontSettings } from '../db/fonts.js';
 import { redirects } from '../db/schema.js';
 import { formatPageTitle, resolveSiteName } from '../db/site.js';
 import { resolveTemplateSetting } from '../db/templates.js';
-import { extractFamilyFromLink } from '../form/fields/font-utils.js';
 import { withCropParams } from '../puck/component-fields/ImageField.js';
 import { buildJsonLd, normalizeBaseUrl } from '../puck/content-types.js';
 import { isWithinSchedule } from '../puck/schedule.js';
 import { resolveDataForSSR } from '../puck/server-data-wrapper.js';
 import externalPuckConfig from '../puck.config.js';
+import { REPLACEMENT_DEFAULTS } from '../theme/index.js';
 
 // Dynamically imported (not a static top-level import) so it's only pulled into the SSR
 // dependency graph on an actual page request, not discovered as a new dependency requiring
@@ -32,12 +32,11 @@ type BreadcrumbEntry = { title: string; path: string };
 
 const contentTypeRoute = await matchContentTypeRoute(db, requestPath);
 
-const [resolved, fontSettings, siteName] = await Promise.all([
+const [resolved, siteName] = await Promise.all([
     contentTypeRoute
         ? getContentTypePage(db, contentTypeRoute.contentType.id, contentTypeRoute.alias)
             .then(page => page ? { page, breadcrumbs: undefined as BreadcrumbEntry[] | undefined } : undefined)
         : getPlainPageForPath(db, requestPath),
-    resolveFontSettings(db),
     resolveSiteName(db),
 ]);
 
@@ -45,9 +44,6 @@ const matchedPage = resolved?.page;
 const templateSetting = matchedPage
     ? await resolveTemplateSetting(db, contentTypeRoute?.contentType.id, { templateId: matchedPage.templateId, noTemplate: matchedPage.noTemplate })
     : undefined;
-
-const headingFontFamily = extractFamilyFromLink(fontSettings.headingFontLink);
-const bodyFontFamily = extractFamilyFromLink(fontSettings.bodyFontLink);
 
 // A page/content item outside its scheduling window (see DateTimeField.tsx and the hardcoded
 // start/end root fields in ContentPuckEditor.tsx/PagePuckEditor.tsx) isn't publicly visible yet,
@@ -157,19 +153,9 @@ const jsonLdScript = jsonLdDocument ? JSON.stringify(jsonLdDocument).replace(/</
     <meta property="og:url" content={ogUrl} />
     {siteName && <meta property="og:site_name" content={siteName} />}
     {jsonLdScript && <script type="application/ld+json" is:inline set:html={jsonLdScript} />}
-    {fontSettings.bodyFontLink && <link rel="stylesheet" href={fontSettings.bodyFontLink} />}
-    {fontSettings.headingFontLink && fontSettings.headingFontLink !== fontSettings.bodyFontLink && (
-        <link rel="stylesheet" href={fontSettings.headingFontLink} />
-    )}
-    <style define:vars={{
-        bodyFontFamily: bodyFontFamily ? `'${bodyFontFamily}', sans-serif` : 'inherit',
-        headingFontFamily: headingFontFamily ? `'${headingFontFamily}', sans-serif` : 'inherit',
-    }}>
-        body { font-family: var(--bodyFontFamily); }
-        :global(h1), :global(h2), :global(h3), :global(h4), :global(h5), :global(h6) { font-family: var(--headingFontFamily); }
-    </style>
+    <ThemeHead />
 </head>
-<body>
+<body data-scheme={REPLACEMENT_DEFAULTS.scheme}>
     <PageRenderer pageData={pageData} templateData={templateData} renderIsolatedIsland={renderToStaticMarkup} />
     <script>
         import "../puck/hydrate-page-islands.js";

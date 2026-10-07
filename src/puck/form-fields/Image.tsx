@@ -1,5 +1,6 @@
 import type { ComponentConfig } from "@puckeditor/core";
 import * as z from "zod";
+import { escapeHtml } from "../../string/index.js";
 import { folderField, type MediaFolderRef } from "../component-fields/FolderPicker.js";
 
 export type ImageProps = {
@@ -33,10 +34,6 @@ function toPropsSchema() {
       folder: z.object({ id: z.string(), name: z.string(), visibility: z.number() }, "A destination folder is required"),
     })
     .loose();
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 const Image: ComponentConfig<ImageProps> = {

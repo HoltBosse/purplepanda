@@ -3,9 +3,12 @@ import { createUsePuck } from "@puckeditor/core";
 import type { CSSProperties, ReactNode } from "react";
 import { Fragment } from "react";
 import * as z from "zod";
+import type { BorderSide } from "../../theme/types.js";
 import { DEFAULT_LAYOUT, layoutField, type ResponsiveLayout, responsiveLayoutSchema } from "../component-fields/LayoutField.js";
+import { withoutIdleSides } from "../component-fields/ThemeFields.js";
 import { getContentTypeRecords } from "../content-types.js";
 import { ItemContext } from "../data-binding.js";
+import { CardSurface, type CardSurfaceProps, cardSurfaceDefaults, cardSurfaceFields } from "./Card.js";
 import { buildGridLayout } from "./card-grid.js";
 
 const useTypedPuck = createUsePuck();
@@ -24,9 +27,26 @@ export type CardCollectionProps = {
   offset: number;
   layout: ResponsiveLayout;
   orderBy: OrderBy;
+  // "card" wraps each item in the site theme's card surface (see theme.card). Plain by default, so
+  // collections saved before cards existed look the same in the editor (which fills in
+  // defaultProps) and on the published page (which doesn't).
+  cardStyle?: "plain" | "card" | undefined;
+  // The cards' own scheme, or "" to take the surrounding one.
+  scheme?: string | undefined;
+  // The cards' own border preset, "none", or "" for the theme's card border; and its sides.
+  border?: string | undefined;
+  borderSides?: BorderSide[] | undefined;
   cardTemplate: Slot;
   items?: CardCollectionItem[];
 };
+
+// Wraps one rendered item in the theme's card surface when the collection asks for it.
+type ItemSurfaceProps = Pick<CardCollectionProps, "cardStyle"> & CardSurfaceProps & { children: ReactNode };
+
+function ItemSurface({ cardStyle, children, ...surface }: ItemSurfaceProps) {
+  if (cardStyle !== "card") return <>{children}</>;
+  return <CardSurface {...surface}>{children}</CardSurface>;
+}
 
 const DEFAULT_ORDER_BY: OrderBy = { field: "", direction: "desc" };
 
@@ -85,12 +105,16 @@ function renderStatic(node: ComponentData, config: Config): ReactNode {
   return componentConfig.render(resolvedProps as never);
 }
 
-type EditingViewProps = Omit<CardCollectionProps, "cardTemplate"> & { cardTemplate: SlotComponent; id: string };
+type EditingViewProps = Pick<CardCollectionProps, "contentType" | "layout" | "items"> & {
+  cardTemplate: SlotComponent;
+  id: string;
+  surface: Omit<ItemSurfaceProps, "children">;
+};
 
 // Editing mode: one real, fully-editable card (drag/select/etc. all work as normal) plus static,
 // non-interactive preview copies of the remaining items so the author can see how the collection
 // will actually repeat, without Puck getting confused by multiple DOM nodes claiming one id.
-function EditingView({ contentType, layout, cardTemplate: Content, items, id }: EditingViewProps) {
+function EditingView({ contentType, layout, cardTemplate: Content, items, id, surface }: EditingViewProps) {
   const config = useTypedPuck((state) => state.config);
   const getItemById = useTypedPuck((state) => state.getItemById);
   const resolvedItems = items ?? [];
@@ -104,17 +128,21 @@ function EditingView({ contentType, layout, cardTemplate: Content, items, id }: 
       {styleTag}
       <div className={className} style={style}>
         <ItemContext.Provider value={resolvedItems[0] ?? null}>
-          <Content />
+          <ItemSurface {...surface}>
+            <Content />
+          </ItemSurface>
         </ItemContext.Provider>
 
         {previewItems.map((item, index) => (
           <div key={item.id ?? index} style={{ pointerEvents: "none", opacity: 0.85 }}>
             <ItemContext.Provider value={item}>
-              {templateNodes.map((childNode) => (
-                <Fragment key={(childNode.props as { id?: string }).id ?? index}>
-                  {renderStatic(childNode, config as Config)}
-                </Fragment>
-              ))}
+              <ItemSurface {...surface}>
+                {templateNodes.map((childNode) => (
+                  <Fragment key={(childNode.props as { id?: string }).id ?? index}>
+                    {renderStatic(childNode, config as Config)}
+                  </Fragment>
+                ))}
+              </ItemSurface>
             </ItemContext.Provider>
           </div>
         ))}
@@ -183,6 +211,15 @@ const CardCollection: ComponentConfig<CardCollectionProps> = {
         },
       },
     } as ObjectField<OrderBy>,
+    cardStyle: {
+      type: "radio",
+      label: "Item surface",
+      options: [
+        { label: "Plain", value: "plain" },
+        { label: "Card", value: "card" },
+      ],
+    },
+    ...cardSurfaceFields({ scheme: "Card color scheme", border: "Card border", borderSides: "Card border sides" }),
     cardTemplate: {
       type: "slot",
       label: "Card Template",
@@ -194,12 +231,14 @@ const CardCollection: ComponentConfig<CardCollectionProps> = {
     offset: 0,
     layout: DEFAULT_LAYOUT,
     orderBy: DEFAULT_ORDER_BY,
+    cardStyle: "plain",
+    ...cardSurfaceDefaults(),
     cardTemplate: [],
   },
   resolveFields: (data, { fields }) => {
     const orderByField = fields.orderBy as ObjectField<OrderBy>;
     return {
-      ...fields,
+      ...withoutIdleSides(fields, data.props.border),
       contentType: {
         ...fields.contentType,
         type: "select",
@@ -224,22 +263,12 @@ const CardCollection: ComponentConfig<CardCollectionProps> = {
     return { items: await getTopContentItems(contentType, limit ?? 10, orderBy, offset) };
   },
   render: (props) => {
-    const { contentType, layout, orderBy, offset, cardTemplate: Content, items, id, puck } = props;
+    const { contentType, layout, cardTemplate: Content, items, id, puck, cardStyle, scheme, border, borderSides } = props;
     const resolvedItems = items ?? [];
+    const surface = { cardStyle, scheme, border, borderSides };
 
     if (puck.isEditing) {
-      return (
-        <EditingView
-          contentType={contentType}
-          layout={layout}
-          orderBy={orderBy}
-          offset={offset}
-          cardTemplate={Content}
-          items={resolvedItems}
-          id={id}
-          limit={props.limit}
-        />
-      );
+      return <EditingView contentType={contentType} layout={layout} cardTemplate={Content} items={resolvedItems} id={id} surface={surface} />;
     }
 
     const { className, styleTag, style } = buildGridLayout(id, layout);
@@ -250,7 +279,9 @@ const CardCollection: ComponentConfig<CardCollectionProps> = {
         <div className={className} style={style}>
           {resolvedItems.map((item) => (
             <ItemContext.Provider key={item.id} value={item}>
-              <Content />
+              <ItemSurface {...surface}>
+                <Content />
+              </ItemSurface>
             </ItemContext.Provider>
           ))}
         </div>

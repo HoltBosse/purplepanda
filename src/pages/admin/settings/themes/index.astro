@@ -1,0 +1,28 @@
+---
+import { requireSuperAdmin } from '../../../../auth/super-admin.js';
+import ThemeSettings from '../../../../components/theme/ThemeSettings.js';
+import { getDb } from '../../../../db/db.js';
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import externalPuckConfig from '../../../../puck.config.js';
+import { getTheme, getThemeUsage } from '../../../../theme/server.js';
+
+// The site theme screen. Super admins only (see auth/super-admin.ts); everyone else gets the
+// admin's not-found page.
+const access = await requireSuperAdmin(Astro);
+if (access.response) return access.response;
+
+const db = getDb();
+const [theme, usage] = await Promise.all([getTheme(db), getThemeUsage(db)]);
+const fontPresets = externalPuckConfig?.fontFamilies ?? [];
+const justSaved = Astro.url.searchParams.get('saved') === '1';
+---
+
+<AdminLayout>
+	<ThemeSettings
+		client:load
+		saved={theme}
+		usage={usage}
+		fontPresets={fontPresets}
+		justSaved={justSaved}
+	/>
+</AdminLayout>

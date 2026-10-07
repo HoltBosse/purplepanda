@@ -27,14 +27,14 @@ function renderIn(location: 'page' | 'form', props: Record<string, unknown> = {}
 describe('Button', () => {
     it('is a link with a Link field outside forms', () => {
         const { fields, html } = renderIn('page');
-        expect(fields).toEqual(['children', 'href', 'image']);
-        expect(html).toBe('<a class="btn btn-primary" href="/next">Go</a>');
+        expect(fields).toEqual(['children', 'href', 'variant', 'image']);
+        expect(html).toBe('<a class="pp-btn pp-btn--primary" href="/next">Go</a>');
     });
 
     it('is a submit button with no Link field in forms', () => {
         const { fields, html } = renderIn('form');
-        expect(fields).toEqual(['children', 'image']);
-        expect(html).toBe('<button class="btn btn-primary" type="submit">Go</button>');
+        expect(fields).toEqual(['children', 'variant', 'image']);
+        expect(html).toBe('<button class="pp-btn pp-btn--primary" type="submit">Go</button>');
     });
 
     it('lays an image out beside the label', () => {
@@ -47,6 +47,10 @@ describe('Button', () => {
 
     it('renders just the label when the image group has no file', () => {
         const { html } = renderIn('form', { image: { file: null, position: 'end', gap: 2 } });
-        expect(html).toBe('<button class="btn btn-primary" type="submit">Go</button>');
+        expect(html).toBe('<button class="pp-btn pp-btn--primary" type="submit">Go</button>');
+    });
+
+    it('takes its look from the theme variant it names', () => {
+        expect(renderIn('page', { variant: 'accent' }).html).toBe('<a class="pp-btn pp-btn--accent" href="/next">Go</a>');
     });
 });

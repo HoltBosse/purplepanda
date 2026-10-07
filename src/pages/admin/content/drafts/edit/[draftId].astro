@@ -4,7 +4,6 @@ import { eq } from 'drizzle-orm';
 import { LazyContentPuckEditor as ContentPuckEditor } from '../../../../../components/lazy-editors';
 import { getContentTypeById } from '../../../../../db/content-types.js';
 import { getDb } from '../../../../../db/db.js';
-import { resolveFontSettings } from '../../../../../db/fonts.js';
 import { dagNodes, pages } from '../../../../../db/schema.js';
 import { resolveTemplateSetting } from '../../../../../db/templates.js';
 import AdminBareLayout from '../../../../../layouts/AdminBareLayout.astro';
@@ -26,10 +25,7 @@ if (!entity?.contentType || !(await getContentTypeById(db, entity.contentType)))
 const saveUrl = `/admin/content/drafts/update/${draftId}`;
 const draftPublishUrl = `/admin/content/drafts/publish/${draftId}`;
 
-const [templateSetting, fontSettings] = await Promise.all([
-    resolveTemplateSetting(db, entity.contentType),
-    resolveFontSettings(db),
-]);
+const templateSetting = await resolveTemplateSetting(db, entity.contentType);
 
 const templateData = templateSetting?.templates?.content as Data | undefined;
 ---
@@ -42,7 +38,5 @@ const templateData = templateSetting?.templates?.content as Data | undefined;
         initialData={draft.content as Data}
         isDraft
         {...(templateData ? { templateData } : {})}
-        {...(fontSettings.headingFontLink ? { headingFontLink: fontSettings.headingFontLink } : {})}
-        {...(fontSettings.bodyFontLink ? { bodyFontLink: fontSettings.bodyFontLink } : {})}
     />
 </AdminBareLayout>

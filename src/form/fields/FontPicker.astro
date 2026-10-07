@@ -1,6 +1,7 @@
 ---
 import BaseField from "../BaseField.astro";
 import type { BaseFieldProps } from "../types";
+import { DEFAULT_SAMPLE_TEXT, presetFonts } from "./font-picker-core";
 import { extractFamilyFromLink } from "./font-utils";
 
 interface Props extends BaseFieldProps {
@@ -13,11 +14,9 @@ const { placeholder, sampleText, fontFamilies, ...baseProps } = Astro.props as P
 const { id, name, value } = baseProps;
 const currentFamily = extractFamilyFromLink(value);
 const buttonLabel = currentFamily ?? placeholder ?? "Select a font";
-const sample = sampleText ?? "The quick brown fox jumps over the lazy dog";
+const sample = sampleText ?? DEFAULT_SAMPLE_TEXT;
 const dialogId = `${id}-dialog`;
-const presetFonts = (fontFamilies ?? [])
-  .map((href) => ({ href, family: extractFamilyFromLink(href) }))
-  .filter((preset): preset is { href: string; family: string } => !!preset.family);
+const presets = presetFonts(fontFamilies ?? []);
 ---
 
 <BaseField {...baseProps}>
@@ -48,7 +47,7 @@ const presetFonts = (fontFamilies ?? [])
   closedby="any"
   data-font-picker-dialog
   data-sample-text={sample}
-  data-presets={JSON.stringify(presetFonts)}
+  data-presets={JSON.stringify(presets)}
   class="relative m-auto w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] md:max-w-2xl rounded-xl bg-base-100 p-6 shadow-xl backdrop:bg-black/50 backdrop:backdrop-blur-sm"
 >
   <button type="button" class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" data-font-picker-close>✕</button>
@@ -67,44 +66,19 @@ const presetFonts = (fontFamilies ?? [])
 
 <script>
   import {
-    BUNNY_FONT_LIST_URL,
-    buildFontLink,
-    pickDefaultWeights,
-    extractFamilyFromLink,
-    type BunnyFont,
-  } from "./font-utils";
-
-  type Font = BunnyFont & { slug: string };
-  type Entry = { family: string; href: string; category?: string; isPreset: boolean };
-  type Preset = { family: string; href: string };
-
-  let fontListPromise: Promise<Font[]> | null = null;
-
-  function loadFontList(): Promise<Font[]> {
-    if (!fontListPromise) {
-      fontListPromise = fetch(BUNNY_FONT_LIST_URL)
-        .then((res) => res.json())
-        .then((data: Record<string, BunnyFont>) =>
-          Object.entries(data)
-            .map(([slug, font]) => ({ ...font, slug }))
-            .sort((a, b) => a.familyName.localeCompare(b.familyName))
-        );
-    }
-    return fontListPromise;
-  }
-
-  const loadedStylesheets = new Set<string>();
-
-  function ensureStylesheet(href: string) {
-    if (loadedStylesheets.has(href)) return;
-    loadedStylesheets.add(href);
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = href;
-    document.head.appendChild(link);
-  }
-
-  const MAX_VISIBLE_ROWS = 500;
+    DEFAULT_SAMPLE_TEXT,
+    ensureStylesheet,
+    type Font,
+    type FontEntry,
+    fontEntries,
+    loadFontList,
+    MAX_VISIBLE_ROWS,
+    matchesQuery,
+    observeRows,
+    type PresetFont,
+    showRowPreview,
+  } from "./font-picker-core";
+  import { extractFamilyFromLink } from "./font-utils";
 
   document.querySelectorAll<HTMLElement>("[data-font-picker]").forEach((wrapper) => {
     if (wrapper.dataset.fontPickerInitialized) return;
@@ -121,8 +95,8 @@ const presetFonts = (fontFamilies ?? [])
     const searchInput = dialog.querySelector<HTMLInputElement>("[data-font-picker-search]")!;
     const list = dialog.querySelector<HTMLElement>("[data-font-picker-list]")!;
     const closeButton = dialog.querySelector<HTMLButtonElement>("[data-font-picker-close]");
-    const sampleText = dialog.dataset.sampleText ?? "The quick brown fox jumps over the lazy dog";
-    const presets: Preset[] = JSON.parse(dialog.dataset.presets || "[]");
+    const sampleText = dialog.dataset.sampleText ?? DEFAULT_SAMPLE_TEXT;
+    const presets: PresetFont[] = JSON.parse(dialog.dataset.presets || "[]");
 
     closeButton?.addEventListener("click", () => dialog.close());
 
@@ -130,21 +104,7 @@ const presetFonts = (fontFamilies ?? [])
     let allFonts: Font[] = [];
     let rendered = false;
 
-    function buildEntries(): Entry[] {
-      const presetFamilies = new Set(presets.map((p) => p.family.toLowerCase()));
-      const presetEntries: Entry[] = presets.map((p) => ({ family: p.family, href: p.href, isPreset: true }));
-      const bunnyEntries: Entry[] = allFonts
-        .filter((f) => !presetFamilies.has(f.familyName.toLowerCase()))
-        .map((f) => ({
-          family: f.familyName,
-          href: buildFontLink(f.familyName, pickDefaultWeights(f.weights)),
-          category: f.category,
-          isPreset: false,
-        }));
-      return [...presetEntries, ...bunnyEntries];
-    }
-
-    function selectEntry(entry: Entry) {
+    function selectEntry(entry: FontEntry) {
       hiddenInput!.value = entry.href;
       label!.textContent = entry.family;
       sampleEl!.style.fontFamily = `'${entry.family}'`;
@@ -154,10 +114,8 @@ const presetFonts = (fontFamilies ?? [])
 
     function renderList(query: string) {
       list.innerHTML = "";
-      const q = query.trim().toLowerCase();
       const currentFamily = extractFamilyFromLink(hiddenInput!.value);
-      const entries = buildEntries();
-      const matches = q ? entries.filter((e) => e.family.toLowerCase().includes(q)) : entries;
+      const matches = fontEntries(presets, allFonts).filter((e) => matchesQuery(e.family, query));
 
       if (matches.length === 0) {
         const empty = document.createElement("p");
@@ -168,21 +126,7 @@ const presetFonts = (fontFamilies ?? [])
       }
 
       observer?.disconnect();
-      observer = new IntersectionObserver(
-        (observerEntries) => {
-          for (const observerEntry of observerEntries) {
-            if (!observerEntry.isIntersecting) continue;
-            const row = observerEntry.target as HTMLElement;
-            observer!.unobserve(row);
-            const href = row.dataset.href!;
-            const family = row.dataset.family!;
-            ensureStylesheet(href);
-            const rowSample = row.querySelector<HTMLElement>("[data-row-sample]");
-            if (rowSample) rowSample.style.fontFamily = `'${family}'`;
-          }
-        },
-        { root: list, rootMargin: "200px" }
-      );
+      observer = observeRows(list, showRowPreview);
 
       const visible = matches.slice(0, MAX_VISIBLE_ROWS);
       for (const entry of visible) {
@@ -232,7 +176,6 @@ const presetFonts = (fontFamilies ?? [])
         rendered = true;
         renderList(searchInput.value);
       } catch {
-        fontListPromise = null;
         if (presets.length === 0) {
           list.innerHTML = "";
           const error = document.createElement("p");
