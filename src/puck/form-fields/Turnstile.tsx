@@ -18,7 +18,9 @@ function toSubmissionSchema() {
     .refine(async (token) => {
       // Dynamically imported so the server-only DB/fetch code in turnstile.server.js never gets
       // pulled into the client editor bundle that also imports this component (see FormEmbed.tsx
-      // for the same pattern).
+      // for the same pattern). The SSR guard is what actually keeps it out: without it Vite still
+      // emits the server module as a fetchable client chunk.
+      if (!import.meta.env.SSR) return false;
       const { verifyTurnstileToken } = await import("./turnstile.server.js");
       return verifyTurnstileToken(token);
     }, "Verification failed, please try again");

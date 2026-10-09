@@ -44,7 +44,9 @@ const Image: ComponentConfig<ImageProps> = {
   processSubmission: async (raw, props) => {
     // Dynamically imported so the server-only sharp/fs/db code in Image.server.js never gets
     // pulled into the client editor bundle that also imports this component (see Turnstile.tsx
-    // for the same pattern).
+    // for the same pattern). The SSR guard is what actually keeps it out: without it Vite still
+    // emits the server module as a fetchable client chunk.
+    if (!import.meta.env.SSR) throw new Error("Image submissions can only be processed on the server");
     const { processImageSubmission } = await import("./Image.server.js");
     return processImageSubmission(raw, props);
   },

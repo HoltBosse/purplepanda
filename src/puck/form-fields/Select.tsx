@@ -175,9 +175,12 @@ function SelectField({
 // users/tags can't be checked against a static enum the way manual can; each posted value is
 // instead checked against the real source with an async DB lookup (isUserOptionValid/
 // isContentOptionValid/isTagOptionValid).
+// Each refine's SSR guard keeps Select.server.js (and the DB code it imports) out of the client
+// build — an unguarded dynamic import() still gets emitted as a fetchable client chunk.
 function buildOptionSchema({ source, contentType, options }: SelectProps): z.ZodTypeAny {
   if (source === "users") {
     return z.string().refine(async (value) => {
+      if (!import.meta.env.SSR) return false;
       const { isUserOptionValid } = await import("./Select.server.js");
       return isUserOptionValid(value);
     }, "Invalid option");
@@ -186,6 +189,7 @@ function buildOptionSchema({ source, contentType, options }: SelectProps): z.Zod
   if (source === "content") {
     return z.string().refine(async (value) => {
       if (!contentType) return false;
+      if (!import.meta.env.SSR) return false;
       const { isContentOptionValid } = await import("./Select.server.js");
       return isContentOptionValid(contentType, value);
     }, "Invalid option");
@@ -193,6 +197,7 @@ function buildOptionSchema({ source, contentType, options }: SelectProps): z.Zod
 
   if (source === "tags") {
     return z.string().refine(async (value) => {
+      if (!import.meta.env.SSR) return false;
       const { isTagOptionValid } = await import("./Select.server.js");
       return isTagOptionValid(value);
     }, "Invalid option");
