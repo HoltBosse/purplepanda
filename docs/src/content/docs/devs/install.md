@@ -26,6 +26,10 @@ npm run dev
 * `DATABASE_URL` - the Postgres connection string (required)
 * `STORAGE_DRIVER` - where uploaded media and documents are stored: `filesystem` (the default),
   `s3` or `memory`. See [Upload storage](#upload-storage)
+* `CLAUDE_API_KEY` - an Anthropic API key for the editors' AI tab and the site assistant (optional).
+  See [AI Assistant](/devs/ai-assistant)
+* `PEXELS_API_KEY` - lets the AI assistants use free Pexels stock photos (optional)
+* `AI_JOB_BUDGET_USD` - the most one site-assistant job may spend, in US dollars (default `1`)
 
 ## Upload storage
 

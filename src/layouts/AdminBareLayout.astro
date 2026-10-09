@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import { eq } from 'drizzle-orm';
+import AiEnabledScript from '../components/AiEnabledScript.astro';
 import ContentTypesScript from '../components/ContentTypesScript.astro';
 import loadingPandaSVGRaw from '../components/LoadingPanda.svg?raw';
 import SiteComponentsScript from '../components/SiteComponentsScript.astro';
@@ -44,6 +45,7 @@ const loadingPandaSvgInline = loadingPandaSVGRaw.replace(/\x3cscript[^>]*>[\s\S]
 	<meta http-equiv="X-UA-Compatible" content="ie=edge">
 	<link rel="icon" type="image/svg+xml" href="/admin/assets/favicon.svg" />
 	<link rel="icon" href="/admin/assets/favicon.ico" />
+	<AiEnabledScript />
 	<ContentTypesScript />
 	<SiteComponentsScript />
 	<ThemeScript />

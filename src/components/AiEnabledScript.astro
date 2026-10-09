@@ -1,0 +1,9 @@
+---
+import { aiEnabled } from '../puck/ai/enabled.server.js';
+
+// Tells the editors whether to offer the AI tab (see getInjectedAiEnabled() in
+// ../puck/ai/enabled.ts). Rendered by AdminBareLayout ahead of the editor island, the same way as
+// SiteComponentsScript. Only a convenience: the AI routes check again server-side.
+const enabled = await aiEnabled();
+---
+<script is:inline set:html={`window.__PP_AI_ENABLED = ${enabled};`} />

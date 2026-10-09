@@ -119,6 +119,8 @@ export interface TenantDomainMap {
   primaryByTenant: Map<string, string>;
   // The opt-in components each tenant has enabled (tenants.enabled_components).
   componentsByTenant: Map<string, string[]>;
+  // Each tenant's AI settings (tenants.ai_enabled / ai_monthly_budget_usd).
+  aiByTenant: Map<string, { enabled: boolean; monthlyBudgetUsd: number }>;
   // The root domain and the tenant owning it, if one is marked.
   rootDomain: string | null;
   rootTenantId: string | null;
@@ -228,6 +230,8 @@ export async function getTenantDomainMap(db: Db): Promise<TenantDomainMap> {
         tenantName: tenants.name,
         tenantState: tenants.state,
         tenantComponents: tenants.enabledComponents,
+        tenantAiEnabled: tenants.aiEnabled,
+        tenantAiBudget: tenants.aiMonthlyBudgetUsd,
       })
       .from(tenantDomains)
       .innerJoin(tenants, eq(tenantDomains.tenantId, tenants.id))
@@ -237,6 +241,7 @@ export async function getTenantDomainMap(db: Db): Promise<TenantDomainMap> {
           domainsByTenant: new Map(),
           primaryByTenant: new Map(),
           componentsByTenant: new Map(),
+          aiByTenant: new Map(),
           rootDomain: null,
           rootTenantId: null,
         };
@@ -252,6 +257,7 @@ export async function getTenantDomainMap(db: Db): Promise<TenantDomainMap> {
           }
           if (row.isPrimary) map.primaryByTenant.set(row.tenantId, row.domain);
           map.componentsByTenant.set(row.tenantId, row.tenantComponents);
+          map.aiByTenant.set(row.tenantId, { enabled: row.tenantAiEnabled, monthlyBudgetUsd: row.tenantAiBudget });
           const domains = map.domainsByTenant.get(row.tenantId) ?? [];
           domains.push(row.domain);
           map.domainsByTenant.set(row.tenantId, domains);

@@ -1,0 +1,70 @@
+---
+import '../../../../../../../styles/global.css';
+import type { Data } from '@puckeditor/core';
+import { eq } from 'drizzle-orm';
+import * as z from 'zod';
+import PageRenderer from '../../../../../../../components/PageRenderer.js';
+import ThemeHead from '../../../../../../../components/ThemeHead.astro';
+import { getDb } from '../../../../../../../db/db.js';
+import { pages, templates } from '../../../../../../../db/schema.js';
+import { resolveTemplateSetting } from '../../../../../../../db/templates.js';
+import { getJob, stepPreview } from '../../../../../../../puck/ai/site-agent.server.js';
+import type { JobStep } from '../../../../../../../puck/ai/site-plan.js';
+import { resolveDataForSSR } from '../../../../../../../puck/server-data-wrapper.js';
+import externalPuckConfig from '../../../../../../../puck.config.js';
+import { REPLACEMENT_DEFAULTS } from '../../../../../../../theme/index.js';
+
+// A built step of an AI site job (see puck/ai/site-agent.server.ts), drawn the way it would be
+// published — inside the template it would use — before the author applies it. Like the draft
+// preview (admin/pages/preview/[draftId].astro), which this mirrors.
+const { renderToStaticMarkup } = await import('react-dom/server');
+
+const db = getDb();
+const row = await getJob(Astro.params.id!);
+const stepParam = z.coerce.number().int().min(0).max(1000).safeParse(Astro.params.step);
+const index = stepParam.success ? stepParam.data : -1;
+const preview = row && stepParam.success ? await stepPreview(row, index) : null;
+if (!row || !preview) return Astro.redirect('/admin/ai');
+
+const step = (row.steps as JobStep[])[index]!.step;
+let template: Data | null = preview.template;
+if (!template && step.kind !== 'create_template' && step.kind !== 'edit_template' && preview.templateRef !== 'none') {
+    if (preview.templateRef) {
+        // An existing template, by id.
+        const [existing] = await db.select({ content: templates.content }).from(templates).where(eq(templates.id, preview.templateRef)).limit(1);
+        template = (existing?.content as Data | undefined) ?? null;
+    } else {
+        // An existing page keeps its own template setting; a new one gets the site default.
+        const [page] = step.kind === 'edit_page' ? await db.select().from(pages).where(eq(pages.id, step.pageId)).limit(1) : [];
+        const setting = await resolveTemplateSetting(db, page?.contentType ?? undefined, {
+            templateId: page?.templateId ?? null,
+            noTemplate: page?.noTemplate ?? false,
+        });
+        template = (setting?.templates?.content as Data | undefined) ?? null;
+    }
+}
+
+const config = externalPuckConfig ?? {};
+const [pageData, templateData] = await Promise.all([
+    resolveDataForSSR(config, preview.page),
+    template ? resolveDataForSSR(config, template) : Promise.resolve(undefined),
+]);
+const title = String((preview.page as any)?.root?.props?.title || (template as any)?.root?.props?.title || 'Preview');
+---
+
+<!DOCTYPE html>
+<html lang="en" data-theme="false">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title} (AI preview)</title>
+    <ThemeHead />
+</head>
+<body data-scheme={REPLACEMENT_DEFAULTS.scheme}>
+    <PageRenderer pageData={pageData} templateData={templateData} renderIsolatedIsland={renderToStaticMarkup} />
+    <script>
+        import "../../../../../../../puck/hydrate-page-islands.js";
+    </script>
+</body>
+</html>

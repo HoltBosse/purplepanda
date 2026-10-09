@@ -101,6 +101,7 @@ export default function TemplatePuckEditor({
       config={config}
       data={initialData ?? defaultInitialData}
       dictionary={{ "label-page": "Template" }}
+      aiLocation="template"
       {...optionalProps}
       onPublish={onPublish ?? defaultSave}
     />

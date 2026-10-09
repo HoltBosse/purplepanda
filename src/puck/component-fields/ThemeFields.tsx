@@ -5,6 +5,7 @@ import { normalizeSides } from "../../theme/normalize.js";
 import { DEFAULT_THEME } from "../../theme/presets.js";
 import { getInjectedTheme, type ThemeSummary, themeSummary } from "../../theme/summary.js";
 import { units } from "../../theme/units.js";
+import { withAiHint } from "../ai/hint.js";
 import { TriangleAlert } from "../icons.js";
 
 // The style fields a component can take from the site theme: a scheme (containers), a button
@@ -145,8 +146,13 @@ type SchemeFieldOptions = {
   allowInherit?: boolean;
 };
 
+// The theme's choices of one kind as the AI assistant sees them (see ../ai/hint.ts): `id` (Name).
+function themeChoices(items: { id: string; name: string }[]): string {
+  return items.map((item) => `${JSON.stringify(item.id)} (${item.name})`).join(" | ");
+}
+
 export function schemeField({ label = "Color scheme", allowInherit = false }: SchemeFieldOptions = {}): CustomField<string | undefined> {
-  return {
+  return withAiHint<CustomField<string | undefined>>({
     type: "custom",
     label,
     render: ({ value, onChange, readOnly }) => {
@@ -173,11 +179,11 @@ export function schemeField({ label = "Color scheme", allowInherit = false }: Sc
         </ThemeFieldShell>
       );
     },
-  };
+  }, () => `theme color scheme id: ${allowInherit ? '"" (inherit) | ' : ""}${themeChoices(currentTheme().schemes)}`);
 }
 
 export function variantField({ label = "Style" }: { label?: string } = {}): CustomField<string | undefined> {
-  return {
+  return withAiHint<CustomField<string | undefined>>({
     type: "custom",
     label,
     render: ({ value, onChange, readOnly }) => {
@@ -215,13 +221,13 @@ export function variantField({ label = "Style" }: { label?: string } = {}): Cust
         </ThemeFieldShell>
       );
     },
-  };
+  }, () => `theme button style id: ${themeChoices(currentTheme().variants)}`);
 }
 
 export function textStyleField({ label = "Text style", allowNone = false }: { label?: string; allowNone?: boolean } = {}): CustomField<
   string | undefined
 > {
-  return {
+  return withAiHint<CustomField<string | undefined>>({
     type: "custom",
     label,
     render: ({ value, onChange, readOnly }) => {
@@ -253,7 +259,7 @@ export function textStyleField({ label = "Text style", allowNone = false }: { la
         </ThemeFieldShell>
       );
     },
-  };
+  }, () => `theme text style id: ${allowNone ? '"" (none) | ' : ""}${themeChoices(currentTheme().textStyles)}`);
 }
 
 type BorderFieldOptions = {
@@ -266,7 +272,7 @@ type BorderFieldOptions = {
 // A border preset from the theme, "none", or (with allowInherit) "" for the theme's own choice.
 // Which sides it goes on is a separate prop: see borderSidesField.
 export function borderField({ label = "Border", allowInherit = false }: BorderFieldOptions = {}): CustomField<string | undefined> {
-  return {
+  return withAiHint<CustomField<string | undefined>>({
     type: "custom",
     label,
     render: ({ value, onChange, readOnly }) => {
@@ -294,7 +300,7 @@ export function borderField({ label = "Border", allowInherit = false }: BorderFi
         </ThemeFieldShell>
       );
     },
-  };
+  }, () => `theme border id: ${allowInherit ? '"" (theme default) | ' : ""}"${NO_BORDER}" (no border) | ${themeChoices(currentTheme().borders)}`);
 }
 
 // The edges of the sides preview, each a thin bar.
@@ -374,7 +380,7 @@ export function SidesPicker({
 }
 
 export function borderSidesField({ label = "Border sides" }: { label?: string } = {}): CustomField<BorderSide[] | undefined> {
-  return {
+  return withAiHint<CustomField<BorderSide[] | undefined>>({
     type: "custom",
     label,
     render: ({ value, onChange, readOnly }) => (
@@ -384,7 +390,7 @@ export function borderSidesField({ label = "Border sides" }: { label?: string } 
         </div>
       </FieldLabel>
     ),
-  };
+  }, `array of ${BORDER_SIDES.map((side) => JSON.stringify(side)).join(" | ")} (only used when border is a preset)`);
 }
 
 type StyleFieldOptions = {

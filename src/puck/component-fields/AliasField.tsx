@@ -1,4 +1,5 @@
 import type { CustomField } from "@puckeditor/core";
+import { withAiHint } from "../ai/hint.js";
 import { Type } from "../icons.js";
 
 // URL aliases only ever match [a-z-]; anything else (spaces, uppercase, punctuation) is
@@ -43,10 +44,10 @@ function AliasFieldInner({
   );
 }
 
-export const aliasField: CustomField<string> = {
+export const aliasField: CustomField<string> = withAiHint<CustomField<string>>({
   type: "custom",
   label: "Alias",
   render: ({ field, id, value, onChange }) => (
     <AliasFieldInner id={id} label={field.label} value={value} onChange={onChange} />
   ),
-};
+}, "URL slug: lowercase letters and hyphens only");

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, jsonb, pgPolicy, pgTable, text, timestamp, unique, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, date, doublePrecision, index, integer, jsonb, pgPolicy, pgTable, text, timestamp, unique, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------------------------
 // Tenancy
@@ -37,6 +37,8 @@ function tenantIsolationPolicy() {
   });
 }
 
+export const DEFAULT_AI_MONTHLY_BUDGET_USD = 10;
+
 export const tenants = pgTable("tenants", {
   id: uuid("id").defaultRandom().primaryKey(),
   state: integer("state").notNull().default(1), // 1 = enabled, 0 = disabled (every domain 404s)
@@ -44,6 +46,10 @@ export const tenants = pgTable("tenants", {
   // The opt-in Puck components (`optIn: true`, see src/puck/site-components.ts) this site may use.
   // Names this build doesn't know (e.g. from another image sharing the database) are kept as-is.
   enabledComponents: text("enabled_components").array().notNull().default(sql`'{}'::text[]`),
+  // Whether this site's admins get the AI assistants (the editors' AI tab and /admin/ai), and how
+  // much they may spend on them per calendar month (UTC), in USD — see puck/ai/enabled.server.ts.
+  aiEnabled: boolean("ai_enabled").notNull().default(false),
+  aiMonthlyBudgetUsd: doublePrecision("ai_monthly_budget_usd").notNull().default(DEFAULT_AI_MONTHLY_BUDGET_USD),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -340,4 +346,40 @@ export const sessions = pgTable("sessions", {
   index("sessions_tenant_id_idx").on(t.tenantId),
   index("sessions_login_id_idx").on(t.loginId),
   index("sessions_expires_at_idx").on(t.expiresAt),
+]);
+
+// A run of the AI site assistant (puck/ai/site-agent.server.ts): the author's request, the plan the
+// assistant drew up, each step's outcome (including the built page/template content, held here
+// until the author approves it), a progress log, and the running cost. Nothing in the site itself
+// changes until the author applies the job.
+export const aiJobs = pgTable("ai_jobs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: tenantIdColumn(),
+  userId: uuid("user_id").notNull(),
+  // planning | building | review | applying | applied | failed | cancelled
+  status: varchar("status", { length: 20 }).notNull().default("planning"),
+  request: text("request").notNull(),
+  plan: jsonb("plan"),
+  steps: jsonb("steps").notNull().default([]),
+  log: jsonb("log").notNull().default([]),
+  error: text("error"),
+  costUsd: doublePrecision("cost_usd").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("ai_jobs_tenant_id_idx").on(t.tenantId),
+  tenantIsolationPolicy(),
+]);
+
+// What a site has spent on AI model calls, one row per calendar month (UTC; `month` is its first
+// day), checked against tenants.ai_monthly_budget_usd. Every call from either assistant adds to it
+// (see recordAiSpend in puck/ai/enabled.server.ts).
+export const aiSpend = pgTable("ai_spend", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: tenantIdColumn(),
+  month: date("month", { mode: "string" }).notNull(),
+  costUsd: doublePrecision("cost_usd").notNull().default(0),
+}, (t) => [
+  unique("ai_spend_tenant_id_month_unique").on(t.tenantId, t.month),
+  tenantIsolationPolicy(),
 ]);

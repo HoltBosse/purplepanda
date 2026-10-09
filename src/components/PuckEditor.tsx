@@ -9,12 +9,15 @@ import { createPortal } from "react-dom";
 import type * as z from "zod";
 import { ensureStylesheet } from "../form/fields/font-picker-core.js";
 import { ChevronDown, Moon, Save, Sun } from "../puck/icons.js";
+import type { Location } from "../puck/index.js";
 import { sanitizeHtml } from "../puck/sanitize-html.js";
 import { sanitizeRichtextData } from "../puck/sanitize-richtext.js";
 import { getInjectedDisabledComponents, hideDisabledComponents } from "../puck/site-components.js";
 import { type ContentValidationError, validateContentTree } from "../puck/validate-content.js";
 import { type Mode, REPLACEMENT_DEFAULTS } from "../theme/index.js";
 import { getInjectedTheme, setInjectedTheme, THEME_CHANNEL, type ThemeSummary } from "../theme/summary.js";
+import { getInjectedAiEnabled } from "../puck/ai/enabled.js";
+import { createAiPlugin } from "./ai/AiPanel.js";
 import { ensureTemplateSlot } from "./template-slot.js";
 
 declare global {
@@ -620,9 +623,12 @@ export interface PuckEditorProps {
   isNew?: boolean;
   onCommit?: (data: Data) => void;
   dictionary?: Dictionary;
+  // Which editor this is, so the AI tab's server side validates against the same per-location
+  // config (see filterConfigByLocation). Pages, content, prefabs and the 404 page are all "page".
+  aiLocation?: Location;
 }
 
-export default function PuckEditor({ config, data, templateData, onPublish, onSave, rootPropsSchema, isNew, onCommit, dictionary }: PuckEditorProps) {
+export default function PuckEditor({ config, data, templateData, onPublish, onSave, rootPropsSchema, isNew, onCommit, dictionary, aiLocation = "page" }: PuckEditorProps) {
   // Written to by createOverrides' headerActions (see below), so it can be reached imperatively
   // from guardedOnPublish — which runs outside Puck's component tree, as a plain
   // PuckEditorProps.onPublish callback, and so can't call useTypedPuck itself.
@@ -701,6 +707,12 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
   }, [config, onCommit, rootPropsSchema]);
 
   const canvasMode = useMemo(createCanvasModeStore, []);
+
+  // The AI tab in the left panel, beside Blocks and Outline (see ./ai/AiPanel.tsx) — only when the
+  // server has an AI key configured.
+  const aiEditorRef = useRef({ config, rootPropsSchema });
+  aiEditorRef.current = { config, rootPropsSchema };
+  const plugins = useMemo(() => (getInjectedAiEnabled() ? [createAiPlugin(() => aiEditorRef.current, aiLocation)] : []), [aiLocation]);
 
   const overrides = useMemo(
     () =>
@@ -826,7 +838,7 @@ export default function PuckEditor({ config, data, templateData, onPublish, onSa
       >
         <img src="/admin/assets/favicon.svg" alt="Admin" style={{ height: "28px", width: "28px" }} />
       </a>
-      <Puck config={configCopy} data={safeData} onPublish={guardedOnPublish} overrides={overrides} {...(dictionary ? { dictionary } : {})} />
+      <Puck config={configCopy} data={safeData} onPublish={guardedOnPublish} overrides={overrides} plugins={plugins} {...(dictionary ? { dictionary } : {})} />
     </div>
   );
 }

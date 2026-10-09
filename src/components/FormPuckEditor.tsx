@@ -152,6 +152,7 @@ export default function FormPuckEditor({ initialData, saveUrl = "/admin/forms/up
       data={initialData ?? defaultInitialData}
       onPublish={onPublish ?? defaultSave}
       dictionary={{ "label-page": "Form" }}
+      aiLocation="form"
       rootPropsSchema={formRootPropsSchema}
       {...optionalProps}
     />

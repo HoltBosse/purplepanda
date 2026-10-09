@@ -1,51 +1,29 @@
 import type { APIContext } from "astro";
-import { and, eq } from "drizzle-orm";
-import * as z from "zod";
 import { addAlertToSession, alertType, createAlert } from "../../../../alert/index.js";
-import { invalidatePagesCache } from "../../../../db/content-cache.js";
-import { entityKindFilter } from "../../../../db/content-types.js";
-import { getDb } from "../../../../db/db.js";
-import { pages, templates } from "../../../../db/schema.js";
+import { NotFoundError, setPageTemplate } from "../../../../services/content.js";
 
 export async function POST(context: APIContext): Promise<Response> {
-    const db = getDb();
     const { id } = context.params;
-
     if (!id) {
         return new Response("Missing page id", { status: 400 });
     }
 
-    const [page] = await db.select({ id: pages.id }).from(pages).where(and(eq(pages.id, id), entityKindFilter(null))).limit(1);
-    if (!page) {
-        return new Response("Page not found", { status: 404 });
-    }
-
     const formData = await context.request.formData();
     const templateId = formData.get("templateId");
-
     if (typeof templateId !== "string" || !templateId) {
-        const alert = createAlert(alertType.error, "Select a template.");
-        await addAlertToSession(context.session, alert);
+        await addAlertToSession(context.session, createAlert(alertType.error, "Select a template."));
         return context.redirect("/admin/pages");
     }
 
-    const [template] = !z.uuid().safeParse(templateId).success ? [] : await db
-        .select({ id: templates.id })
-        .from(templates)
-        .where(and(eq(templates.id, templateId), eq(templates.state, 1)))
-        .limit(1);
-    if (!template) {
-        const alert = createAlert(alertType.error, "Template not found.");
-        await addAlertToSession(context.session, alert);
+    try {
+        await setPageTemplate({ pageId: id, templateId, userId: (await context.session?.get("userId")) as string });
+    } catch (error) {
+        if (!(error instanceof NotFoundError)) throw error;
+        if (error.message === "Page not found") return new Response("Page not found", { status: 404 });
+        await addAlertToSession(context.session, createAlert(alertType.error, "Template not found."));
         return context.redirect("/admin/pages");
     }
 
-    // A specific template is now pinned, so any earlier "no template" choice no longer applies.
-    await db.update(pages).set({ templateId, noTemplate: false }).where(eq(pages.id, id));
-    invalidatePagesCache(db);
-
-    const alert = createAlert(alertType.success, "Template updated.");
-    await addAlertToSession(context.session, alert);
-
+    await addAlertToSession(context.session, createAlert(alertType.success, "Template updated."));
     return context.redirect("/admin/pages");
 }

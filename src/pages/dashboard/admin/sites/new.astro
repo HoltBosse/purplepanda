@@ -2,11 +2,13 @@
 import { asc, desc, eq } from 'drizzle-orm';
 import { dashboardAccess } from '../../../../auth/dashboard.js';
 import { getDb } from '../../../../db/db.js';
-import { tenantDomains, tenants } from '../../../../db/schema.js';
+import { aiSpend, DEFAULT_AI_MONTHLY_BUDGET_USD, tenantDomains, tenants } from '../../../../db/schema.js';
 import { createFormFlashSession } from '../../../../form/session.js';
 import PortalLayout from '../../../../layouts/PortalLayout.astro';
+import { currentAiMonth } from '../../../../puck/ai/enabled.server.js';
 import { optInComponentNames } from '../../../../puck/site-components.js';
 import externalPuckConfig from '../../../../puck.config.js';
+import { runWithTenant } from '../../../../tenant/context.js';
 import { getHostingDomain, hostingHostname } from '../../../../tenant/index.js';
 
 const access = await dashboardAccess(Astro, { superAdmin: true });
@@ -20,6 +22,8 @@ const { id } = Astro.params;
 
 let name = '';
 let enabledComponents: string[] = [];
+let aiEnabled = false;
+let aiBudget = DEFAULT_AI_MONTHLY_BUDGET_USD;
 let domains: { domain: string; isRoot: boolean; isPrimary: boolean }[] = [];
 if (id) {
     const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id)).limit(1);
@@ -28,6 +32,8 @@ if (id) {
     }
     name = tenant.name;
     enabledComponents = tenant.enabledComponents;
+    aiEnabled = tenant.aiEnabled;
+    aiBudget = tenant.aiMonthlyBudgetUsd;
     domains = await db
         .select({ domain: tenantDomains.domain, isRoot: tenantDomains.isRoot, isPrimary: tenantDomains.isPrimary })
         .from(tenantDomains)
@@ -35,6 +41,15 @@ if (id) {
         .orderBy(desc(tenantDomains.isRoot), asc(tenantDomains.domain));
 }
 const isRootTenant = domains.some((domain) => domain.isRoot);
+
+// This month's AI spend (UTC calendar month, see puck/ai/enabled.server.ts). ai_spend is
+// row-level-secured, so it's read as the site being edited.
+const [spendRow] = id
+    ? await runWithTenant({ id, name, isRoot: isRootTenant }, () =>
+        db.select({ costUsd: aiSpend.costUsd }).from(aiSpend).where(eq(aiSpend.month, currentAiMonth())).limit(1),
+    )
+    : [];
+const aiSpentUsd = spendRow?.costUsd ?? 0;
 
 // Whatever was posted, when the update handler bounced it back with an error.
 const formFlash = createFormFlashSession(Astro.session);
@@ -46,6 +61,8 @@ const domainsValue = flash.domains ?? domains.map((domain) => domain.domain).joi
 const rootValue = flash.root ?? domains.find((domain) => domain.isRoot)?.domain ?? '';
 const rootOptions = domains.map((domain) => domain.domain);
 const primaryValue = flash.primary ?? domains.find((domain) => domain.isPrimary)?.domain ?? '';
+const aiEnabledValue = flash.aiEnabled !== undefined ? flash.aiEnabled === 'on' : aiEnabled;
+const aiBudgetValue = flash.aiBudget ?? String(aiBudget);
 
 // The components this build marks `optIn` (see src/puck/site-components.ts), each ticked when this
 // site has it enabled. Enabled names this build doesn't have are kept by the update handler, and
@@ -158,6 +175,26 @@ const inputClassList = "w-full rounded-md border border-gray-300 px-3 py-2 focus
                     {' '}enabled for this site but not part of this build. Saving leaves {unknownComponentCount === 1 ? 'it' : 'them'} enabled.
                 </p>
             )}
+        </div>
+
+        <div class="p-6 bg-base-100 rounded-lg space-y-4">
+            <h2 class="text-lg font-medium">AI</h2>
+            <p class="text-sm opacity-70">
+                The AI assistants: the AI tab in the editors and the site-wide AI Assistant. They also need
+                <code>CLAUDE_API_KEY</code> set on the server. Once the site has spent its monthly budget, they
+                stop until the next calendar month (UTC).
+            </p>
+            <label class="flex items-center gap-2">
+                <input type="checkbox" class="checkbox checkbox-sm" name="aiEnabled" checked={aiEnabledValue} />
+                <span>Enable AI</span>
+            </label>
+            <label class="block">
+                <span class="block mb-1 font-medium">Monthly budget (USD)</span>
+                <input class={`${inputClassList} sm:max-w-xs`} type="number" name="aiBudget" value={aiBudgetValue} min="0" step="0.01" required />
+                {id && (
+                    <span class="block mt-1 text-sm opacity-70">${aiSpentUsd.toFixed(2)} spent this month.</span>
+                )}
+            </label>
         </div>
 
         {id && (

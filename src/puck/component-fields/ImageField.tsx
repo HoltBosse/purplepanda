@@ -7,6 +7,7 @@ import Search from "lucide-react/dist/esm/icons/search.mjs";
 import Upload from "lucide-react/dist/esm/icons/upload.mjs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toDefaultImageText } from "../../media/default-text.js";
+import { withAiHint } from "../ai/hint.js";
 
 /*
   TODO:
@@ -991,7 +992,7 @@ function ImagePickerField({
 // usage where leaving the image empty is fine (see ImagePickerField's `optional` prop).
 export type ImageFieldConfig = CustomField<ImageConfig | null> & { minimal?: boolean; optional?: boolean };
 
-export const imageField: ImageFieldConfig = {
+export const imageField: ImageFieldConfig = withAiHint<ImageFieldConfig>({
   type: "custom",
   label: "Image",
   minimal: false,
@@ -1004,7 +1005,7 @@ export const imageField: ImageFieldConfig = {
       optional={(field as ImageFieldConfig | undefined)?.optional ?? false}
     />
   ),
-};
+}, 'media image or null: {"id": media uuid from search_media/save_attachment, "title": string, "alt": string, "width": null, "height": null, "objectPosition": null, "crop": null}');
 
 export type ImageSizeOverride = { width: number | null; height: number | null };
 

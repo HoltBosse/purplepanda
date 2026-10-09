@@ -1,0 +1,25 @@
+---
+import SiteAssistant from '../../../components/ai/SiteAssistant.js';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { stockPhotosEnabled } from '../../../media/stock.server.js';
+import { aiEnabled } from '../../../puck/ai/enabled.server.js';
+import { listJobs } from '../../../puck/ai/site-agent.server.js';
+
+// The AI site assistant (see puck/ai/site-agent.server.ts): changes across the whole site, planned
+// and built by the assistant and applied once the author has reviewed them. Without an AI key, or
+// with AI off for this site, there's nothing to show, so it's back to the dashboard (which hides
+// the link too).
+if (!(await aiEnabled())) return Astro.redirect('/admin');
+
+const jobs = (await listJobs()).map((row) => ({
+	id: row.id,
+	status: row.status,
+	request: row.request,
+	costUsd: row.costUsd,
+	createdAt: row.createdAt.toISOString(),
+}));
+---
+
+<AdminLayout>
+	<SiteAssistant client:load initialJobs={jobs as any} stockPhotos={stockPhotosEnabled()} />
+</AdminLayout>

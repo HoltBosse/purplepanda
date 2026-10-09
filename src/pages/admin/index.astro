@@ -12,6 +12,7 @@ import {
 	Link2,
 	Plus,
 	Shapes,
+	Sparkles,
 	Tags,
 	UserRound,
 	Users,
@@ -24,6 +25,7 @@ import { listContentTypes } from '../../db/content-types.js';
 import { getDb } from '../../db/db.js';
 import { documents, formSubmissions, forms, media, pages, redirects, roles, tags, templates, userActions, userRoles, users } from '../../db/schema.js';
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import { aiEnabled } from '../../puck/ai/enabled.server.js';
 import { capitalize } from '../../string';
 
 const db = getDb();
@@ -149,6 +151,7 @@ const statItems = [
 			<a href="/admin/forms/new" class="btn btn-sm btn-outline gap-2"><Plus size={14} />New Form</a>
 			<a href="/admin/users/new" class="btn btn-sm btn-outline gap-2"><Plus size={14} />Invite User</a>
 			<a href="/admin/media" class="btn btn-sm btn-outline gap-2"><Images size={14} />Media Library</a>
+			{(await aiEnabled()) && <a href="/admin/ai" class="btn btn-sm btn-primary gap-2 ml-auto"><Sparkles size={14} />AI Assistant</a>}
 		</div>
 
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">

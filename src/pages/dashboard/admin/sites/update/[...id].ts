@@ -16,6 +16,8 @@ import { domainSchema, normalizeDomain, parseDomainList } from "../../../../../t
 const nameSchema = z.string().trim().min(1).max(255);
 // One hostname per line: generous for any real site, but bounded.
 const domainsSchema = z.string().max(10_000);
+// USD per calendar month; "0" turns spending off without turning the feature off.
+const aiBudgetSchema = z.number().min(0).max(1_000_000);
 // "" for "not the root site", else one of the site's hostnames.
 const rootSchema = z.union([z.literal(""), domainSchema]);
 
@@ -45,10 +47,12 @@ export async function POST(context: APIContext): Promise<Response> {
     // (`<id>.hosting.…`) its domains should point at, so the site has to be created with that id.
     const rawHostingId = field("hostingId");
     const rawComponents = formData.getAll("components").filter((value): value is string => typeof value === "string");
+    const rawAiEnabled = field("aiEnabled");
+    const rawAiBudget = field("aiBudget");
 
     const formFlash = createFormFlashSession(context.session);
     const fail = async (message: string, flashHostingId = rawHostingId) => {
-        await formFlash.set("tenant", { name: rawName, domains: rawDomains, root: rawRoot, primary: rawPrimary, components: rawComponents.join("\n"), hostingId: flashHostingId });
+        await formFlash.set("tenant", { name: rawName, domains: rawDomains, root: rawRoot, primary: rawPrimary, components: rawComponents.join("\n"), aiEnabled: rawAiEnabled, aiBudget: rawAiBudget, hostingId: flashHostingId });
         await addAlertToSession(context.session, createAlert(alertType.error, message));
         return context.redirect(isNew ? "/dashboard/admin/sites/new" : `/dashboard/admin/sites/edit/${id}`);
     };
@@ -70,6 +74,12 @@ export async function POST(context: APIContext): Promise<Response> {
     if (!name.success) {
         return fail("A site name is required.");
     }
+
+    const aiBudget = aiBudgetSchema.safeParse(rawAiBudget.trim() === "" ? Number.NaN : Number(rawAiBudget));
+    if (!aiBudget.success) {
+        return fail("The AI budget has to be an amount in dollars, like 10 or 25.50.");
+    }
+    const ai = { aiEnabled: rawAiEnabled === "on", aiMonthlyBudgetUsd: aiBudget.data };
 
     const domainsField = domainsSchema.safeParse(rawDomains);
     if (!domainsField.success) {
@@ -148,10 +158,10 @@ export async function POST(context: APIContext): Promise<Response> {
     const tenantId = await db.transaction(async (tx) => {
         let savedId: string;
         if (id) {
-            await tx.update(tenants).set({ name: name.data, enabledComponents }).where(eq(tenants.id, id));
+            await tx.update(tenants).set({ name: name.data, enabledComponents, ...ai }).where(eq(tenants.id, id));
             savedId = id;
         } else {
-            const [inserted] = await tx.insert(tenants).values({ id: hostingId!, name: name.data, enabledComponents }).returning({ id: tenants.id });
+            const [inserted] = await tx.insert(tenants).values({ id: hostingId!, name: name.data, enabledComponents, ...ai }).returning({ id: tenants.id });
             savedId = inserted!.id;
         }
 

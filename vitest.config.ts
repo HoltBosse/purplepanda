@@ -20,6 +20,7 @@ const { DISPLAY: _display, ...envWithoutDisplay } = process.env;
 // find the runner"). Listing them (with the other late-discovered deps below) keeps the optimizer
 // settled before the first test loads. Only bites on a cold cache — i.e. exactly the first CI run.
 const lucideIconEntries = [
+  'arrow-up',
   'calendar-clock',
   'check',
   'chevron-down',
@@ -35,10 +36,13 @@ const lucideIconEntries = [
   'moon',
   'mouse-pointer-click',
   'palette',
+  'paperclip',
   'plus',
   'rotate-ccw',
   'save',
   'smartphone',
+  'sparkles',
+  'square',
   'square-dashed',
   'subscript',
   'sun',

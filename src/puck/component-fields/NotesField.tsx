@@ -1,4 +1,5 @@
 import type { CustomField } from "@puckeditor/core";
+import { withAiHint } from "../ai/hint.js";
 
 const MAX_LENGTH = 256;
 
@@ -36,10 +37,10 @@ function NotesFieldInner({
   );
 }
 
-export const notesField: CustomField<string> = {
+export const notesField: CustomField<string> = withAiHint<CustomField<string>>({
   type: "custom",
   label: "Notes",
   render: ({ field, id, value, onChange }) => (
     <NotesFieldInner id={id} label={field.label} value={value} onChange={onChange} />
   ),
-};
+}, "string (internal editor notes, not published)");

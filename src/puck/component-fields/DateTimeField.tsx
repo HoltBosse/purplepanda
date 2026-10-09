@@ -1,4 +1,5 @@
 import type { CustomField } from "@puckeditor/core";
+import { withAiHint } from "../ai/hint.js";
 import { CalendarClock, CircleX } from "../icons.js";
 
 // The native datetime-local input works in timezone-naive "wall clock" values
@@ -78,10 +79,10 @@ function DateTimeFieldInner({
 
 // Value is always a UTC ISO 8601 timestamp string (e.g. "2024-01-01T12:00:00.000Z") or "" —
 // never a timezone-specific local time — regardless of the editing browser's timezone.
-export const dateTimeField: CustomField<string> = {
+export const dateTimeField: CustomField<string> = withAiHint<CustomField<string>>({
   type: "custom",
   label: "Date/Time",
   render: ({ field, id, value, onChange }) => (
     <DateTimeFieldInner id={id} label={field.label} value={value} onChange={onChange} />
   ),
-};
+}, "UTC ISO 8601 timestamp string, or \"\"");

@@ -1,6 +1,7 @@
 import type { CustomField } from "@puckeditor/core";
 import { useState } from "react";
 import * as z from "zod";
+import { withAiHint } from "../ai/hint.js";
 import { Monitor, Smartphone, Tablet } from "../icons.js";
 
 export type GridLayout = { columns: number; gap: number };
@@ -103,11 +104,11 @@ function ResponsiveLayoutField({ value, onChange }: { value: ResponsiveLayout | 
   );
 }
 
-export const layoutField: CustomField<ResponsiveLayout> = {
+export const layoutField: CustomField<ResponsiveLayout> = withAiHint<CustomField<ResponsiveLayout>>({
   type: "custom",
   label: "Layout",
   render: ({ value, onChange }) => <ResponsiveLayoutField value={value} onChange={onChange} />,
-};
+}, '{"desktop": {"columns": 1-12, "gap": number}, "tablet": {...same}, "mobile": {...same}, "tabletCustomized": boolean, "mobileCustomized": boolean} (set *Customized true for a breakpoint that differs from desktop)');
 
 // Mirrors the columns (1-12) / gap (>= 0) bounds the sliders in ResponsiveLayoutField enforce in
 // the UI — Puck's own field `min`/`max` are display hints only, not enforced server-side, so a

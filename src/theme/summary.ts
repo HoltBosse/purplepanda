@@ -88,9 +88,18 @@ export const THEME_GLOBAL = "__PP_THEME";
 
 type GlobalWithTheme = typeof globalThis & { __PP_THEME?: ThemeSummary };
 
+// On the server there's no page-wide global to inject into — one process serves every site — so
+// server code that needs the theme fields' choices (the AI site assistant building pages, see
+// puck/ai/site-agent.server.ts) registers a provider that returns the current request's theme.
+let themeProvider: (() => ThemeSummary | undefined) | undefined;
+
+export function setThemeSummaryProvider(provider: () => ThemeSummary | undefined): void {
+  themeProvider = provider;
+}
+
 // In the browser: the injected summary, or undefined outside the admin (and in tests).
 export function getInjectedTheme(): ThemeSummary | undefined {
-  return (globalThis as GlobalWithTheme).__PP_THEME;
+  return themeProvider?.() ?? (globalThis as GlobalWithTheme).__PP_THEME;
 }
 
 export function setInjectedTheme(summary: ThemeSummary): void {

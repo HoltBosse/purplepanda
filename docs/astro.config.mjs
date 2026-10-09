@@ -29,6 +29,7 @@ export default defineConfig({
 						{ label: 'Content Types', slug: 'devs/content-types' },
 						{ label: 'Themes', slug: 'devs/themes' },
 						{ label: 'Fonts', slug: 'devs/fonts' },
+						{ label: 'AI Assistant', slug: 'devs/ai-assistant' },
 						{ label: 'Image REST API', slug: 'devs/image-rest-api' },
 						{ label: 'Actions API', slug: 'devs/actions-api' },
 						{ label: 'Hooks', slug: 'devs/hooks' },
