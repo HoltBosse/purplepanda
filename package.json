@@ -10,11 +10,11 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "dev": "astro dev",
+    "dev": "TZ=UTC astro dev",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "start": "HOST=0.0.0.0 PORT=3012 node ./dist/server/entry.mjs",
+    "start": "TZ=UTC HOST=0.0.0.0 PORT=3012 node ./dist/server/entry.mjs",
     "start:cluster": "pm2 start ecosystem.config.cjs",
     "reload:cluster": "pm2 reload ecosystem.config.cjs",
     "stop:cluster": "pm2 stop ecosystem.config.cjs",

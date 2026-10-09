@@ -14,6 +14,9 @@ module.exports = {
       instances: "max",
       env: {
         NODE_ENV: "production",
+        // Dates are stored and compared in UTC; pinning the process zone means any stray
+        // zone-less date string is read as UTC too, rather than as the host's local time.
+        TZ: "UTC",
         HOST: "0.0.0.0",
         PORT: "3012",
       },

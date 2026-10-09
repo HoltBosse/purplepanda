@@ -3,6 +3,7 @@ import '../styles/global.css';
 import { House, LogOut, ShieldCheck } from '@lucide/astro';
 import { AlertList } from '../alert/AlertList.js';
 import Container from '../components/Container.astro';
+import TimeZoneScript from '../components/TimeZoneScript.astro';
 
 // The root site's account pages (/dashboard/*): the admin layout's shell — icon rail, profile
 // menu, content area — with just Home, plus Admin (/dashboard/admin, managing every site and
@@ -25,6 +26,7 @@ const alerts = Astro.locals.alerts ?? [];
 	<title>{title}</title>
 	<link rel="icon" type="image/svg+xml" href="/admin/assets/favicon.svg" />
 	<link rel="icon" href="/admin/assets/favicon.ico" />
+	<TimeZoneScript />
 </head>
 <body class="h-screen overflow-hidden">
 	<div class="flex h-full">

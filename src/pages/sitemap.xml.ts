@@ -24,7 +24,9 @@ export const GET: APIRoute = async ({ site, url }) => {
     const latestPublish = db
         .select({
             entityId: dagNodes.entityId,
-            lastmod: sql<Date>`max(${dagNodes.createdAt})`.as('lastmod'),
+            // mapWith: a raw sql aggregate comes back as Postgres's text rendering, which
+            // `new Date()` would misparse; the column's own mapping turns it into a real Date.
+            lastmod: sql<Date>`max(${dagNodes.createdAt})`.mapWith(dagNodes.createdAt).as('lastmod'),
         })
         .from(dagNodes)
         .where(and(eq(dagNodes.entityType, 'page'), eq(dagNodes.nodeType, 'publish')))
@@ -65,7 +67,7 @@ export const GET: APIRoute = async ({ site, url }) => {
 
     const urls = entries
         .map(({ path, lastmod }) => {
-            const lastmodTag = lastmod ? `\n    <lastmod>${new Date(lastmod).toISOString()}</lastmod>` : '';
+            const lastmodTag = lastmod ? `\n    <lastmod>${lastmod.toISOString()}</lastmod>` : '';
             return `  <url>\n    <loc>${origin}/${path}</loc>${lastmodTag}\n  </url>`;
         })
         .join('\n');

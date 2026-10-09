@@ -11,6 +11,7 @@ import { resolvePagePathById } from '../../../db/page-path.js';
 import { flattenTree, groupByParent } from '../../../db/page-tree.js';
 import { dagNodes, pages, templates, userActions, users } from '../../../db/schema.js';
 import Select from '../../../form/fields/Select.astro';
+import { requestTimeZone } from '../../../http/timezone.js';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { isWithinSchedule } from '../../../puck/schedule.js';
 import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
@@ -108,7 +109,7 @@ const searchConfig: DrizzleSearchConfig = {
 
 const q = Astro.url.searchParams.get('q') ?? '';
 const isSearching = q.trim().length > 0;
-const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig);
+const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig, { timeZone: requestTimeZone(Astro.cookies) });
 
 const itemsPerPage = 12;
 const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);

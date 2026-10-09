@@ -340,7 +340,7 @@ export default function SiteAssistant({ initialJobs, stockPhotos }: { initialJob
                 <ul className="mt-1 flex flex-col gap-0.5 text-base-content/70">
                   {job.log.slice(-15).map((entry) => (
                     <li key={`${entry.at}-${entry.text}`}>
-                      {new Date(entry.at).toLocaleTimeString()} · {entry.text}
+                      {new Date(entry.at).toLocaleTimeString(hydrated ? undefined : "en-US", hydrated ? undefined : { timeZone: "UTC" })} · {entry.text}
                     </li>
                   ))}
                 </ul>

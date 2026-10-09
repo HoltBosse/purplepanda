@@ -99,6 +99,16 @@ export interface JoinConfig {
   type?: "inner" | "left";
 }
 
+export interface BuildSearchOptions {
+  /**
+   * IANA timezone the user typed their dates in (see http/timezone.ts). A bare date like
+   * `created:2024-01-01` means that calendar day *for them*, so its bounds are that zone's
+   * midnights converted to UTC instants. Must already be validated — it's bound as a parameter, but
+   * an unknown zone makes Postgres error. Defaults to "UTC".
+   */
+  timeZone?: string;
+}
+
 export interface DrizzleSearchConfig {
   fields: readonly DrizzleSearchField[];
   /** Required if the query may contain unqualified terms (plain `foo` / `"foo"`). */
@@ -124,7 +134,12 @@ export function applySearchJoins<T extends PgSelect>(qb: T, joins: readonly Join
  * Unrecognized fields or values that don't fit their field's type are silently skipped (the GUI is
  * responsible for surfacing that to the user before submit; see `./validate.js`).
  */
-export function buildSearchWhere(ast: SearchAst, config: DrizzleSearchConfig): SQL | undefined {
+export function buildSearchWhere(
+  ast: SearchAst,
+  config: DrizzleSearchConfig,
+  options: BuildSearchOptions = {},
+): SQL | undefined {
+  const timeZone = options.timeZone ?? "UTC";
   const validated = validateSearchAst(ast, config.fields);
   const conditions: SQL[] = [];
 
@@ -138,7 +153,7 @@ export function buildSearchWhere(ast: SearchAst, config: DrizzleSearchConfig): S
     }
 
     if (!term.field) continue;
-    const condition = buildFieldCondition(term.node, term.field);
+    const condition = buildFieldCondition(term.node, term.field, timeZone);
     if (condition) conditions.push(condition);
   }
 
@@ -191,7 +206,7 @@ function buildTextSearchCondition(node: TextTermNode, fulltext?: FulltextSearchC
   return or(fullText, ...[...fulltext.columns].map((c) => ilike(c, pattern)));
 }
 
-function buildFieldCondition(node: FieldTermNode, field: DrizzleSearchField): SQL | undefined {
+function buildFieldCondition(node: FieldTermNode, field: DrizzleSearchField, timeZone: string): SQL | undefined {
   if (field.nullable && node.value === "null") {
     return isNull(field.column);
   }
@@ -200,11 +215,11 @@ function buildFieldCondition(node: FieldTermNode, field: DrizzleSearchField): SQ
     case "boolean":
       return eqValue(field.column, node.value === "true");
     case "date":
-      return dateComparisonCondition(field.column, node.operator, node.value);
+      return dateComparisonCondition(field.column, node.operator, node.value, timeZone);
     case "datetime":
       return /^\d{4}-\d{2}-\d{2}$/.test(node.value)
-        ? dateComparisonCondition(field.column, node.operator, node.value)
-        : literalComparisonCondition(field.column, node.operator, node.value);
+        ? dateComparisonCondition(field.column, node.operator, node.value, timeZone)
+        : literalComparisonCondition(field.column, node.operator, zonedInstant(node.value, timeZone));
     case "time":
       return literalComparisonCondition(field.column, node.operator, node.value);
     case "enum": {
@@ -301,8 +316,20 @@ function regconfig(language: string): SQL {
   return sql`${language}::regconfig`;
 }
 
-function dateRangeCondition(column: SearchColumn, isoDate: string): SQL {
-  return sql`${column} >= ${isoDate} and ${column} < ${nextIsoDate(isoDate)}`;
+/**
+ * The UTC instant of a wall-clock date/time in the user's timezone. A value that already carries
+ * its own offset (`...Z`, `...+02:00`) is an instant as-is. Assumes timestamptz columns — every
+ * timestamp in schema.ts is one — so both sides of the comparison are absolute instants.
+ */
+function zonedInstant(value: string, timeZone: string): SQL {
+  if (/(?:Z|[+-]\d{2}(?::?\d{2})?)$/i.test(value) && value.includes("T")) {
+    return sql`${value}::timestamptz`;
+  }
+  return sql`(${value}::timestamp at time zone ${timeZone})`;
+}
+
+function dateRangeCondition(column: SearchColumn, isoDate: string, timeZone: string): SQL {
+  return sql`${column} >= ${zonedInstant(isoDate, timeZone)} and ${column} < ${zonedInstant(nextIsoDate(isoDate), timeZone)}`;
 }
 
 /**
@@ -311,27 +338,29 @@ function dateRangeCondition(column: SearchColumn, isoDate: string): SQL {
  * before 2024-01-01" (`lte`) means anything up through the end of that day. `eq` keeps the existing
  * whole-day range. This mirrors `dateRangeCondition` above rather than replacing it.
  */
-function dateComparisonCondition(column: SearchColumn, operator: SearchOperator, isoDate: string): SQL {
+function dateComparisonCondition(column: SearchColumn, operator: SearchOperator, isoDate: string, timeZone: string): SQL {
+  const startOfDay = zonedInstant(isoDate, timeZone);
+  const startOfNextDay = zonedInstant(nextIsoDate(isoDate), timeZone);
   switch (operator) {
     case "gt":
-      return sql`${column} >= ${nextIsoDate(isoDate)}`;
+      return sql`${column} >= ${startOfNextDay}`;
     case "gte":
-      return sql`${column} >= ${isoDate}`;
+      return sql`${column} >= ${startOfDay}`;
     case "lt":
-      return sql`${column} < ${isoDate}`;
+      return sql`${column} < ${startOfDay}`;
     case "lte":
-      return sql`${column} < ${nextIsoDate(isoDate)}`;
+      return sql`${column} < ${startOfNextDay}`;
     default:
-      return dateRangeCondition(column, isoDate);
+      return dateRangeCondition(column, isoDate, timeZone);
   }
 }
 
 // Raw `sql` comparisons rather than Drizzle's typed `gt`/`lt` helpers: those coerce their operand
 // through the *column's* driver mapping (e.g. a timestamp column expects a JS `Date`), but these
-// values are ISO strings straight from the query grammar — Postgres compares/casts them against a
-// date/timestamp/time column implicitly, same as the pre-existing `dateRangeCondition` below.
+// values are ISO strings straight from the query grammar (or, for datetimes, the SQL `zonedInstant`
+// above builds from one), which Postgres compares/casts against the column itself.
 /** Straightforward ordering for values that already carry the precision to compare directly (datetimes, times). */
-function literalComparisonCondition(column: SearchColumn, operator: SearchOperator, value: string): SQL {
+function literalComparisonCondition(column: SearchColumn, operator: SearchOperator, value: string | SQL): SQL {
   switch (operator) {
     case "gt":
       return sql`${column} > ${value}`;

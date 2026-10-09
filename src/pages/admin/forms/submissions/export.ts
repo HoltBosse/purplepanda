@@ -3,6 +3,7 @@ import type { APIRoute } from 'astro';
 import { and, desc, gt } from 'drizzle-orm';
 import { getDb } from '../../../../db/db.js';
 import { formSubmissions, forms } from '../../../../db/schema.js';
+import { requestTimeZone } from '../../../../http/timezone.js';
 import {
     collectSubmissionFieldMeta,
     formatSubmissionValue,
@@ -25,11 +26,11 @@ function csvCell(value: string): string {
     return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
-export const GET: APIRoute = async ({ url }) => {
+export const GET: APIRoute = async ({ url, cookies }) => {
     const db = getDb();
 
     const q = url.searchParams.get('q') ?? '';
-    const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig);
+    const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig, { timeZone: requestTimeZone(cookies) });
     // Same soft-delete filter as index.astro; deliberately no pagination limit/offset here.
     const listFilter = and(gt(formSubmissions.state, -1), searchWhere);
 

@@ -6,6 +6,7 @@ import ContentTypesScript from '../components/ContentTypesScript.astro';
 import loadingPandaSVGRaw from '../components/LoadingPanda.svg?raw';
 import SiteComponentsScript from '../components/SiteComponentsScript.astro';
 import ThemeScript from '../components/ThemeScript.astro';
+import TimeZoneScript from '../components/TimeZoneScript.astro';
 import { getDb } from '../db/db.js';
 import { users } from '../db/schema.js';
 
@@ -49,6 +50,7 @@ const loadingPandaSvgInline = loadingPandaSVGRaw.replace(/\x3cscript[^>]*>[\s\S]
 	<ContentTypesScript />
 	<SiteComponentsScript />
 	<ThemeScript />
+	<TimeZoneScript />
 </head>
 <body class="h-screen overflow-x-hidden">
 	{showLoadingPanda && (

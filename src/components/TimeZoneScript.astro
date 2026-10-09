@@ -1,0 +1,19 @@
+---
+import { TIME_ZONE_COOKIE } from '../http/timezone.js';
+
+// Reports the browser's timezone to the server via a cookie (see http/timezone.ts). Inline in
+// <head> so it's set before anything on the page can submit a request that depends on it. Scoped
+// to the two areas that read it — both admin UIs — rather than `/`, so it isn't sent along with
+// every public page and image request too.
+---
+<script is:inline define:vars={{ name: TIME_ZONE_COOKIE }}>
+    try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const secure = location.protocol === 'https:' ? '; Secure' : '';
+        if (tz) {
+            for (const path of ['/admin', '/dashboard']) {
+                document.cookie = `${name}=${encodeURIComponent(tz)}; path=${path}; max-age=31536000; SameSite=Lax${secure}`;
+            }
+        }
+    } catch {}
+</script>

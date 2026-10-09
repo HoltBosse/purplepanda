@@ -7,6 +7,7 @@ import { isMemberOfCurrentTenant } from '../../../auth/accounts.js';
 import Pagination from '../../../components/Pagination.astro';
 import { getDb } from '../../../db/db.js';
 import { roles, userRoles, users, userTenants } from '../../../db/schema.js';
+import { requestTimeZone } from '../../../http/timezone.js';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../search/drizzle.js';
 import { parseSearchQuery } from '../../../search/parser.js';
@@ -79,7 +80,7 @@ const searchConfig: DrizzleSearchConfig = {
 
 const q = Astro.url.searchParams.get('q') ?? '';
 // Accounts are shared across tenants, so only this tenant's members are listed.
-const searchWhere = and(buildSearchWhere(parseSearchQuery(q), searchConfig), isMemberOfCurrentTenant());
+const searchWhere = and(buildSearchWhere(parseSearchQuery(q), searchConfig, { timeZone: requestTimeZone(Astro.cookies) }), isMemberOfCurrentTenant());
 
 const itemsPerPage = 12;
 const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);

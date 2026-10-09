@@ -27,7 +27,13 @@ class TenantPool extends Pool {
     const checkout = super.connect().then(async (client) => {
       if (appliedTenant.get(client) !== tenantId) {
         try {
-          await client.query("SELECT set_config('app.tenant_id', $1, false)", [tenantId]);
+          // A brand-new connection has no entry yet, so it always takes this branch on its first
+          // checkout — which also makes it the place to pin the session TimeZone to UTC. Every
+          // timestamp column is timestamptz, so stored instants don't depend on it, but anything
+          // Postgres renders or casts without an explicit zone (text output, a bare '2024-01-01'
+          // literal, date_trunc) does. Set here rather than via the pool's `options`, which
+          // node-postgres silently replaces with any `?options=` on DATABASE_URL.
+          await client.query("SELECT set_config('app.tenant_id', $1, false), set_config('TimeZone', 'UTC', false)", [tenantId]);
         } catch (err) {
           client.release(err as Error);
           throw err;

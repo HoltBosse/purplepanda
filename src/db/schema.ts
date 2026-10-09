@@ -50,7 +50,7 @@ export const tenants = pgTable("tenants", {
   // much they may spend on them per calendar month (UTC), in USD — see puck/ai/enabled.server.ts.
   aiEnabled: boolean("ai_enabled").notNull().default(false),
   aiMonthlyBudgetUsd: doublePrecision("ai_monthly_budget_usd").notNull().default(DEFAULT_AI_MONTHLY_BUDGET_USD),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 // Hostnames (no scheme or port, lowercased) a tenant answers on — e.g. example.com and
@@ -122,7 +122,7 @@ export const media = pgTable("media", {
   title: varchar("title", { length: 255 }).notNull(),
   alt: varchar("alt", { length: 255 }).notNull(),
   folder: uuid("folder").references(() => mediafolders.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("media_tenant_id_idx").on(t.tenantId),
   tenantIsolationPolicy(),
@@ -197,7 +197,7 @@ export const formSubmissions = pgTable("form_submissions", {
   state: integer("state").notNull().default(1),
   formId: uuid("form_id").notNull().references(() => forms.id),
   data: jsonb("data").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("form_submissions_tenant_id_idx").on(t.tenantId),
   tenantIsolationPolicy(),
@@ -262,7 +262,7 @@ export const userActions = pgTable("user_actions", {
   id: uuid("id").defaultRandom().primaryKey(),
   tenantId: tenantIdColumn(),
   userId: uuid("user_id").references(() => users.id),
-  date: timestamp("date").defaultNow().notNull(),
+  date: timestamp("date", { withTimezone: true }).defaultNow().notNull(),
   type: varchar("type", { length: 255 }).notNull(),
   data: jsonb("data").notNull(),
 }, (t) => [
@@ -289,7 +289,7 @@ export const dagNodes = pgTable("dag_nodes", {
   content: jsonb("content").notNull(),
   nodeType: varchar("node_type", { length: 20 }).notNull().default("publish"), // 'publish' | 'draft'
   name: varchar("name", { length: 255 }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("dag_nodes_tenant_id_idx").on(t.tenantId),
   tenantIsolationPolicy(),
@@ -304,7 +304,7 @@ export const ssoTokens = pgTable("sso_tokens", {
   // The root-site sign-in the token was issued under, carried into the session it's redeemed for
   // (see sessions.login_id).
   loginId: uuid("login_id").notNull(),
-  expiresAt: timestamp("expires_at").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 }, (t) => [
   index("sso_tokens_login_id_idx").on(t.loginId),
   index("sso_tokens_expires_at_idx").on(t.expiresAt),
@@ -316,7 +316,7 @@ export const ssoTokens = pgTable("sso_tokens", {
 export const passwordResetTokens = pgTable("password_reset_tokens", {
   tokenHash: varchar("token_hash", { length: 64 }).primaryKey(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  expiresAt: timestamp("expires_at").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 }, (t) => [
   index("password_reset_tokens_user_id_idx").on(t.userId),
   index("password_reset_tokens_expires_at_idx").on(t.expiresAt),
@@ -337,10 +337,10 @@ export const sessions = pgTable("sessions", {
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
   tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   loginId: uuid("login_id"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   // Null while any entry in the session has no ttl, i.e. the row lives until destroyed.
-  expiresAt: timestamp("expires_at"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
 }, (t) => [
   index("sessions_user_id_idx").on(t.userId),
   index("sessions_tenant_id_idx").on(t.tenantId),
@@ -364,8 +364,8 @@ export const aiJobs = pgTable("ai_jobs", {
   log: jsonb("log").notNull().default([]),
   error: text("error"),
   costUsd: doublePrecision("cost_usd").notNull().default(0),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("ai_jobs_tenant_id_idx").on(t.tenantId),
   tenantIsolationPolicy(),

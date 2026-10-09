@@ -10,6 +10,7 @@ import Container from '../components/Container.astro';
 import ContentTypesScript from '../components/ContentTypesScript.astro';
 import SiteComponentsScript from '../components/SiteComponentsScript.astro';
 import ThemeScript from '../components/ThemeScript.astro';
+import TimeZoneScript from '../components/TimeZoneScript.astro';
 import { listContentTypes } from '../db/content-types.js';
 import { getDb } from '../db/db.js';
 import { users } from '../db/schema.js';
@@ -139,6 +140,7 @@ const navItems = (await runOverride('admin:nav', { user, defaultNavItems }, navI
 	<ContentTypesScript />
 	<SiteComponentsScript />
 	<ThemeScript />
+	<TimeZoneScript />
 </head>
 <body class="h-screen overflow-hidden">
 	<div class="flex h-full">

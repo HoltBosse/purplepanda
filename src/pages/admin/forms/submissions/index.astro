@@ -5,6 +5,7 @@ import LocalDateTime from '../../../../components/LocalDateTime.astro';
 import Pagination from '../../../../components/Pagination.astro';
 import { getDb } from '../../../../db/db.js';
 import { formSubmissions, forms } from '../../../../db/schema.js';
+import { requestTimeZone } from '../../../../http/timezone.js';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import { applySearchJoins, buildSearchWhere } from '../../../../search/drizzle.js';
 import { parseSearchQuery } from '../../../../search/parser.js';
@@ -14,7 +15,7 @@ import { searchConfig, searchFields } from './_search-config.js';
 const db = getDb();
 
 const q = Astro.url.searchParams.get('q') ?? '';
-const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig);
+const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig, { timeZone: requestTimeZone(Astro.cookies) });
 
 const itemsPerPage = 12;
 const pageData = z.coerce.number().int().positive().default(1).safeParse(Astro.url.searchParams.get("page") ?? 1);

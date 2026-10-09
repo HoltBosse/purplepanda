@@ -8,6 +8,7 @@ import { listContentTypes } from '../../../../db/content-types.js';
 import { getDb } from '../../../../db/db.js';
 import { resolvePagePathById } from '../../../../db/page-path.js';
 import { dagNodes, pages, userActions, users } from '../../../../db/schema.js';
+import { requestTimeZone } from '../../../../http/timezone.js';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import { isWithinSchedule } from '../../../../puck/schedule.js';
 import { applySearchJoins, buildSearchWhere, type DrizzleSearchConfig } from '../../../../search/drizzle.js';
@@ -90,7 +91,7 @@ const searchConfig: DrizzleSearchConfig = {
 };
 
 const q = Astro.url.searchParams.get('q') ?? '';
-const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig);
+const searchWhere = buildSearchWhere(parseSearchQuery(q), searchConfig, { timeZone: requestTimeZone(Astro.cookies) });
 
 // Named `currentPage`/`totalPageCount` rather than the usual `page`/`totalPages` because the rows
 // being listed are themselves `pages`, and the table's map callback already binds `page` per row.
